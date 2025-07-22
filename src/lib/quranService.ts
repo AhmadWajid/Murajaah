@@ -27,6 +27,15 @@ export interface SurahData {
   ayahs: AyahData[];
 }
 
+export interface SurahListItem {
+  number: number;
+  name: string;
+  englishName: string;
+  englishNameTranslation: string;
+  numberOfAyahs: number;
+  revelationType: string;
+}
+
 // Cache for API responses
 const cache = new Map<string, { data: any; timestamp: number }>();
 const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
@@ -70,7 +79,7 @@ export async function getSurah(surahNumber: number, edition: string = DEFAULT_ED
   return response.data;
 }
 
-export async function getSurahList(): Promise<any[]> {
+export async function getSurahList(): Promise<SurahListItem[]> {
   const response = await fetchWithCache('/surah');
   return response.data;
 }
@@ -100,26 +109,45 @@ export async function getAyahRange(
   return response.data.ayahs;
 }
 
-export async function getAvailableEditions(): Promise<any[]> {
+export async function getAvailableEditions(): Promise<EditionData[]> {
   const response = await fetchWithCache('/edition');
   return response.data;
 }
 
-export async function getEditionsByLanguage(language: string): Promise<any[]> {
+export interface EditionData {
+  identifier: string;
+  name: string;
+  englishName: string;
+  format: string;
+  language: string;
+  type: string;
+  direction: string;
+}
+
+export async function getEditionsByLanguage(language: string): Promise<EditionData[]> {
   const response = await fetchWithCache(`/edition/language/${language}`);
   return response.data;
 }
 
-export async function getEditionsByType(type: string): Promise<any[]> {
+export async function getEditionsByType(type: string): Promise<EditionData[]> {
   const response = await fetchWithCache(`/edition/type/${type}`);
   return response.data;
+}
+
+export interface SearchResult {
+  count: number;
+  text: string;
+  edition: EditionData;
+  surah: SurahListItem;
+  numberInSurah: number;
+  ayah: number;
 }
 
 export async function searchQuran(
   keyword: string, 
   surah: number | 'all' = 'all', 
   edition: string = DEFAULT_EDITIONS.english
-): Promise<any[]> {
+): Promise<SearchResult[]> {
   const surahParam = surah === 'all' ? 'all' : surah.toString();
   const response = await fetchWithCache(`/search/${encodeURIComponent(keyword)}/${surahParam}/${edition}`);
   return response.data.matches;

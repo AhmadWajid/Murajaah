@@ -1,10 +1,9 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { getSurahName, getAyahCount, validateAyahRange, SURAH_NAMES } from '@/lib/quran';
 import { createMemorizationItem, MemorizationItem } from '@/lib/spacedRepetition';
 import { addMemorizationItem, getAllMemorizationItems, removeMemorizationItem } from '@/lib/storage';
-import { generateMemorizationId } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';

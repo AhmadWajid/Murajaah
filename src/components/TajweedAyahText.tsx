@@ -133,10 +133,9 @@ export function TajweedAyahText({
     }
     setLoading(true);
     try {
-      let data;
       // Use the original tajweed endpoint
       const response = await fetch(`/api/tajweed?action=words&surah=${surahNumber}&ayah=${ayahNumber}`);
-      data = await response.json();
+      const data = await response.json();
       setTajweedWords(data.words || []);
     } catch {
       setTajweedWords([]);

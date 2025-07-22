@@ -2,6 +2,68 @@ import { NextRequest, NextResponse } from 'next/server';
 import Database from 'better-sqlite3';
 import path from 'path';
 
+// Define interfaces for database responses
+interface WordRow {
+  id: number;
+  location: string;
+  surah: number;
+  ayah: number;
+  word: number;
+  text: string;
+}
+
+interface SurahRow {
+  surah: number;
+}
+
+interface AyahCountRow {
+  maxAyah: number;
+}
+
+interface StatsRow {
+  total_words: number;
+  words_with_rules: number;
+}
+
+interface RuleClassRow {
+  rule_class: string;
+}
+
+interface PageRow {
+  page_number: number;
+  line_number: number;
+  line_type: string;
+  is_centered: number;
+  first_word_id: number;
+  last_word_id: number;
+  surah_number: number;
+}
+
+interface LineInfoRow {
+  first_word_id: number;
+  last_word_id: number;
+  line_type: string;
+  is_centered: number;
+  surah_number: number;
+}
+
+interface TajweedRule {
+  class: string;
+  text: string;
+  startIndex: number;
+  endIndex: number;
+}
+
+interface ProcessedWord {
+  id: number;
+  location: string;
+  surah: number;
+  ayah: number;
+  word: number;
+  text: string;
+  tajweedRules: TajweedRule[];
+}
+
 let tajweedDb: Database.Database | null = null;
 let pagesDb: Database.Database | null = null;
 
@@ -22,8 +84,8 @@ function getPagesDatabase(): Database.Database {
 }
 
 // Parse tajweed rules from XML-like tags in the text
-function parseTajweedRules(text: string): any[] {
-  const rules: any[] = [];
+function parseTajweedRules(text: string): TajweedRule[] {
+  const rules: TajweedRule[] = [];
   const ruleRegex = /<rule class=([^>]+)>([^<]+)<\/rule>/g;
   let match;
   let offset = 0;
@@ -73,9 +135,9 @@ export async function GET(request: NextRequest) {
           ORDER BY word
         `);
         
-        const rows = stmt.all(surah, ayah) as any[];
+        const rows = stmt.all(surah, ayah) as WordRow[];
         
-        const words = rows.map(row => ({
+        const words: ProcessedWord[] = rows.map(row => ({
           id: row.id,
           location: row.location,
           surah: row.surah,
@@ -89,7 +151,7 @@ export async function GET(request: NextRequest) {
         
       case 'surahs':
         const surahsStmt = tajweedDatabase.prepare('SELECT DISTINCT surah FROM words ORDER BY surah');
-        const surahsRows = surahsStmt.all() as any[];
+        const surahsRows = surahsStmt.all() as SurahRow[];
         const surahs = surahsRows.map(row => row.surah);
         
         return NextResponse.json({ surahs });
@@ -97,7 +159,7 @@ export async function GET(request: NextRequest) {
       case 'ayahCount':
         const surahNum = parseInt(searchParams.get('surah') || '1');
         const ayahStmt = tajweedDatabase.prepare('SELECT MAX(ayah) as maxAyah FROM words WHERE surah = ?');
-        const ayahRow = ayahStmt.get(surahNum) as any;
+        const ayahRow = ayahStmt.get(surahNum) as AyahCountRow | undefined;
         const maxAyah = ayahRow?.maxAyah || 0;
         
         return NextResponse.json({ maxAyah });
@@ -110,7 +172,7 @@ export async function GET(request: NextRequest) {
           FROM words
         `);
         
-        const statsRow = statsStmt.get() as any;
+        const statsRow = statsStmt.get() as StatsRow;
         const stats = {
           totalWords: statsRow.total_words,
           wordsWithRules: statsRow.words_with_rules,
@@ -131,7 +193,7 @@ export async function GET(request: NextRequest) {
           ORDER BY rule_class
         `);
         
-        const rulesRows = rulesStmt.all() as any[];
+        const rulesRows = rulesStmt.all() as RuleClassRow[];
         const ruleClasses = rulesRows.map(row => row.rule_class.replace(/['"]/g, ''));
         
         return NextResponse.json({ ruleClasses });
@@ -145,7 +207,7 @@ export async function GET(request: NextRequest) {
           ORDER BY line_number
         `);
         
-        const pageRows = pageStmt.all(pageNumber) as any[];
+        const pageRows = pageStmt.all(pageNumber) as PageRow[];
         
         return NextResponse.json({ pageLayout: pageRows });
         
@@ -160,7 +222,7 @@ export async function GET(request: NextRequest) {
           WHERE page_number = ? AND line_number = ?
         `);
         
-        const lineRow = lineStmt.get(pageNum, lineNum) as any;
+        const lineRow = lineStmt.get(pageNum, lineNum) as LineInfoRow | undefined;
         
         if (!lineRow || lineRow.line_type !== 'ayah') {
           return NextResponse.json({ words: [] });
@@ -174,9 +236,9 @@ export async function GET(request: NextRequest) {
           ORDER BY word
         `);
         
-        const lineWordsRows = lineWordsStmt.all(lineRow.first_word_id, lineRow.last_word_id) as any[];
+        const lineWordsRows = lineWordsStmt.all(lineRow.first_word_id, lineRow.last_word_id) as WordRow[];
         
-        const lineWords = lineWordsRows.map(row => ({
+        const lineWords: ProcessedWord[] = lineWordsRows.map(row => ({
           id: row.id,
           location: row.location,
           surah: row.surah,

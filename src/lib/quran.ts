@@ -188,8 +188,42 @@ export function generateAyahList(surah: number, start: number, end: number): num
   return Array.from({ length: end - start + 1 }, (_, i) => start + i);
 }
 
+// API Response interfaces
+interface ApiResponse<T> {
+  code: number;
+  status: string;
+  data: T;
+}
+
+interface SurahApiData {
+  number: number;
+  name: string;
+  englishName: string;
+  englishNameTranslation: string;
+  revelationType: string;
+  numberOfAyahs: number;
+  ayahs: AyahApiData[];
+}
+
+interface AyahApiData {
+  number: number;
+  text: string;
+  surah: {
+    number: number;
+    name: string;
+    englishName: string;
+  };
+  numberInSurah: number;
+  juz: number;
+  manzil: number;
+  page: number;
+  ruku: number;
+  hizbQuarter: number;
+  sajda: boolean;
+}
+
 // API functions for fetching Quran data from AlQuran.cloud
-export async function fetchSurah(surah: number, edition: string = DEFAULT_EDITIONS.arabic): Promise<any> {
+export async function fetchSurah(surah: number, edition: string = DEFAULT_EDITIONS.arabic): Promise<ApiResponse<SurahApiData>> {
   try {
     const response = await fetch(`${ALQURAN_API_BASE}/surah/${surah}/${edition}`);
     if (!response.ok) {
@@ -202,7 +236,7 @@ export async function fetchSurah(surah: number, edition: string = DEFAULT_EDITIO
   }
 }
 
-export async function fetchAyah(surah: number, ayah: number, edition: string = DEFAULT_EDITIONS.arabic): Promise<any> {
+export async function fetchAyah(surah: number, ayah: number, edition: string = DEFAULT_EDITIONS.arabic): Promise<ApiResponse<AyahApiData>> {
   try {
     const response = await fetch(`${ALQURAN_API_BASE}/ayah/${surah}:${ayah}/${edition}`);
     if (!response.ok) {
@@ -215,7 +249,7 @@ export async function fetchAyah(surah: number, ayah: number, edition: string = D
   }
 }
 
-export async function fetchAyahRange(surah: number, start: number, end: number, edition: string = DEFAULT_EDITIONS.arabic): Promise<any> {
+export async function fetchAyahRange(surah: number, start: number, end: number, edition: string = DEFAULT_EDITIONS.arabic): Promise<ApiResponse<SurahApiData>> {
   try {
     const response = await fetch(`${ALQURAN_API_BASE}/surah/${surah}/${edition}?offset=${start - 1}&limit=${end - start + 1}`);
     if (!response.ok) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Repeat, Repeat1, FastForward, Rewind, XCircle, Info } from 'lucide-react';
+import { Repeat, Repeat1, FastForward, XCircle, Info } from 'lucide-react';
 
 interface AudioPlayerProps {
   currentAudio: HTMLAudioElement | null;

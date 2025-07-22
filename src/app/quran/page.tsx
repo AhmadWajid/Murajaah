@@ -1,37 +1,52 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams, useRouter } from 'next/navigation';
-import { getAllMemorizationItems, addMemorizationItem, updateMemorizationItem, updateMemorizationItemWithIndividualRating, getMemorizationItem, getMistakes, toggleMistake, showMistake, getHideMistakesSetting, saveHideMistakesSetting, saveLastPage, loadLastPage, saveSelectedReciter, loadSelectedReciter, saveFontSettings, loadFontSettings, MistakeData } from '@/lib/storage';
+import { useSearchParams } from 'next/navigation';
+import { getAllMemorizationItems, addMemorizationItem, updateMemorizationItem, getMemorizationItem, getMistakes, toggleMistake, getHideMistakesSetting, saveHideMistakesSetting, saveLastPage, loadLastPage, saveSelectedReciter, loadSelectedReciter, saveFontSettings, loadFontSettings, MistakeData } from '@/lib/storage';
 import { MemorizationItem, updateInterval, createMemorizationItem } from '@/lib/spacedRepetition';
-import { getSurah, getQuranMeta, getPage, getAyah, fetchPageWithTranslation } from '@/lib/quranService';
-import { formatAyahRange } from '@/lib/quran';
-import { generateMemorizationId, getTodayISODate } from '@/lib/utils';
+import { getSurah, getQuranMeta, getPage, getAyah, fetchPageWithTranslation, SurahListItem } from '@/lib/quranService';
+import { generateMemorizationId } from '@/lib/utils';
 import AppHeader from '@/components/AppHeader';
 import QuranHeaderContent from '@/components/QuranHeaderContent';
 import QuranContent from '@/components/QuranContent';
 import AudioPlayer from '@/components/AudioPlayer';
 import RevisionModal from '@/components/RevisionModal';
-
 import EnhancedMemorizationModal from '@/components/EnhancedMemorizationModal';
 
+// Define interfaces for the data structures
+interface PageData {
+  number: number;
+  ayahs: Array<{
+    number: number;
+    text: string;
+    surah: {
+      number: number;
+      name: string;
+      englishName: string;
+    };
+    numberInSurah: number;
+  }>;
+}
+
+interface ReviewItem extends MemorizationItem {
+  currentAyah: { surah: number; ayah: number };
+}
 
 // Total number of pages in the Quran
 const TOTAL_QURAN_PAGES = 604;
 
 export default function QuranViewer() {
   const searchParams = useSearchParams();
-  const router = useRouter();
+  // Remove unused router variable
   const [currentPage, setCurrentPage] = useState(1);
   const [isInitialized, setIsInitialized] = useState(false);
   const [currentSurah, setCurrentSurah] = useState(1);
   const [currentAyah, setCurrentAyah] = useState(1);
-  const [pageData, setPageData] = useState<any>(null);
-  const [previousPageData, setPreviousPageData] = useState<any>(null);
+  const [pageData, setPageData] = useState<PageData | null>(null);
+  const [previousPageData, setPreviousPageData] = useState<PageData | null>(null);
   const [loading, setLoading] = useState(true);
   const [memorizationItems, setMemorizationItems] = useState<MemorizationItem[]>([]);
-  const [surahList, setSurahList] = useState<any[]>([]);
-  const [quranMeta, setQuranMeta] = useState<any>(null);
+  const [surahList, setSurahList] = useState<SurahListItem[]>([]);
   const [highlightedRange, setHighlightedRange] = useState<{surah: number, start: number, end: number} | null>(null);
   const [selectedAyahs, setSelectedAyahs] = useState<Set<number>>(new Set());
   const [openReviewDropdown, setOpenReviewDropdown] = useState<string | null>(null);
@@ -39,7 +54,7 @@ export default function QuranViewer() {
   const [arabicTexts, setArabicTexts] = useState<Record<string, string>>({});
   const [previousArabicTexts, setPreviousArabicTexts] = useState<Record<string, string>>({});
   
-  const [reviewsOnCurrentPage, setReviewsOnCurrentPage] = useState<any[]>([]);
+  const [reviewsOnCurrentPage, setReviewsOnCurrentPage] = useState<ReviewItem[]>([]);
   
   // Audio player state
   const [isPlaying, setIsPlaying] = useState(false);
@@ -54,7 +69,7 @@ export default function QuranViewer() {
   // Load font settings from localStorage
   const savedFontSettings = loadFontSettings();
   const [layoutMode, setLayoutMode] = useState<'spread' | 'single'>(savedFontSettings.layoutMode);
-  const [fontSize, setFontSize] = useState(savedFontSettings.fontSize);
+  const [fontSize] = useState(savedFontSettings.fontSize); // Remove unused setFontSize
   const [arabicFontSize, setArabicFontSize] = useState(savedFontSettings.arabicFontSize);
   const [translationFontSize, setTranslationFontSize] = useState(savedFontSettings.translationFontSize);
   const [padding, setPadding] = useState(savedFontSettings.padding);
@@ -354,7 +369,7 @@ export default function QuranViewer() {
         const decodedId = decodeURIComponent(reviewId);
         
         // First try to find in regular memorization items
-        let memorizationItem = getMemorizationItem(decodedId);
+        const memorizationItem = getMemorizationItem(decodedId);
         
         // All items are now in unified storage, so no need to check complex items separately
         
@@ -408,7 +423,7 @@ export default function QuranViewer() {
 
   // Close review dropdown when clicking outside
   useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
+    const handleClickOutside = () => {
       if (openReviewDropdown) {
         setOpenReviewDropdown(null);
       }
@@ -464,10 +479,9 @@ export default function QuranViewer() {
   };
 
   const loadSurahList = async () => {
-    try {
-      const meta = await getQuranMeta();
-      setQuranMeta(meta);
-      setSurahList(meta.surahs.references);
+          try {
+        const meta = await getQuranMeta();
+        setSurahList(meta.surahs.references);
     } catch (error) {
       console.error('Error loading surah list:', error);
     }
@@ -724,51 +738,6 @@ export default function QuranViewer() {
       }
     } catch (error) {
       console.error('Error navigating to surah:', error);
-    }
-  };
-
-  const loadSurahData = async (surahNumber: number, ayahStart?: number, ayahEnd?: number) => {
-    try {
-      const surahData = await getSurah(surahNumber);
-      
-      // Filter ayahs if range is specified
-      let filteredAyahs = surahData.ayahs;
-      if (ayahStart && ayahEnd) {
-        filteredAyahs = surahData.ayahs.filter((ayah: any) => 
-          ayah.numberInSurah >= ayahStart && ayah.numberInSurah <= ayahEnd
-        );
-      }
-      
-      // Create a page-like structure for the surah view
-      const pageData = {
-        number: surahNumber,
-        ayahs: filteredAyahs.map((ayah: any) => ({
-          ...ayah,
-          surah: {
-            number: surahNumber,
-            name: surahData.name,
-            englishName: surahData.englishName,
-            englishNameTranslation: surahData.englishNameTranslation,
-            numberOfAyahs: surahData.ayahs?.length || 0,
-            revelationType: surahData.revelationType
-          }
-        }))
-      };
-      
-      setPageData(pageData);
-      setCurrentSurah(surahNumber);
-      setCurrentPage(surahNumber); // Use surah number as page number for surah view
-      
-      // Load Arabic texts for the surah
-      const texts: Record<string, string> = {};
-      filteredAyahs.forEach((ayah: any) => {
-        const key = `${surahNumber}:${ayah.numberInSurah}`;
-        texts[key] = ayah.text;
-      });
-      setArabicTexts(texts);
-      
-    } catch (error) {
-      console.error('Error loading surah data:', error);
     }
   };
 
@@ -1030,10 +999,10 @@ export default function QuranViewer() {
     setRevealedMistakes(prev => new Set([...prev, mistakeKey]));
   };
 
-  const getReviewsOnCurrentPage = (currentPageData: any) => {
+  const getReviewsOnCurrentPage = (currentPageData: PageData): ReviewItem[] => {
     if (!currentPageData || !currentPageData.ayahs) return [];
 
-    const reviews: any[] = [];
+    const reviews: ReviewItem[] = [];
     
     // Get all memorization items (unified storage)
     const allItems = getAllMemorizationItems();
@@ -1052,10 +1021,11 @@ export default function QuranViewer() {
         // Show ALL memorization items on this page, regardless of completion status
         // This allows multiple reviews per day - no filtering by nextReview or completedToday
         if (item) {
-          reviews.push({
+          const reviewItem: ReviewItem = {
             ...item,
             currentAyah: { surah: surahNumber, ayah: ayahNumber }
-          });
+          };
+          reviews.push(reviewItem);
         }
       }
     });

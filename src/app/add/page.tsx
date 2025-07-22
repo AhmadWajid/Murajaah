@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -11,14 +10,14 @@ import QuranSelector from '@/components/QuranSelector';
 export default function AddPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [isAdding, setIsAdding] = useState(false);
+  // Remove unused isAdding state
 
   // Get the surah parameter from URL if it exists
   const surahParam = searchParams.get('surah');
   const currentSurah = surahParam ? parseInt(surahParam) : 1;
 
   const handleAdd = () => {
-    setIsAdding(true);
+    // Remove setIsAdding call
     // Redirect back to the dashboard after successful addition
     router.push('/');
   };

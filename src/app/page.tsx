@@ -2,16 +2,15 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { getAllMemorizationItems, updateMemorizationItem, removeMemorizationItem, updateMemorizationItemWithIndividualRating, cleanupDuplicateItems, getMistakesList, MistakeData, removeMistake, addMemorizationItem } from '@/lib/storage';
-import { generateMemorizationId } from '@/lib/utils';
+import { getAllMemorizationItems, updateMemorizationItem, removeMemorizationItem, cleanupDuplicateItems, getMistakesList, MistakeData, removeMistake, addMemorizationItem } from '@/lib/storage';
+import { generateMemorizationId, getTodayISODate } from '@/lib/utils';
 import { MemorizationItem, updateInterval, resetDailyCompletions, getDueItems, getUpcomingReviews } from '@/lib/spacedRepetition';
 import { formatAyahRange, formatAyahRangeArabic } from '@/lib/quran';
-import { getSurahList } from '@/lib/quranService';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { getSurahList, SurahListItem } from '@/lib/quranService';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { Calendar, Clock, CheckCircle, BookOpen, Plus, BarChart3, RefreshCw, Edit, Trash2, Eye, ChevronDown, ChevronRight } from 'lucide-react';
+import { Calendar, Clock, CheckCircle, BookOpen, Plus, Edit, Trash2, Eye, ChevronDown, ChevronRight } from 'lucide-react';
 import AppHeader from '@/components/AppHeader';
 import {
   AlertDialog,
@@ -166,7 +165,7 @@ export default function Dashboard() {
   const [dueItems, setDueItems] = useState<MemorizationItem[]>([]);
   const [upcomingItems, setUpcomingItems] = useState<MemorizationItem[]>([]);
   const [mistakes, setMistakes] = useState<MistakeData[]>([]);
-  const [surahList, setSurahList] = useState<any[]>([]);
+  const [surahList, setSurahList] = useState<SurahListItem[]>([]);
   const [expandedSurahs, setExpandedSurahs] = useState<Set<number>>(new Set());
   const [editingItem, setEditingItem] = useState<MemorizationItem | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
@@ -219,22 +218,12 @@ export default function Dashboard() {
     try {
       const surahs = await getSurahList();
       setSurahList(surahs);
-    } catch (error) {
-      // console.error('Error loading surah list:', error);
+    } catch {
+      // Error loading surah list - silently handled
     }
   };
 
-  const getPriorityColor = (item: MemorizationItem) => {
-    const today = getTodayISODate();
-    
-    if (item.nextReview < today) return 'bg-red-100 border-red-300 text-red-800 dark:bg-red-900/20 dark:border-red-700 dark:text-red-300';
-    if (item.nextReview === today) return 'bg-orange-100 border-orange-300 text-orange-800 dark:bg-orange-900/20 dark:border-orange-700 dark:text-orange-300';
-    
-    // Calculate days until review for future dates
-    const daysUntilReview = Math.ceil((new Date(item.nextReview).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-    if (daysUntilReview <= 3) return 'bg-yellow-100 border-yellow-300 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-700 dark:text-yellow-300';
-    return 'bg-green-100 border-green-300 text-green-800 dark:bg-green-900/20 dark:border-green-700 dark:text-green-300';
-  };
+  // Remove unused getPriorityColor function
 
   const getPriorityText = (item: MemorizationItem) => {
     const today = getTodayISODate();
@@ -420,10 +409,7 @@ export default function Dashboard() {
     loadAllData();
   };
 
-  // Function to fix broken items (no longer needed with unified storage)
-  const fixBrokenItems = async () => {
-    alert('All items are now stored in unified storage. No broken items to fix.');
-  };
+  // Function removed - fixBrokenItems is no longer needed
 
   return (
     <div className="min-h-screen bg-background">
@@ -1115,11 +1101,4 @@ export default function Dashboard() {
       </main>
     </div>
   );
-}
-
-// Helper function to get today's date in ISO format
-function getTodayISODate(): string {
-  const now = new Date();
-  const localDateString = now.toLocaleDateString('en-CA');
-  return localDateString;
 }

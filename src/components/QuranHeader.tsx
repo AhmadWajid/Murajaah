@@ -495,7 +495,7 @@ export default function QuranHeader({
                             )}
                             {surahSearchTerm && surahsToShow.length === 0 && (
                               <div className="text-center text-gray-500 py-4">
-                                No surahs found matching "{surahSearchTerm}"
+                                No surahs found matching &quot;{surahSearchTerm}&quot;
                               </div>
                             )}
                             {surahSearchTerm && surahsToShow.length > 0 && (
@@ -510,7 +510,7 @@ export default function QuranHeader({
                             {surahSearchTerm && surahsToShow.length > 0 && <Separator className="my-2" />}
                             {surahSearchTerm && surahsToShow.length > 0 && (
                               <div className="text-xs text-gray-500 mb-2 px-3 py-1">
-                                Click surah to navigate, or use "Go to Ayah" for specific verse
+                                Click surah to navigate, or use &quot;Go to Ayah&quot; for specific verse
                               </div>
                             )}
                             {surahsToShow.map((surah) => (

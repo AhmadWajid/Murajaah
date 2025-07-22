@@ -1,5 +1,6 @@
-import { MemorizationItem } from './spacedRepetition';
+import { MemorizationItem, updateIndividualAyahRating } from './spacedRepetition';
 import { STORAGE } from './constants';
+import { getTodayISODate } from './utils';
 
 const MEMORIZATION_STORAGE_KEY = 'quran-memorization-items';
 
@@ -91,7 +92,6 @@ export function updateMemorizationItemWithIndividualRating(
   if (itemIndex >= 0) {
     const item = data.items[itemIndex];
     
-    const { updateIndividualAyahRating } = require('./spacedRepetition');
     const result = updateIndividualAyahRating(item, ayahNumber, rating);
     
     if (result.shouldSplit && result.newItems) {
@@ -205,7 +205,6 @@ export function cleanupDuplicateItems(): void {
 export function migrateDateFormats(): void {
   try {
     const data = loadMemorizationData();
-    const { getTodayISODate } = require('./utils');
     const today = getTodayISODate();
     
     let hasChanges = false;
@@ -379,7 +378,7 @@ export const getMistakesInVerseOrder = (): MistakeData[] => {
 };
 
 // Get the next mistake in verse order after the current position, prioritizing current page
-export const getNextMistakeInVerseOrder = (currentSurah: number, currentAyah: number, pageAyahs?: any[]): MistakeData | null => {
+export const getNextMistakeInVerseOrder = (currentSurah: number, currentAyah: number, pageAyahs?: Array<{ surah?: { number: number }; numberInSurah: number }>): MistakeData | null => {
   const mistakesInOrder = getMistakesInVerseOrder();
   
   if (mistakesInOrder.length === 0) {
