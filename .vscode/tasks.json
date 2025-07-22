@@ -1,0 +1,31 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Restart CSS Language Server",
+      "type": "shell",
+      "command": "echo",
+      "args": ["Restart VS Code or reload window to apply CSS settings"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    },
+    {
+      "label": "Clear VS Code Cache",
+      "type": "shell",
+      "command": "rm",
+      "args": ["-rf", "${workspaceFolder}/.vscode/.cache"],
+      "group": "build",
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "focus": false,
+        "panel": "shared"
+      }
+    }
+  ]
+} 
