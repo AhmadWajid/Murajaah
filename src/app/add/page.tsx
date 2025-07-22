@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -8,16 +9,22 @@ import { ArrowLeft } from 'lucide-react';
 import QuranSelector from '@/components/QuranSelector';
 
 export default function AddPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <AddPageContent />
+    </Suspense>
+  );
+}
+
+function AddPageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  // Remove unused isAdding state
 
   // Get the surah parameter from URL if it exists
   const surahParam = searchParams.get('surah');
   const currentSurah = surahParam ? parseInt(surahParam) : 1;
 
   const handleAdd = () => {
-    // Remove setIsAdding call
     // Redirect back to the dashboard after successful addition
     router.push('/');
   };
