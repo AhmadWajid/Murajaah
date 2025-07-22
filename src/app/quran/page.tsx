@@ -1,7 +1,8 @@
 'use client';
 
+import { Suspense } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
 import { getAllMemorizationItems, addMemorizationItem, updateMemorizationItem, getMemorizationItem, getMistakes, toggleMistake, getHideMistakesSetting, saveHideMistakesSetting, saveLastPage, loadLastPage, saveSelectedReciter, loadSelectedReciter, saveFontSettings, loadFontSettings, MistakeData } from '@/lib/storage';
 import { MemorizationItem, updateInterval, createMemorizationItem } from '@/lib/spacedRepetition';
 import { getSurah, getQuranMeta, getPage, getAyah, fetchPageWithTranslation, SurahListItem } from '@/lib/quranService';
@@ -35,7 +36,15 @@ interface ReviewItem extends MemorizationItem {
 // Total number of pages in the Quran
 const TOTAL_QURAN_PAGES = 604;
 
-export default function QuranViewer() {
+export default function QuranPage() {
+  return (
+    <Suspense fallback={<div>Loading...</div>}>
+      <QuranPageContent />
+    </Suspense>
+  );
+}
+
+function QuranPageContent() {
   const searchParams = useSearchParams();
   // Remove unused router variable
   const [currentPage, setCurrentPage] = useState(1);
