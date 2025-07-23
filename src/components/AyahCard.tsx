@@ -13,7 +13,6 @@ interface AyahCardProps {
   ayah: any;
   index: number;
   pageData: any;
-  arabicTexts: Record<string, string>;
   isMemorization: boolean;
   status: string | null;
   isSelected: boolean;
@@ -30,25 +29,23 @@ interface AyahCardProps {
   fontSize?: number;
   arabicFontSize?: number;
   translationFontSize?: number;
-  padding?: number;
   fontTargetArabic?: boolean;
   mistakes?: Record<string, boolean | MistakeData>;
   onToggleMistake?: (surahNumber: number, ayahNumber: number) => void;
   hideMistakes?: boolean;
   onRevealMistake?: (surahNumber: number, ayahNumber: number) => void;
   revealedMistakes?: Set<string>;
-  enableTajweed?: boolean;
   hideWords?: boolean;
   hideWordsDelay?: number;
   wordByWordData: any[];
   showWordByWordTooltip: boolean;
+  padding?: number;
 }
 
 export default function AyahCard({
   ayah,
   index,
   pageData,
-  arabicTexts,
   isMemorization,
   status,
   isSelected,
@@ -58,14 +55,11 @@ export default function AyahCard({
   onAyahClick,
   onPlayAudio,
   onQuickReview,
-  onToggleReviewDropdown,
-  openReviewDropdown,
   onReviewComplete,
   reviewsOnPage,
   fontSize = 24,
   arabicFontSize = 24,
   translationFontSize = 20,
-  padding = 16,
   fontTargetArabic = false,
 
   mistakes = {},
@@ -73,11 +67,11 @@ export default function AyahCard({
   hideMistakes = false,
   onRevealMistake,
   revealedMistakes = new Set(),
-  enableTajweed = false,
   hideWords = false,
   hideWordsDelay = 500,
   wordByWordData = [],
   showWordByWordTooltip = true,
+  padding = 0,
 }: AyahCardProps) {
   const [showReviewRatingDropdown, setShowReviewRatingDropdown] = useState(false);
   // Tafsir modal state
@@ -385,6 +379,7 @@ export default function AyahCard({
         } ${isSelected ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-300 dark:border-blue-600 shadow-lg' : ''} ${
           isInHighlightedRange ? 'bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-300 dark:border-purple-600 shadow-xl' : ''
         } ${!isSelected && !isInHighlightedRange ? 'hover:bg-gradient-to-r hover:from-amber-50 hover:to-orange-50 dark:hover:from-amber-900/10 dark:hover:to-orange-900/10' : ''} bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm`}
+        style={{ padding }}
         onClick={() => onAyahClick(ayahNumber)}
       >
         {/* Ayah Number */}

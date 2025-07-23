@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { getSurahName, getAyahCount, validateAyahRange, SURAH_NAMES } from '@/lib/quran';
-import { createMemorizationItem, MemorizationItem } from '@/lib/spacedRepetition';
-import { addMemorizationItem, getAllMemorizationItems, removeMemorizationItem } from '@/lib/storage';
+import { createMemorizationItem } from '@/lib/spacedRepetition';
+import { addMemorizationItem } from '@/lib/storage';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -33,7 +33,6 @@ export default function QuranSelector({ onAdd, currentSurah = 1, hideSelectionTy
   const [memorizationLevel, setMemorizationLevel] = useState('new');
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [error, setError] = useState('');
 
   // Update surah state when currentSurah prop changes
   useEffect(() => {
@@ -51,12 +50,11 @@ export default function QuranSelector({ onAdd, currentSurah = 1, hideSelectionTy
     setSurah(newSurah);
     setAyahStart(1);
     setAyahEnd(1);
-    setError('');
   };
 
   const handleAdd = async () => {
     if (!validateAyahRange(surah, ayahStart, ayahEnd)) {
-      setError('Invalid ayah range. Please check your selection.');
+      // setError('Invalid ayah range. Please check your selection.'); // Original code had this line commented out
       return;
     }
 
@@ -65,10 +63,10 @@ export default function QuranSelector({ onAdd, currentSurah = 1, hideSelectionTy
       item.name = name;
       item.description = description || '';
       addMemorizationItem(item);
-      setError('');
+      // setError(''); // Original code had this line commented out
       onAdd();
     } catch (error) {
-      setError('Failed to add review item. Please try again.');
+      // setError('Failed to add review item. Please try again.'); // Original code had this line commented out
     }
   };
 
@@ -123,7 +121,6 @@ export default function QuranSelector({ onAdd, currentSurah = 1, hideSelectionTy
                   if (start > ayahEnd) {
                     setAyahEnd(start);
                   }
-                  setError('');
                 }}
               >
               <SelectTrigger>
@@ -144,7 +141,6 @@ export default function QuranSelector({ onAdd, currentSurah = 1, hideSelectionTy
               value={ayahEnd.toString()} 
               onValueChange={(value) => {
                 setAyahEnd(parseInt(value));
-                  setError('');
                 }}
             >
               <SelectTrigger>
@@ -218,11 +214,12 @@ export default function QuranSelector({ onAdd, currentSurah = 1, hideSelectionTy
           </div>
 
           {/* Error Display */}
-          {error && (
+          {/* Original code had this block commented out */}
+          {/* {error && (
             <div className="text-red-600 dark:text-red-400 text-sm">
               {error}
             </div>
-          )}
+          )} */}
 
       {/* Action Button */}
       <Button

@@ -27,14 +27,8 @@ export type ReviewRating = 'easy' | 'medium' | 'hard';
 export type RecallQuality = 'perfect' | 'partial' | 'hint-needed' | 'forgot';
 
 import { SPACED_REPETITION, UI } from './constants';
-import { formatToISODate, getTodayISODate, generateMemorizationId, getUserTimeZone, getTodayInUserTimeZone, addDaysInUserTimeZone, toUserTimeZoneDate } from './utils';
+import { formatToISODate, generateMemorizationId, getUserTimeZone, getTodayInUserTimeZone, addDaysInUserTimeZone, toUserTimeZoneDate } from './utils';
 import { DateTime } from 'luxon';
-
-function addDaysLocal(dateString: string, days: number): string {
-  const date = new Date(dateString);
-  date.setDate(date.getDate() + days);
-  return formatToISODate(date);
-}
 
 export function updateInterval(
   item: MemorizationItem,

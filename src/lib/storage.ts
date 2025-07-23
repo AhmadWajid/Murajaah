@@ -2,8 +2,6 @@ import { MemorizationItem, updateIndividualAyahRating } from './spacedRepetition
 import { STORAGE } from './constants';
 import { getTodayISODate } from './utils';
 
-const MEMORIZATION_STORAGE_KEY = 'quran-memorization-items';
-
 export interface StorageData {
   items: MemorizationItem[];
   lastSync: string;

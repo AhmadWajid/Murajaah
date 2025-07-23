@@ -41,7 +41,7 @@ export default function EnhancedMemorizationModal({
   onConfirm,
   onClose
 }: EnhancedMemorizationModalProps) {
-  const router = useRouter();
+  if (!isOpen) return null;
   const searchParams = useSearchParams();
   // All useState and useEffect hooks must be at the top
   const [selectionType, setSelectionType] = useState<'surah' | 'page' | 'ayahs' | 'custom'>('page');
@@ -104,9 +104,6 @@ export default function EnhancedMemorizationModal({
     setDescriptionEdited(true);
   };
 
-  // Early return after all hooks and variable declarations
-  if (!isOpen) return null;
-
   // When selectedSurah changes, update ayah grid, range, and name/description if not edited
   // But skip this during initialization when we have external selected ayahs
   useEffect(() => {
@@ -137,7 +134,7 @@ export default function EnhancedMemorizationModal({
         setSelectedAyahs(new Set());
       }
     }
-  }, [selectedSurah, selectionType, isOpen, externalSelectedAyahs]);
+  }, [selectedSurah, selectionType, isOpen, externalSelectedAyahs, pageData]);
 
 
 

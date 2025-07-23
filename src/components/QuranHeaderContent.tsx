@@ -21,12 +21,10 @@ import {
   Languages,
   Target,
   Menu,
-  X,
-  ChevronUp,
-  ChevronDown
+  X
 } from 'lucide-react';
 import { getLanguagesWithTranslations } from '@/lib/quranService';
-import { loadFontSettings, saveFontSettings, getNextMistakeInVerseOrder, MistakeData } from '@/lib/storage';
+import { getNextMistakeInVerseOrder, MistakeData } from '@/lib/storage';
 
 interface QuranHeaderContentProps {
   currentPage: number;
@@ -52,20 +50,19 @@ interface QuranHeaderContentProps {
   onToggleFontTarget: () => void;
   hideMistakes?: boolean;
   onToggleHideMistakes?: () => void;
-  hideWords?: boolean;
-  onToggleHideWords?: () => void;
-  hideWordsDelay?: number;
-  onHideWordsDelayChange?: (delay: number) => void;
-  selectedLanguage?: string;
-  selectedTranslation?: string;
-  onLanguageChange?: (language: string) => void;
-  onTranslationChange?: (translation: string) => void;
   showWordByWordTooltip?: boolean;
   onToggleWordByWordTooltip?: () => void;
   currentAyah?: number;
-  mistakes?: Record<string, boolean | MistakeData>;
   onNavigateToNextMistake?: (surahNumber: number, ayahNumber: number) => void;
   pageData?: any;
+  selectedLanguage: string;
+  selectedTranslation: string;
+  onLanguageChange: (lang: string) => void;
+  onTranslationChange: (translation: string) => void;
+  hideWords: boolean;
+  onToggleHideWords: () => void;
+  hideWordsDelay: number;
+  onHideWordsDelayChange: (delay: number) => void;
 }
 
 export default function QuranHeaderContent(props: QuranHeaderContentProps) {
@@ -92,20 +89,19 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
     onToggleFontTarget,
     hideMistakes = false,
     onToggleHideMistakes,
-    hideWords,
-    onToggleHideWords,
-    hideWordsDelay = 500,
-    onHideWordsDelayChange,
-    selectedLanguage = 'en',
-    selectedTranslation = 'en.asad',
-    onLanguageChange,
-    onTranslationChange,
     showWordByWordTooltip = true,
     onToggleWordByWordTooltip,
     currentAyah = 1,
-    mistakes = {},
     onNavigateToNextMistake,
     pageData,
+    selectedLanguage,
+    selectedTranslation,
+    onLanguageChange,
+    onTranslationChange,
+    hideWords,
+    onToggleHideWords,
+    hideWordsDelay,
+    onHideWordsDelayChange,
   } = props;
 
   const [showViewSettings, setShowViewSettings] = useState(false);
@@ -123,12 +119,6 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
     }
     return false;
   });
-  const [availableTranslations, setAvailableTranslations] = useState<Map<string, Array<{
-    identifier: string;
-    name: string;
-    englishName: string;
-    direction: string;
-  }>>>(new Map());
 
   // Get the next mistake in verse order
   const getNextMistake = () => {
@@ -137,48 +127,6 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
 
   const nextMistake = getNextMistake();
   const hasNextMistake = nextMistake !== null;
-
-  // Get language name helper
-  const getLanguageName = (code: string) => {
-    const languageNames: Record<string, string> = {
-      'en': 'English',
-      'ar': 'Arabic',
-      'es': 'Spanish',
-      'fr': 'French',
-      'de': 'German',
-      'it': 'Italian',
-      'pt': 'Portuguese',
-      'ru': 'Russian',
-      'zh': 'Chinese',
-      'ja': 'Japanese',
-      'ko': 'Korean',
-      'hi': 'Hindi',
-      'ur': 'Urdu',
-      'fa': 'Persian',
-      'tr': 'Turkish',
-      'id': 'Indonesian',
-      'ms': 'Malay',
-      'bn': 'Bengali',
-      'ta': 'Tamil',
-      'th': 'Thai',
-      'vi': 'Vietnamese'
-    };
-    return languageNames[code] || code.toUpperCase();
-  };
-
-  // Truncate long translator names
-  const truncateTranslatorName = (name: string) => {
-    if (name.length <= 25) return name;
-    return name.substring(0, 25) + '...';
-  };
-
-  // Save translation settings
-  const saveTranslationSettings = (language: string, translation: string) => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('selectedLanguage', language);
-      localStorage.setItem('selectedTranslation', translation);
-    }
-  };
 
   // Save mobile header visibility to localStorage
   useEffect(() => {
@@ -192,7 +140,7 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
     const loadTranslations = async () => {
       try {
         const translations = await getLanguagesWithTranslations();
-        setAvailableTranslations(translations);
+        // setAvailableTranslations(translations); // This line was removed as per the edit hint
       } catch (error) {
         console.error('Error loading translations:', error);
       }

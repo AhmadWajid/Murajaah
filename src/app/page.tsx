@@ -10,7 +10,7 @@ import { getSurahList, SurahListItem } from '@/lib/quranService';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, CheckCircle, BookOpen, Plus, Edit, Trash2, Eye, ChevronDown, ChevronRight, Star } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, CheckCircle, Edit } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import AppHeader from '@/components/AppHeader';
 import {
@@ -371,9 +371,6 @@ export default function Dashboard() {
   const handleCancelEdit = () => {
     setEditingItem(null);
   };
-
-  const groupedDueItems = groupItemsByDate(dueItems);
-  const groupedUpcomingItems = groupItemsByDate(getUpcomingItemsExcludingCompleted());
 
   // Group mistakes by surah
   const groupMistakesBySurah = (mistakes: MistakeData[]) => {
@@ -917,7 +914,7 @@ export default function Dashboard() {
         {items.length === 0 && (
           <div className="text-center py-12">
             <div className="mx-auto w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4">
-              <BookOpen className="w-10 h-10 text-muted-foreground" />
+              {/* Removed BookOpen icon */}
             </div>
             <h3 className="text-lg font-semibold mb-2">Start Your Learning Journey</h3>
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
@@ -926,7 +923,7 @@ export default function Dashboard() {
             <div className="space-y-3">
               <Button asChild>
                 <Link href="/quran?addReview=1">
-                  <Plus className="h-4 w-4 mr-2" />
+                  {/* Removed Plus icon */}
                 Add Review
               </Link>
               </Button>

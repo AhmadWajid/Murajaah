@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { MemorizationItem, ReviewRating, RecallQuality, updateInterval } from '@/lib/spacedRepetition';
+import { MemorizationItem, ReviewRating, RecallQuality } from '@/lib/spacedRepetition';
 import { formatAyahRange, formatAyahRangeArabic } from '@/lib/quran';
 import { getAyahRange, getAyahAudioUrl } from '@/lib/quranService';
 import { updateMemorizationItem, updateMemorizationItemWithIndividualRating, getMemorizationItem } from '@/lib/storage';

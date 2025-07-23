@@ -34,7 +34,6 @@ interface QuranContentProps {
   fontSize?: number;
   arabicFontSize?: number;
   translationFontSize?: number;
-  padding?: number;
   fontTargetArabic?: boolean;
   mistakes?: Record<string, boolean | MistakeData>;
   onToggleMistake?: (surahNumber: number, ayahNumber: number) => void;
@@ -45,6 +44,7 @@ interface QuranContentProps {
   hideWordsDelay?: number;
   wordByWordData: any[];
   showWordByWordTooltip: boolean;
+  padding?: number;
 }
 
 export default function QuranContent({
@@ -72,7 +72,6 @@ export default function QuranContent({
   fontSize = 24,
   arabicFontSize = 24,
   translationFontSize = 20,
-  padding = 16,
   fontTargetArabic = false,
 
   mistakes = {},
@@ -84,6 +83,7 @@ export default function QuranContent({
   hideWordsDelay = 500,
   wordByWordData = [],
   showWordByWordTooltip = true,
+  padding = 0,
 }: QuranContentProps) {
   const [showSelectedAyahsModal, setShowSelectedAyahsModal] = useState(false);
   const isAyahInMemorization = (surah: number, ayahNumber: number) => {
@@ -127,7 +127,7 @@ export default function QuranContent({
 
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900 translation-loading">
-      <div className="max-w-7xl mx-auto px-2 sm:px-0">
+      <div className="max-w-7xl mx-auto" style={{ padding: padding }}>
         {layoutMode === 'spread' ? (
           /* Two-Page Spread Layout - RTL Order */
           <div className="flex gap-2 sm:gap-6 p-2 sm:p-6">
@@ -185,8 +185,6 @@ export default function QuranContent({
                         ayah.text.includes('الرحمن الرحيم')
                       );
                       
-                      const finalHasBismillah = hasBismillah || hasBismillahAlt;
-                      
                       return (
                         <div key={ayah.number}>
                           
@@ -194,7 +192,6 @@ export default function QuranContent({
                             ayah={ayah}
                             index={index}
                             pageData={pageData}
-                            arabicTexts={arabicTexts}
                             isMemorization={isAyahInMemorization(surahNumber, ayahNumber)}
                             status={getMemorizationStatus(surahNumber, ayahNumber)}
                             isSelected={Array.from(selectedAyahs).some(sel => sel.surah === surahNumber && sel.ayah === ayahNumber)}
@@ -227,7 +224,6 @@ export default function QuranContent({
                             fontSize={fontSize}
                             arabicFontSize={arabicFontSize}
                             translationFontSize={translationFontSize}
-                            padding={padding}
                             fontTargetArabic={fontTargetArabic}
                             mistakes={mistakes}
                             onToggleMistake={onToggleMistake}
@@ -238,6 +234,7 @@ export default function QuranContent({
                             hideWordsDelay={hideWordsDelay}
                             wordByWordData={wordByWordData}
                             showWordByWordTooltip={showWordByWordTooltip}
+                            padding={padding}
                           />
                         </div>
                       );
@@ -309,20 +306,12 @@ export default function QuranContent({
                         // Combine both conditions for highlighting
                         const shouldHighlight = isInHighlightedRange || isInReviewOnPage;
 
-                        // Find ALL memorization items that overlap with this ayah
-                        const overlappingMemorizationItems = memorizationItems.filter(item => 
-                          item.surah === surahNumber && 
-                          ayahNumber >= item.ayahStart && 
-                          ayahNumber <= item.ayahEnd
-                        );
-
                         return (
                           <AyahCard
                             key={ayah.number}
                             ayah={ayah}
                             index={index}
                             pageData={previousPageData}
-                            arabicTexts={previousArabicTexts}
                             isMemorization={isMemorization}
                             status={status}
                             isSelected={isSelected}
@@ -339,7 +328,6 @@ export default function QuranContent({
                             fontSize={fontSize}
                             arabicFontSize={arabicFontSize}
                             translationFontSize={translationFontSize}
-                            padding={padding}
                             fontTargetArabic={fontTargetArabic}
                             mistakes={mistakes}
                             onToggleMistake={onToggleMistake}
@@ -350,6 +338,7 @@ export default function QuranContent({
                             hideWordsDelay={hideWordsDelay}
                             wordByWordData={wordByWordData}
                             showWordByWordTooltip={showWordByWordTooltip}
+                            padding={padding}
                           />
                         );
                       })
@@ -413,18 +402,16 @@ export default function QuranContent({
                     // Check if this is the first ayah of a surah (except Al-Tawbah)
                     const isFirstAyah = ayahNumber === 1 && surahNumber !== 9;
                     
-                                            // Check if the ayah text contains Bismillah (more flexible pattern)
-                        const bismillahPattern = /بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ/;
-                        const hasBismillah = isFirstAyah && bismillahPattern.test(ayah.text);
-                        
-                        // Alternative check - look for common Bismillah variations
-                        const hasBismillahAlt = isFirstAyah && ayah.text && (
-                          ayah.text.includes('بِسْمِ') || 
-                          ayah.text.includes('بسم الله') ||
-                          ayah.text.includes('الرحمن الرحيم')
-                        );
-                        
-                        const finalHasBismillah = hasBismillah || hasBismillahAlt;
+                    // Check if the ayah text contains Bismillah (more flexible pattern)
+                    const bismillahPattern = /بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ/;
+                    const hasBismillah = isFirstAyah && bismillahPattern.test(ayah.text);
+                    
+                    // Alternative check - look for common Bismillah variations
+                    const hasBismillahAlt = isFirstAyah && ayah.text && (
+                      ayah.text.includes('بِسْمِ') || 
+                      ayah.text.includes('بسم الله') ||
+                      ayah.text.includes('الرحمن الرحيم')
+                    );
                     
                     return (
                       <div key={ayah.number}>
@@ -433,7 +420,6 @@ export default function QuranContent({
                           ayah={ayah}
                           index={index}
                           pageData={pageData}
-                          arabicTexts={arabicTexts}
                           isMemorization={isAyahInMemorization(surahNumber, ayahNumber)}
                           status={getMemorizationStatus(surahNumber, ayahNumber)}
                           isSelected={Array.from(selectedAyahs).some(sel => sel.surah === surahNumber && sel.ayah === ayahNumber)}
@@ -466,7 +452,6 @@ export default function QuranContent({
                           fontSize={fontSize}
                           arabicFontSize={arabicFontSize}
                           translationFontSize={translationFontSize}
-                          padding={padding}
                           fontTargetArabic={fontTargetArabic}
                           mistakes={mistakes}
                           onToggleMistake={onToggleMistake}
@@ -477,6 +462,7 @@ export default function QuranContent({
                           hideWordsDelay={hideWordsDelay}
                           wordByWordData={wordByWordData}
                           showWordByWordTooltip={showWordByWordTooltip}
+                          padding={padding}
                         />
                       </div>
                     );

@@ -47,7 +47,6 @@ export default function QuranPage() {
 function QuranPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  // Remove unused router variable
   const [currentPage, setCurrentPage] = useState(1);
   const [isInitialized, setIsInitialized] = useState(false);
   const [currentSurah, setCurrentSurah] = useState(1);
@@ -58,7 +57,6 @@ function QuranPageContent() {
   const [memorizationItems, setMemorizationItems] = useState<MemorizationItem[]>([]);
   const [surahList, setSurahList] = useState<SurahListItem[]>([]);
   const [highlightedRange, setHighlightedRange] = useState<{surah: number, start: number, end: number} | null>(null);
-  // Change selectedAyahs type and initialization
   const [selectedAyahs, setSelectedAyahs] = useState<Set<{surah: number, ayah: number}>>(new Set());
   const [openReviewDropdown, setOpenReviewDropdown] = useState<string | null>(null);
   const [showEnhancedModal, setShowEnhancedModal] = useState(false);
@@ -1238,7 +1236,6 @@ function QuranPageContent() {
             showWordByWordTooltip={showWordByWordTooltip}
             onToggleWordByWordTooltip={() => setShowWordByWordTooltip((prev) => !prev)}
             currentAyah={currentAyah}
-            mistakes={mistakes}
             onNavigateToNextMistake={handleNavigateToAyah}
             pageData={pageData}
           />
@@ -1299,7 +1296,6 @@ function QuranPageContent() {
         fontSize={fontTargetArabic ? arabicFontSize : translationFontSize}
         arabicFontSize={arabicFontSize}
         translationFontSize={translationFontSize}
-        padding={padding}
         fontTargetArabic={fontTargetArabic}
         mistakes={mistakes}
         onToggleMistake={handleToggleMistake}
@@ -1310,6 +1306,7 @@ function QuranPageContent() {
         hideWordsDelay={hideWordsDelay}
         wordByWordData={wordByWordData}
         showWordByWordTooltip={showWordByWordTooltip}
+        padding={padding}
       />
 
       {/* Audio Player */}

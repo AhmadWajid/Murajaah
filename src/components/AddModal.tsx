@@ -122,8 +122,6 @@ export default function AddModal({
     }
   };
 
-  const selectedLevel = MEMORIZATION_LEVELS.find(level => level.value === memorizationLevel);
-
   if (!isOpen) return null;
 
   return (

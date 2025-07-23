@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { TajweedWord } from '@/lib/tajweedService';
 import { qpcFontLoader } from '@/lib/qpcFontLoader';
 import { Tooltip } from 'react-tooltip';
@@ -43,14 +43,12 @@ export function TajweedAyahText({
   const [tajweedWords, setTajweedWords] = useState<TajweedWord[]>([]);
   const [loading, setLoading] = useState(false);
   const [fontLoaded, setFontLoaded] = useState(false);
-  const [hoveredRuleClass, setHoveredRuleClass] = useState<string | null>(null);
-  // Track which word (by id) is currently hovered for tajweed
   const [hoveredTajweedWordId, setHoveredTajweedWordId] = useState<string | null>(null);
-  const hoverTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hoverTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
   
   // State for delayed hide words feature
   const [visibleWordIds, setVisibleWordIds] = useState<Set<string>>(new Set());
-  const wordTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const wordTimeoutsRef = React.useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   // Detect Safari (Mac or iOS)
   const [isSafari, setIsSafari] = useState(false);
@@ -388,7 +386,7 @@ export function TajweedAyahText({
   };
 
   // Set a CSS variable for the tooltip background color
-  const tooltipBgColor = hoveredRuleClass && ruleColorMap[hoveredRuleClass] ? ruleColorMap[hoveredRuleClass] : undefined;
+  // const tooltipBgColor = hoveredRuleClass && ruleColorMap[hoveredRuleClass] ? ruleColorMap[hoveredRuleClass] : undefined;
 
   return (
     <div 

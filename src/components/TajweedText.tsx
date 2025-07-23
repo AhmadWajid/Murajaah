@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { TajweedWord, TajweedRule, TAJWEED_COLORS, TAJWEED_DESCRIPTIONS } from '@/lib/tajweedService';
+import { TajweedWord, TAJWEED_COLORS, TAJWEED_DESCRIPTIONS } from '@/lib/tajweedService';
 import { qpcFontLoader } from '@/lib/qpcFontLoader';
 
 interface TajweedTextProps {

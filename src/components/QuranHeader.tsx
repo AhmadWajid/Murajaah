@@ -19,9 +19,6 @@ import {
   BookOpen, 
   Plus, 
   Search,
-  Eye,
-  EyeOff,
-  Type,
   Maximize2,
   Minimize2,
   Languages,
@@ -49,7 +46,6 @@ interface QuranHeaderProps {
   onToggleLayout: () => void;
   selectedReciter: string;
   onReciterChange: (reciter: string) => void;
-  onAddRevision: () => void;
   onEnhancedMemorization?: () => void;
   fontSize: number;
   onFontSizeChange: (size: number) => void;
@@ -89,7 +85,6 @@ export default function QuranHeader({
   onToggleLayout,
   selectedReciter,
   onReciterChange,
-  onAddRevision,
   onEnhancedMemorization,
   fontSize,
   onFontSizeChange,
@@ -229,12 +224,6 @@ export default function QuranHeader({
     return name.substring(0, 17) + '...';
   };
 
-  // Get full translator name for tooltips
-  const getFullTranslatorName = (identifier: string) => {
-    if (!selectedLanguage || !availableTranslations.has(selectedLanguage)) return '';
-    return availableTranslations.get(selectedLanguage)?.find(t => t.identifier === identifier)?.englishName || '';
-  };
-
   // Close all modals when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -251,7 +240,6 @@ export default function QuranHeader({
       const isOutsideAudioSettings = !target.closest('[data-modal="audio-settings"]');
       const isOutsideSurahSelector = !target.closest('[data-modal="surah-selector"]');
       const isOutsideActions = !target.closest('[data-modal="actions"]');
-      const isOutsideAyahNavigator = !target.closest('[data-modal="ayah-navigator"]');
       // Check if click is outside the trigger buttons
       const isOutsideViewButton = !target.closest('[data-button="view-settings"]');
       const isOutsideAudioButton = !target.closest('[data-button="audio-settings"]');

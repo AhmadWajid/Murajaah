@@ -5,7 +5,6 @@ import { MemorizationItem } from '@/lib/spacedRepetition';
 import { getAllMemorizationItems, removeMemorizationItem } from '@/lib/storage';
 import { getDueItems, getUpcomingReviews } from '@/lib/spacedRepetition';
 import { formatAyahRange, getSurahName } from '@/lib/quran';
-import { FILTER_TYPES, SORT_TYPES, DATE_FORMAT } from '@/lib/constants';
 import { getTodayISODate } from '@/lib/utils';
 
 interface MemorizationListProps {
