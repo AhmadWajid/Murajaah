@@ -61,7 +61,7 @@ export default function AppHeader({
                 </Link>
               </Button>
               <Button variant="outline" size="sm" asChild className="px-2 sm:px-4">
-                <Link href="/add">
+                <Link href="/quran?addReview=1">
                   <Plus className="h-4 w-4 sm:mr-2" />
                   <span className="hidden sm:inline">Add New</span>
                 </Link>

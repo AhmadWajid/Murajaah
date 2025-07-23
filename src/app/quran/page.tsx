@@ -46,6 +46,7 @@ export default function QuranPage() {
 
 function QuranPageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   // Remove unused router variable
   const [currentPage, setCurrentPage] = useState(1);
   const [isInitialized, setIsInitialized] = useState(false);
@@ -57,7 +58,8 @@ function QuranPageContent() {
   const [memorizationItems, setMemorizationItems] = useState<MemorizationItem[]>([]);
   const [surahList, setSurahList] = useState<SurahListItem[]>([]);
   const [highlightedRange, setHighlightedRange] = useState<{surah: number, start: number, end: number} | null>(null);
-  const [selectedAyahs, setSelectedAyahs] = useState<Set<number>>(new Set());
+  // Change selectedAyahs type and initialization
+  const [selectedAyahs, setSelectedAyahs] = useState<Set<{surah: number, ayah: number}>>(new Set());
   const [openReviewDropdown, setOpenReviewDropdown] = useState<string | null>(null);
   const [showEnhancedModal, setShowEnhancedModal] = useState(false);
   const [arabicTexts, setArabicTexts] = useState<Record<string, string>>({});
@@ -510,16 +512,10 @@ function QuranPageContent() {
       }));
       
       const pageData = {
-        ...arabicPageData,
+        number: page,
         ayahs: combinedAyahs
       };
       
-      console.log('Page data loaded:', { 
-        page, 
-        ayahsCount: pageData.ayahs?.length,
-        firstAyah: pageData.ayahs?.[0]?.text?.substring(0, 50) + '...',
-        ayahs: pageData.ayahs?.map((a: any) => ({ surah: a.surah?.number, ayah: a.numberInSurah }))
-      });
       setPageData(pageData);
       
 
@@ -753,9 +749,6 @@ function QuranPageContent() {
   const goToPage = (page: number, skipSave: boolean = false) => {
     if (page >= 1 && page <= TOTAL_QURAN_PAGES) {
       setCurrentPage(page);
-      // Clear selections when changing pages to avoid confusion
-      setSelectedAyahs(new Set());
-      
       // Only clear URL parameters and save page if not skipping
       if (!skipSave) {
         // Clear URL parameters when navigating normally
@@ -770,22 +763,36 @@ function QuranPageContent() {
     }
   };
 
-  const handleAyahClick = (ayahNumber: number) => {
+  // Update handleAyahClick to accept surah and ayah
+  const handleAyahClick = (surah: number, ayah: number) => {
     setSelectedAyahs(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(ayahNumber)) {
-        newSet.delete(ayahNumber);
-      } else {
-        newSet.add(ayahNumber);
+      const key = JSON.stringify({ surah, ayah });
+      let found = false;
+      for (const item of newSet) {
+        if (JSON.stringify(item) === key) {
+          newSet.delete(item);
+          found = true;
+          break;
+        }
+      }
+      if (!found) {
+        newSet.add({ surah, ayah });
       }
       return newSet;
     });
   };
 
-  const handleRemoveAyah = (ayahNumber: number) => {
+  // Update handleRemoveAyah to accept surah and ayah
+  const handleRemoveAyah = (surah: number, ayah: number) => {
     setSelectedAyahs(prev => {
       const newSet = new Set(prev);
-      newSet.delete(ayahNumber);
+      for (const item of newSet) {
+        if (item.surah === surah && item.ayah === ayah) {
+          newSet.delete(item);
+          break;
+        }
+      }
       return newSet;
     });
   };
@@ -1153,11 +1160,28 @@ function QuranPageContent() {
     fetchWordByWord();
   }, [currentPage]);
 
+  // Open Add Review modal if addReview param is present
+  useEffect(() => {
+    if (searchParams.get('addReview')) {
+      setShowEnhancedModal(true);
+    }
+  }, [searchParams]);
+
+  // Remove addReview param from URL when modal is closed
+  const handleCloseEnhancedModal = () => {
+    setShowEnhancedModal(false);
+    if (searchParams.get('addReview')) {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('addReview');
+      router.replace(url.pathname + url.search);
+    }
+  };
+
   // Add this guard clause after all hooks
   if (!isInitialized) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-32">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-32 px-0 sm:px-4">
       {/* Header */}
       <AppHeader 
         pageType="quran"
@@ -1244,8 +1268,8 @@ function QuranPageContent() {
         selectedAyahs={selectedAyahs}
         onConfirm={handleEnhancedMemorization}
         onClose={() => {
-          setShowEnhancedModal(false);
           setSelectedAyahs(new Set());
+          handleCloseEnhancedModal();
         }}
       />
 

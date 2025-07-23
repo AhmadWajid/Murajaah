@@ -15,6 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Murajaah - Quran Review & Memorization",
   description: "A personalized Quran memorization assistant that helps users track, review, and retain their memorization using spaced repetition and feedback-based learning.",
+  viewport: "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no",
 };
 
 export default function RootLayout({

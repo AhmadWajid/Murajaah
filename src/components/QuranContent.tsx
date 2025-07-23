@@ -20,14 +20,14 @@ interface QuranContentProps {
   showTranslation: boolean;
   memorizationItems: any[];
   highlightedRange: { surah: number; start: number; end: number } | null;
-  selectedAyahs: Set<number>;
+  selectedAyahs: Set<{surah: number, ayah: number}>;
   openReviewDropdown: string | null;
-  onAyahClick: (ayahNumber: number) => void;
+  onAyahClick: (surah: number, ayah: number) => void;
   onPlayAudio: (surahNumber: number, ayahNumber: number) => void;
   onQuickReview: (surahNumber: number, ayahNumber: number, rating: 'easy' | 'medium' | 'hard') => void;
   onToggleReviewDropdown: (key: string | null) => void;
   onAddRevision: () => void;
-  onRemoveAyah?: (ayahNumber: number) => void;
+  onRemoveAyah?: (surah: number, ayah: number) => void;
   onClearSelectedAyahs?: () => void;
   onReviewComplete?: (item: any) => void;
   reviewsOnPage?: any[];
@@ -127,10 +127,10 @@ export default function QuranContent({
 
   return (
     <main className="min-h-screen bg-gray-50 dark:bg-gray-900 translation-loading">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl mx-auto px-2 sm:px-0">
         {layoutMode === 'spread' ? (
           /* Two-Page Spread Layout - RTL Order */
-          <div className="flex gap-6 p-6">
+          <div className="flex gap-2 sm:gap-6 p-2 sm:p-6">
             {/* Left Page (Current Page) */}
             <Card className="flex-1 min-h-screen shadow-lg border-0">
               <div className="p-3 sm:p-6 lg:p-8">
@@ -197,7 +197,7 @@ export default function QuranContent({
                             arabicTexts={arabicTexts}
                             isMemorization={isAyahInMemorization(surahNumber, ayahNumber)}
                             status={getMemorizationStatus(surahNumber, ayahNumber)}
-                            isSelected={selectedAyahs.has(ayahNumber)}
+                            isSelected={Array.from(selectedAyahs).some(sel => sel.surah === surahNumber && sel.ayah === ayahNumber)}
                             isInHighlightedRange={(() => {
                               // Check if this ayah is in the highlighted range OR if it's part of a review on this page
                               const isInHighlightedRange = !!(highlightedRange && 
@@ -217,7 +217,7 @@ export default function QuranContent({
                             })()}
                             showTranslation={showTranslation}
                             memorizationItems={memorizationItems}
-                            onAyahClick={onAyahClick}
+                            onAyahClick={() => onAyahClick(surahNumber, ayahNumber)}
                             onPlayAudio={onPlayAudio}
                             onQuickReview={onQuickReview}
                             onToggleReviewDropdown={onToggleReviewDropdown}
@@ -291,7 +291,7 @@ export default function QuranContent({
                         const ayahNumber = ayah.numberInSurah;
                         const isMemorization = isAyahInMemorization(surahNumber, ayahNumber);
                         const status = getMemorizationStatus(surahNumber, ayahNumber);
-                        const isSelected = selectedAyahs.has(ayahNumber);
+                        const isSelected = Array.from(selectedAyahs).some(sel => sel.surah === surahNumber && sel.ayah === ayahNumber);
                         
                         // Check if this ayah is in the highlighted range OR if it's part of a review on this page
                         const isInHighlightedRange = !!(highlightedRange && 
@@ -329,7 +329,7 @@ export default function QuranContent({
                             isInHighlightedRange={shouldHighlight}
                             showTranslation={showTranslation} // Show translation based on user preference
                             memorizationItems={memorizationItems}
-                            onAyahClick={onAyahClick}
+                            onAyahClick={() => onAyahClick(surahNumber, ayahNumber)}
                             onPlayAudio={onPlayAudio}
                             onQuickReview={onQuickReview}
                             onToggleReviewDropdown={onToggleReviewDropdown}
@@ -370,7 +370,8 @@ export default function QuranContent({
           </div>
         ) : (
           /* Single Page Layout */
-          <Card className="min-h-screen shadow-lg border-0 mx-6 my-6">
+          <Card className="min-h-screen mx-0 my-0 border-0 shadow-none rounded-none bg-transparent p-0
+            sm:mx-6 sm:my-6 sm:shadow-lg sm:rounded-xl sm:bg-card sm:text-card-foreground sm:border-0 sm:p-0">
             <div className="p-3 sm:p-6 lg:p-8">
               {/* Page Header */}
               <div className="text-center mb-8 pb-6 border-b border-gray-200 dark:border-gray-700">
@@ -435,7 +436,7 @@ export default function QuranContent({
                           arabicTexts={arabicTexts}
                           isMemorization={isAyahInMemorization(surahNumber, ayahNumber)}
                           status={getMemorizationStatus(surahNumber, ayahNumber)}
-                          isSelected={selectedAyahs.has(ayahNumber)}
+                          isSelected={Array.from(selectedAyahs).some(sel => sel.surah === surahNumber && sel.ayah === ayahNumber)}
                           isInHighlightedRange={(() => {
                             // Check if this ayah is in the highlighted range OR if it's part of a review on this page
                             const isInHighlightedRange = !!(highlightedRange && 
@@ -455,7 +456,7 @@ export default function QuranContent({
                           })()}
                           showTranslation={showTranslation}
                           memorizationItems={memorizationItems}
-                          onAyahClick={onAyahClick}
+                          onAyahClick={() => onAyahClick(surahNumber, ayahNumber)}
                           onPlayAudio={onPlayAudio}
                           onQuickReview={onQuickReview}
                           onToggleReviewDropdown={onToggleReviewDropdown}

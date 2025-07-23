@@ -10,7 +10,8 @@ import { getSurahList, SurahListItem } from '@/lib/quranService';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Calendar, Clock, CheckCircle, BookOpen, Plus, Edit, Trash2, Eye, ChevronDown, ChevronRight } from 'lucide-react';
+import { Calendar, Clock, CheckCircle, BookOpen, Plus, Edit, Trash2, Eye, ChevronDown, ChevronRight, Star } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import AppHeader from '@/components/AppHeader';
 import {
   AlertDialog,
@@ -29,6 +30,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import React from 'react'; // Added for React.Fragment
 
 interface GroupedItems {
   [date: string]: MemorizationItem[];
@@ -170,6 +172,7 @@ export default function Dashboard() {
   const [editingItem, setEditingItem] = useState<MemorizationItem | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showMistakeDeleteConfirm, setShowMistakeDeleteConfirm] = useState<{ surah: number; ayah?: number; deleteAll?: boolean } | null>(null);
+  const [reviewingItem, setReviewingItem] = useState<MemorizationItem | null>(null);
   // No longer needed with unified storage
 
   // Helper function to load all data
@@ -411,6 +414,63 @@ export default function Dashboard() {
 
   // Function removed - fixBrokenItems is no longer needed
 
+  // Helper to sort items by nextReview ascending, then by surah number ascending for same-day items
+  const sortedItems = [...items].sort((a, b) => {
+    const dateA = new Date(a.nextReview).getTime();
+    const dateB = new Date(b.nextReview).getTime();
+    if (dateA !== dateB) return dateA - dateB;
+    // If same date, sort by surah number ascending
+    if (a.surah !== b.surah) return a.surah - b.surah;
+    // If same surah, sort by ayahStart ascending
+    return a.ayahStart - b.ayahStart;
+  });
+
+  // Helper to assign a color class for each date group
+  const dateColorMap: Record<string, string> = {};
+  const colorClasses = [
+    'bg-blue-50 dark:bg-blue-950/20',
+    'bg-yellow-50 dark:bg-yellow-950/20',
+    'bg-purple-50 dark:bg-purple-950/20',
+    'bg-pink-50 dark:bg-pink-950/20',
+    'bg-orange-50 dark:bg-orange-950/20',
+    'bg-cyan-50 dark:bg-cyan-950/20',
+    'bg-lime-50 dark:bg-lime-950/20',
+  ];
+  let colorIndex = 0;
+  sortedItems.forEach(item => {
+    const date = item.nextReview;
+    if (!dateColorMap[date]) {
+      dateColorMap[date] = colorClasses[colorIndex % colorClasses.length];
+      colorIndex++;
+    }
+  });
+
+  // State for expanded/collapsed date groups
+  const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
+  const [collapseAll, setCollapseAll] = useState(false);
+
+  // Effect to collapse/expand all groups when collapseAll changes
+  useEffect(() => {
+    const newState: Record<string, boolean> = {};
+    Object.keys(groupedByDate).forEach(date => {
+      newState[date] = !collapseAll; // ON = expanded, OFF = collapsed
+    });
+    setExpandedDates(newState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collapseAll, items.length]);
+
+  // Group sortedItems by nextReview date
+  const groupedByDate: Record<string, typeof sortedItems> = {};
+  sortedItems.forEach(item => {
+    if (!groupedByDate[item.nextReview]) groupedByDate[item.nextReview] = [];
+    groupedByDate[item.nextReview].push(item);
+  });
+
+  // Helper to toggle expand/collapse
+  const toggleDateExpand = (date: string) => {
+    setExpandedDates(prev => ({ ...prev, [date]: !prev[date] }));
+  };
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
@@ -420,64 +480,6 @@ export default function Dashboard() {
       />
 
       <main className="container mx-auto px-4 py-6">
-        <div className="flex justify-center mb-8">
-          <Button asChild size="lg" className="text-lg px-8 py-4 font-bold shadow-lg">
-            <Link href="/quran">Open Quran</Link>
-          </Button>
-        </div>
-        {/* Stats Overview */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-center">
-                <div className="flex items-center justify-center space-x-2 mb-2">
-                  <BookOpen className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <p className="text-sm font-medium">Total</p>
-              </div>
-                <p className="text-2xl font-bold">{items.length}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-center">
-                <div className="flex items-center justify-center space-x-2 mb-2">
-                  <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <p className="text-sm font-medium">Due</p>
-              </div>
-                <p className="text-2xl font-bold">{dueItems.length}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-center">
-                <div className="flex items-center justify-center space-x-2 mb-2">
-                  <Calendar className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <p className="text-sm font-medium">This Week</p>
-              </div>
-                <p className="text-2xl font-bold">{upcomingItems.length}</p>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="text-center">
-                <div className="flex items-center justify-center space-x-2 mb-2">
-                  <CheckCircle className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                  <p className="text-sm font-medium">Completed</p>
-              </div>
-                <p className="text-2xl font-bold">
-                  {items.filter(item => item.reviewCount > 0).length}
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
         {/* Mistakes Section */}
         {mistakes.length > 0 && (
           <div className="mb-6">
@@ -628,109 +630,6 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* Due for Review - Compact */}
-        {Object.keys(groupedDueItems).length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center space-x-3 mb-3">
-              <Clock className="h-5 w-5 text-red-600" />
-              <h2 className="text-lg font-semibold">Due for Review</h2>
-            </div>
-            
-            {Object.entries(groupedDueItems).map(([date, dateItems]) => (
-              <div key={date} className="mb-4">
-                <h3 className="text-md font-medium mb-2">
-                  <Badge variant="destructive">
-                    {getDateLabel(date)} ({dateItems.length})
-                  </Badge>
-                </h3>
-                <Card>
-                  <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b bg-red-50/50 dark:bg-red-950/20">
-                            <th className="text-left p-2 font-medium text-red-700 dark:text-red-300 w-1/4">Surah & Ayahs</th>
-                            <th className="text-left p-2 font-medium text-red-700 dark:text-red-300 w-16">Ruku</th>
-                            <th className="text-left p-2 font-medium text-red-700 dark:text-red-300 w-20">Reviews</th>
-                            <th className="text-left p-2 font-medium text-red-700 dark:text-red-300 w-20">Interval</th>
-                            <th className="text-left p-2 font-medium text-red-700 dark:text-red-300 w-24">Status</th>
-                            <th className="text-left p-2 font-medium text-red-700 dark:text-red-300 w-32">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {dateItems.map((item) => (
-                            <tr key={item.id} className="border-b hover:bg-red-50/30 dark:hover:bg-red-950/10">
-                              <td className="p-2">
-                                <div>
-                                  <div className="font-medium text-sm">
-                                    {formatAyahRange(item.surah, item.ayahStart, item.ayahEnd)}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    {formatAyahRangeArabic(item.surah, item.ayahStart, item.ayahEnd)}
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="p-2">
-                                {item.rukuStart && item.rukuEnd ? (
-                                  <Badge variant="outline" className="text-xs px-2 py-1">
-                                    {item.rukuStart}{item.rukuStart !== item.rukuEnd ? `-${item.rukuEnd}` : ''}
-                                  </Badge>
-                                ) : (
-                                  <span className="text-muted-foreground text-sm">-</span>
-                                )}
-                              </td>
-                              <td className="p-2 font-medium text-sm">{item.reviewCount}</td>
-                              <td className="p-2 font-medium text-sm">{item.interval}d</td>
-                              <td className="p-2">
-                                <Badge variant="destructive" className="text-xs px-2 py-1">
-                                  {getPriorityText(item)}
-                                </Badge>
-                              </td>
-                              <td className="p-2">
-                                <div className="flex items-center space-x-1">
-                                  <Button asChild size="sm" variant="outline" className="h-8 w-8 p-0">
-                                    <Link href={`/quran?review=${encodeURIComponent(item.id)}`}>
-                                      <Eye className="h-3 w-3" />
-                                    </Link>
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleQuickReview(item, 'easy')}
-                                    className="h-8 px-2 text-xs"
-                                  >
-                                    E
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleQuickReview(item, 'medium')}
-                                    className="h-8 px-2 text-xs"
-                                  >
-                                    M
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleQuickReview(item, 'hard')}
-                                    className="h-8 px-2 text-xs"
-                                  >
-                                    H
-                                  </Button>
-                                </div>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            ))}
-          </div>
-        )}
-
         {/* Completed Today - Compact */}
         {getCompletedTodayItems().length > 0 && (
           <div className="mb-6">
@@ -786,38 +685,148 @@ export default function Dashboard() {
         )}
 
         {/* Upcoming Reviews - Compact */}
-        {Object.keys(groupedUpcomingItems).length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center space-x-3 mb-3">
-              <Calendar className="h-5 w-5 text-blue-600" />
-              <h2 className="text-lg font-semibold">Upcoming Reviews</h2>
+        {/* Removed the Upcoming Reviews section as requested. */}
+
+        {/* All Items - Compact Table */}
+        {items.length > 0 && (
+          <div>
+            <div className="flex items-center justify-between mb-2">
+               <span className="font-semibold text-lg">All Items ({items.length})</span>
+               <div className="flex items-center gap-2">
+                 <label htmlFor="collapse-all" className="text-sm select-none cursor-pointer">Expand All</label>
+                 <Switch id="collapse-all" checked={!collapseAll} onCheckedChange={v => setCollapseAll(!v)} />
+               </div>
             </div>
-            
-            {Object.entries(groupedUpcomingItems).map(([date, dateItems]) => (
-              <div key={date} className="mb-4">
-                <h3 className="text-md font-medium mb-2">
-                  <Badge variant="secondary">
-                    {getDateLabel(date)} ({dateItems.length})
-                  </Badge>
-                </h3>
-                <Card>
-                  <CardContent className="p-0">
-                    <div className="overflow-x-auto">
-                      <table className="w-full">
-                        <thead>
-                          <tr className="border-b bg-blue-50/50 dark:bg-blue-950/20">
-                            <th className="text-left p-2 font-medium text-blue-700 dark:text-blue-300 w-1/4">Surah & Ayahs</th>
-                            <th className="text-left p-2 font-medium text-blue-700 dark:text-blue-300 w-16">Ruku</th>
-                            <th className="text-left p-2 font-medium text-blue-700 dark:text-blue-300 w-20">Reviews</th>
-                            <th className="text-left p-2 font-medium text-blue-700 dark:text-blue-300 w-20">Interval</th>
-                            <th className="text-left p-2 font-medium text-blue-700 dark:text-blue-300 w-24">Status</th>
-                            <th className="text-left p-2 font-medium text-blue-700 dark:text-blue-300 w-32">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {dateItems.map((item) => (
-                            <tr key={item.id} className="border-b hover:bg-blue-50/30 dark:hover:bg-blue-950/10">
-                              <td className="p-2">
+            <div className="overflow-x-auto">
+              {/* Responsive: Table on md+, Compact Card List on mobile */}
+              <div className="block md:hidden space-y-2">
+                {Object.entries(groupedByDate).map(([date, dateItems]) => {
+                  const label = getDateLabel(date);
+                  const isToday = label === 'Today';
+                  const expanded = expandedDates[date] ?? isToday;
+                  const rowColor = dateColorMap[date] || '';
+                  return (
+                    <div key={date} className={`rounded-lg border ${rowColor} mb-1`}> 
+                      <div className="flex items-center gap-2 px-3 py-2 cursor-pointer bg-muted/30" onClick={() => toggleDateExpand(date)}>
+                        {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                        <span className="font-semibold text-sm">{label}</span>
+                        <span className="ml-2 text-xs text-muted-foreground">{dateItems.length} due</span>
+                        <span className="text-xs text-muted-foreground ml-2">{date}</span>
+                      </div>
+                      {expanded && (
+                        <div>
+                          {dateItems.map((item) => {
+                            const reviewDate = parseLocalDate(item.nextReview).toLocaleDateString();
+                            const today = getTodayISODate();
+                            const isCompletedToday = item.completedToday === today;
+                            return (
+                              <Link
+                                key={item.id}
+                                href={`/quran?review=${encodeURIComponent(item.id)}`}
+                                className={`flex items-center justify-between px-3 py-2 border-b last:border-b-0 bg-white dark:bg-black/30 ${isCompletedToday ? 'bg-green-50/50 dark:bg-green-950/20 border-l-4 border-l-green-500' : ''} transition hover:bg-muted/40`}
+                                style={{ textDecoration: 'none' }}
+                              >
+                                <div className="flex-1 min-w-0">
+                                  <div className="font-semibold text-base truncate">{formatAyahRange(item.surah, item.ayahStart, item.ayahEnd)}</div>
+                                  <div className="text-xs text-muted-foreground truncate">{formatAyahRangeArabic(item.surah, item.ayahStart, item.ayahEnd)}</div>
+                                  <div className="text-xs text-muted-foreground mt-1">Next: {reviewDate}</div>
+                                </div>
+                                <div className="flex items-center ml-2 gap-1">
+                                  <Badge variant={
+                                    isCompletedToday ? 'secondary' :
+                                    getPriorityText(item) === 'Overdue' ? 'destructive' :
+                                    getPriorityText(item) === 'Due Today' ? 'destructive' :
+                                    getPriorityText(item) === 'Due Soon' ? 'secondary' :
+                                    'outline'
+                                  } className={`text-xs px-2 py-1 ${isCompletedToday ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : ''}`}>{isCompletedToday ? 'Completed' : getPriorityText(item)}</Badge>
+                                  {!isCompletedToday && (
+                                    <button
+                                      className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-green-100 dark:hover:bg-green-900/30 focus:outline-none"
+                                      onClick={e => {
+                                        e.preventDefault();
+                                        setReviewingItem(item);
+                                      }}
+                                      aria-label="Review (Easy/Medium/Hard)"
+                                      title="Review (Easy/Medium/Hard)"
+                                      type="button"
+                                    >
+                                      <CheckCircle className="h-5 w-5 text-green-600" />
+                                    </button>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="w-8 h-8 p-0"
+                                    onClick={e => {
+                                      e.preventDefault();
+                                      handleEdit(item);
+                                    }}
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                  <button
+                                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/50 focus:outline-none"
+                                    onClick={e => {
+                                      e.preventDefault();
+                                      setShowDeleteConfirm(item.id);
+                                    }}
+                                    aria-label="Delete"
+                                    type="button"
+                                  >
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </button>
+                                  <ChevronRight className="h-5 w-5 text-muted-foreground ml-1 flex-shrink-0" />
+                                </div>
+                              </Link>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              {/* Table for md+ screens */}
+              <table className="w-full min-w-full hidden md:table">
+                <thead>
+                  <tr className="border-b">
+                    <th className="text-left p-3 font-medium w-1/4">Surah & Ayahs</th>
+                    <th className="text-left p-3 font-medium w-16">Ruku</th>
+                    <th className="text-left p-3 font-medium w-20">Reviews</th>
+                    <th className="text-left p-3 font-medium w-20">Interval</th>
+                    <th className="text-left p-3 font-medium w-24">Next Review</th>
+                    <th className="text-left p-3 font-medium w-32">Status</th>
+                    <th className="text-left p-3 font-medium w-32">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(groupedByDate).map(([date, dateItems]) => {
+                    const label = getDateLabel(date);
+                    const isToday = label === 'Today';
+                    const expanded = expandedDates[date] ?? isToday;
+                    const rowColor = dateColorMap[date] || '';
+                    return (
+                      <React.Fragment key={date}>
+                        <tr className={`border-b cursor-pointer ${rowColor}`}
+                          onClick={() => toggleDateExpand(date)}>
+                          <td colSpan={7} className="p-2 font-semibold">
+                            <div className="flex items-center gap-2">
+                              {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                              <span>{label}</span>
+                              <span className="ml-2 text-xs text-muted-foreground">Due: {dateItems.length}</span>
+                              <span className="text-xs text-muted-foreground ml-2">{date}</span>
+                            </div>
+                          </td>
+                        </tr>
+                        {expanded && dateItems.map((item) => {
+                          const reviewDate = parseLocalDate(item.nextReview).toLocaleDateString();
+                          const today = getTodayISODate();
+                          const isCompletedToday = item.completedToday === today;
+                          return (
+                            <tr key={item.id} className={`border-b hover:bg-muted/50 ${
+                              isCompletedToday ? 'bg-green-50/50 dark:bg-green-950/20 border-l-4 border-l-green-500' : ''
+                            }`}>
+                              <td className="p-3">
                                 <div>
                                   <div className="font-medium text-sm">
                                     {formatAyahRange(item.surah, item.ayahStart, item.ayahEnd)}
@@ -827,7 +836,7 @@ export default function Dashboard() {
                                   </div>
                                 </div>
                               </td>
-                              <td className="p-2">
+                              <td className="p-3">
                                 {item.rukuStart && item.rukuEnd ? (
                                   <Badge variant="outline" className="text-xs px-2 py-1">
                                     {item.rukuStart}{item.rukuStart !== item.rukuEnd ? `-${item.rukuEnd}` : ''}
@@ -836,158 +845,71 @@ export default function Dashboard() {
                                   <span className="text-muted-foreground text-sm">-</span>
                                 )}
                               </td>
-                              <td className="p-2 font-medium text-sm">{item.reviewCount}</td>
-                              <td className="p-2 font-medium text-sm">{item.interval}d</td>
-                              <td className="p-2">
-                                <Badge variant="outline" className="text-xs px-2 py-1">
-                                  {getPriorityText(item)}
+                              <td className="p-3 font-medium text-sm">{item.reviewCount}</td>
+                              <td className="p-3 font-medium text-sm">{item.interval}d</td>
+                              <td className="p-3 font-medium text-sm">{reviewDate}</td>
+                              <td className="p-3">
+                                <Badge variant={
+                                  isCompletedToday ? 'secondary' :
+                                  getPriorityText(item) === 'Overdue' ? 'destructive' :
+                                  getPriorityText(item) === 'Due Today' ? 'destructive' :
+                                  getPriorityText(item) === 'Due Soon' ? 'secondary' :
+                                  'outline'
+                                } className={`text-xs px-2 py-1 ${
+                                  isCompletedToday ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : ''
+                                }`}>
+                                  {isCompletedToday ? 'Completed' : getPriorityText(item)}
                                 </Badge>
                               </td>
-                              <td className="p-2">
-                                <div className="flex items-center space-x-1">
-                                  <Button asChild size="sm" variant="outline" className="h-8 w-8 p-0">
-                                    <Link href={`/quran?review=${encodeURIComponent(item.id)}`}>
-                                      <Eye className="h-3 w-3" />
-                                    </Link>
-                                  </Button>
+                              <td className="p-3">
+                                <div className="flex items-center gap-1">
+                                  {!isCompletedToday && (
+                                    <button
+                                      className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-green-100 dark:hover:bg-green-900/30 focus:outline-none"
+                                      onClick={e => {
+                                        e.preventDefault();
+                                        setReviewingItem(item);
+                                      }}
+                                      aria-label="Review (Easy/Medium/Hard)"
+                                      title="Review (Easy/Medium/Hard)"
+                                      type="button"
+                                    >
+                                      <CheckCircle className="h-5 w-5 text-green-600" />
+                                    </button>
+                                  )}
                                   <Button
                                     size="sm"
                                     variant="outline"
-                                    onClick={() => handleQuickReview(item, 'easy')}
-                                    className="h-8 px-2 text-xs"
+                                    className="w-8 h-8 p-0"
+                                    onClick={e => {
+                                      e.preventDefault();
+                                      handleEdit(item);
+                                    }}
                                   >
-                                    E
+                                    <Edit className="h-4 w-4" />
                                   </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleQuickReview(item, 'medium')}
-                                    className="h-8 px-2 text-xs"
+                                  <button
+                                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/50 focus:outline-none"
+                                    onClick={e => {
+                                      e.preventDefault();
+                                      setShowDeleteConfirm(item.id);
+                                    }}
+                                    aria-label="Delete"
+                                    type="button"
                                   >
-                                    M
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() => handleQuickReview(item, 'hard')}
-                                    className="h-8 px-2 text-xs"
-                                  >
-                                    H
-                                  </Button>
+                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                  </button>
                                 </div>
                               </td>
                             </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </CardContent>
-                </Card>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* All Items - Compact Table */}
-        {items.length > 0 && (
-          <div>
-            <div className="flex items-center space-x-3 mb-4">
-              <BookOpen className="h-5 w-5" />
-              <h2 className="text-xl font-semibold">All Items ({items.length})</h2>
-              </div>
-            <Card>
-              <CardContent className="p-0">
-              <div className="overflow-x-auto">
-                  <table className="w-full min-w-full">
-                    <thead>
-                      <tr className="border-b">
-                        <th className="text-left p-3 font-medium w-1/4">Surah & Ayahs</th>
-                        <th className="text-left p-3 font-medium w-16">Ruku</th>
-                        <th className="text-left p-3 font-medium w-20">Reviews</th>
-                        <th className="text-left p-3 font-medium w-20">Interval</th>
-                        <th className="text-left p-3 font-medium w-24">Next Review</th>
-                        <th className="text-left p-3 font-medium w-32">Status</th>
-                        <th className="text-left p-3 font-medium w-32">Actions</th>
-                    </tr>
-                  </thead>
-                    <tbody>
-                      {items.map((item) => {
-                        const reviewDate = parseLocalDate(item.nextReview).toLocaleDateString();
-                        const today = getTodayISODate();
-                        const isCompletedToday = item.completedToday === today;
-                        
-                        return (
-                          <tr key={item.id} className={`border-b hover:bg-muted/50 ${
-                            isCompletedToday ? 'bg-green-50/50 dark:bg-green-950/20 border-l-4 border-l-green-500' : ''
-                          }`}>
-                            <td className="p-3">
-                                <div>
-                                <div className="font-medium text-sm">
-                                    {formatAyahRange(item.surah, item.ayahStart, item.ayahEnd)}
-                                  </div>
-                                <div className="text-xs text-muted-foreground">
-                                    {formatAyahRangeArabic(item.surah, item.ayahStart, item.ayahEnd)}
-                                </div>
-                              </div>
-                            </td>
-                            <td className="p-3">
-                              {item.rukuStart && item.rukuEnd ? (
-                                <Badge variant="outline" className="text-xs px-2 py-1">
-                                  {item.rukuStart}{item.rukuStart !== item.rukuEnd ? `-${item.rukuEnd}` : ''}
-                                </Badge>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">-</span>
-                              )}
-                            </td>
-                            <td className="p-3 font-medium text-sm">{item.reviewCount}</td>
-                            <td className="p-3 font-medium text-sm">{item.interval}d</td>
-                            <td className="p-3 font-medium text-sm">{reviewDate}</td>
-                            <td className="p-3">
-                              <Badge variant={
-                                isCompletedToday ? 'secondary' :
-                                getPriorityText(item) === 'Overdue' ? 'destructive' :
-                                getPriorityText(item) === 'Due Today' ? 'destructive' :
-                                getPriorityText(item) === 'Due Soon' ? 'secondary' :
-                                'outline'
-                              } className={`text-xs px-2 py-1 ${
-                                isCompletedToday ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : ''
-                              }`}>
-                                {isCompletedToday ? 'Completed' : getPriorityText(item)}
-                              </Badge>
-                            </td>
-                            <td className="p-3">
-                              <div className="flex items-center space-x-1">
-                                <Button asChild size="sm" variant="outline" className="h-8 w-8 p-0">
-                                  <Link href={`/quran?review=${encodeURIComponent(item.id)}`}>
-                                    <Eye className="h-3 w-3" />
-                                  </Link>
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => handleEdit(item)}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Edit className="h-3 w-3" />
-                                </Button>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => setShowDeleteConfirm(item.id)}
-                                  className="h-8 w-8 p-0"
-                                >
-                                  <Trash2 className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
-              </div>
-              </CardContent>
-            </Card>
+                          );
+                        })}
+                      </React.Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
@@ -1003,9 +925,9 @@ export default function Dashboard() {
             </p>
             <div className="space-y-3">
               <Button asChild>
-                <Link href="/add">
+                <Link href="/quran?addReview=1">
                   <Plus className="h-4 w-4 mr-2" />
-                Add Your First Item
+                Add Review
               </Link>
               </Button>
               <div className="text-sm text-muted-foreground">
@@ -1033,6 +955,33 @@ export default function Dashboard() {
                   onSave={handleSaveEdit} 
                   onCancel={handleCancelEdit} 
                 />
+            </DialogContent>
+          </Dialog>
+        )}
+
+        {/* Add the review modal, similar to the edit modal, but for reviewing the item */}
+        {reviewingItem && (
+          <Dialog open={!!reviewingItem} onOpenChange={() => setReviewingItem(null)}>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Review Item</DialogTitle>
+              </DialogHeader>
+              {/* Place your review UI/modal content here, e.g., quick review buttons or details */}
+              <div className="flex flex-col gap-4">
+                <div>
+                  <div className="font-medium text-sm">
+                    {formatAyahRange(reviewingItem.surah, reviewingItem.ayahStart, reviewingItem.ayahEnd)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {formatAyahRangeArabic(reviewingItem.surah, reviewingItem.ayahStart, reviewingItem.ayahEnd)}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Button onClick={() => { handleQuickReview(reviewingItem, 'easy'); setReviewingItem(null); }}>Easy</Button>
+                  <Button onClick={() => { handleQuickReview(reviewingItem, 'medium'); setReviewingItem(null); }}>Medium</Button>
+                  <Button onClick={() => { handleQuickReview(reviewingItem, 'hard'); setReviewingItem(null); }}>Hard</Button>
+                </div>
+              </div>
             </DialogContent>
           </Dialog>
         )}

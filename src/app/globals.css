@@ -34,8 +34,91 @@
   /* Prevent letter merging */
   letter-spacing: 0.01em;
   /* Additional Arabic text improvements */
-  word-spacing: 0.05em;
+  word-spacing: 0.1em;
   text-justify: inter-word;
+  /* Better text wrapping */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+  hyphens: none;
+  white-space: normal;
+}
+
+/* Mobile-specific Arabic text optimizations */
+@media (max-width: 640px) {
+  .arabic-text {
+    word-spacing: 0.02em !important;
+    line-height: 1.5 !important;
+    letter-spacing: 0.002em !important;
+    /* Tighter spacing on mobile */
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    word-break: normal !important;
+    overflow-wrap: anywhere !important;
+    text-wrap: pretty !important;
+    /* Force text to wrap more aggressively */
+    white-space: pre-wrap !important;
+  }
+  
+  /* Ensure containers don't cause horizontal scrolling */
+  .arabic-text * {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  
+  /* More specific targeting for mobile browsers */
+  .arabic-text span {
+    display: inline !important;
+    word-break: normal !important;
+    overflow-wrap: anywhere !important;
+  }
+}
+
+/* Additional mobile optimizations for real devices */
+@media screen and (max-device-width: 480px) {
+  .arabic-text {
+    -webkit-text-size-adjust: none !important;
+    text-size-adjust: none !important;
+    word-spacing: 0.01em !important;
+    letter-spacing: 0.001em !important;
+    line-height: 1.4 !important;
+  }
+}
+
+/* Force container elements to not overflow on mobile */
+@media screen and (max-width: 640px) {
+  /* Ensure all containers respect mobile boundaries */
+  div[dir="rtl"] {
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    box-sizing: border-box !important;
+  }
+  
+  /* Target the specific text containers */
+  .text-right {
+    padding-left: 0.25rem !important;
+    padding-right: 0.25rem !important;
+  }
+  
+  /* Comprehensive Arabic text mobile fix */
+  .arabic-text, .uthmanic-hafs, .font-arabic {
+    /* Reset all text wrapping properties */
+    white-space: normal !important;
+    word-wrap: break-word !important;
+    overflow-wrap: break-word !important;
+    word-break: keep-all !important;
+    hyphens: none !important;
+    /* Minimal spacing for mobile */
+    word-spacing: 0.01em !important;
+    letter-spacing: 0 !important;
+    /* Ensure no horizontal overflow */
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+    /* Box model */
+    box-sizing: border-box !important;
+    /* Display properties */
+    display: block !important;
+    width: 100% !important;
+  }
 }
 
 /* Override any Tailwind font size classes for Arabic */
@@ -204,6 +287,11 @@ body {
 
 .btn-danger:hover {
   background-color: #b91c1c;
+}
+
+/* Utility: Safe area padding for iOS bottom insets */
+.pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 @theme inline {

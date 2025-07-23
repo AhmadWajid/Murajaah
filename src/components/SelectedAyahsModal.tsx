@@ -9,11 +9,11 @@ import { formatAyahRange } from '@/lib/quran';
 
 interface SelectedAyahsModalProps {
   isOpen: boolean;
-  selectedAyahs: Set<number>;
+  selectedAyahs: Set<{surah: number, ayah: number}>;
   pageData: any;
   onClose: () => void;
   onAddForReview: () => void;
-  onRemoveAyah: (ayahNumber: number) => void;
+  onRemoveAyah: (surah: number, ayah: number) => void;
   onClearAll: () => void;
 }
 
@@ -30,42 +30,30 @@ export default function SelectedAyahsModal({
 
   // Group selected ayahs by surah and create ranges
   const getSelectedAyahsInfo = () => {
-    if (!pageData?.ayahs) return [];
-    
-    const selectedAyahsArray = Array.from(selectedAyahs).sort((a, b) => a - b);
-    const ayahsInfo = selectedAyahsArray.map(ayahNumber => {
-      const ayah = pageData.ayahs.find((a: any) => a.numberInSurah === ayahNumber);
-      return {
-        surahNumber: ayah?.surah?.number || 1,
-        surahName: ayah?.surah?.englishName || 'Unknown',
-        ayahNumber,
-        text: ayah?.text || '',
-        translation: ayah?.translation || ''
-      };
+    const selectedAyahsArray = Array.from(selectedAyahs);
+    // Group by surah
+    const groupedBySurah: { [key: number]: { surah: number, ayah: number }[] } = {};
+    selectedAyahsArray.forEach(sel => {
+      if (!groupedBySurah[sel.surah]) groupedBySurah[sel.surah] = [];
+      groupedBySurah[sel.surah].push(sel);
     });
-
-    // Group by surah and create ranges
-    const groupedBySurah: { [key: number]: any[] } = {};
-    ayahsInfo.forEach(ayah => {
-      if (!groupedBySurah[ayah.surahNumber]) {
-        groupedBySurah[ayah.surahNumber] = [];
-      }
-      groupedBySurah[ayah.surahNumber].push(ayah);
-    });
-
     return Object.entries(groupedBySurah).map(([surahNumber, ayahs]) => {
-      const sortedAyahs = ayahs.sort((a, b) => a.ayahNumber - b.ayahNumber);
-      const start = sortedAyahs[0].ayahNumber;
-      const end = sortedAyahs[sortedAyahs.length - 1].ayahNumber;
-      
+      const sortedAyahs = ayahs.sort((a, b) => a.ayah - b.ayah);
+      const start = sortedAyahs[0].ayah;
+      const end = sortedAyahs[sortedAyahs.length - 1].ayah;
+      // Try to get surah name from pageData or fallback
+      let surahName = 'Unknown';
+      if (pageData?.ayahs) {
+        const found = pageData.ayahs.find((a: any) => a.surah?.number === Number(surahNumber));
+        if (found) surahName = found.surah?.englishName || found.surah?.name || 'Unknown';
+      }
       return {
-        surahNumber: parseInt(surahNumber),
-        surahName: sortedAyahs[0].surahName,
+        surahNumber: Number(surahNumber),
+        surahName,
         start,
         end,
         ayahs: sortedAyahs,
-        range: start === end ? `${start}` : `${start}-${end}`,
-        displayText: formatAyahRange(parseInt(surahNumber), start, end)
+        range: start === end ? `${start}` : `${start}-${end}`
       };
     });
   };
@@ -144,7 +132,7 @@ export default function SelectedAyahsModal({
                         size="sm"
                         onClick={() => {
                           // Remove all ayahs in this range
-                          range.ayahs.forEach(ayah => onRemoveAyah(ayah.ayahNumber));
+                          range.ayahs.forEach(ayah => onRemoveAyah(ayah.surah, ayah.ayah));
                         }}
                         className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
                       >
@@ -156,25 +144,20 @@ export default function SelectedAyahsModal({
                     <div className="space-y-2">
                       {range.ayahs.map(ayah => (
                         <div
-                          key={ayah.ayahNumber}
+                          key={ayah.ayah}
                           className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"
                         >
                           <div className="flex-1">
                             <div className="flex items-center space-x-2">
                               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {ayah.surahNumber}:{ayah.ayahNumber}
+                                {ayah.surah}:{ayah.ayah}
                               </span>
-                              {ayah.translation && (
-                                <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-xs">
-                                  {ayah.translation}
-                                </span>
-                              )}
                             </div>
                           </div>
                           <Button
                             variant="ghost"
                             size="sm"
-                            onClick={() => onRemoveAyah(ayah.ayahNumber)}
+                            onClick={() => onRemoveAyah(ayah.surah, ayah.ayah)}
                             className="h-5 w-5 p-0 text-gray-400 hover:text-red-500"
                           >
                             <X className="h-3 w-3" />
@@ -198,29 +181,12 @@ export default function SelectedAyahsModal({
         {selectedAyahs.size > 0 && (
           <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800/50">
             <div className="flex items-center justify-between">
-              <Button
-                variant="outline"
-                onClick={onClearAll}
-                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-              >
-                <Trash2 className="h-4 w-4 mr-2" />
+              <Button variant="outline" onClick={onClearAll}>
                 Clear All
               </Button>
-              <div className="flex space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={onClose}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  onClick={onAddForReview}
-                  className="bg-blue-600 hover:bg-blue-700"
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add for Review
-                </Button>
-              </div>
+              <Button onClick={onAddForReview}>
+                <Plus className="h-4 w-4 mr-2" /> Add for Review
+              </Button>
             </div>
           </div>
         )}

@@ -14,6 +14,7 @@ import { Separator } from '@/components/ui/separator';
 interface QuranSelectorProps {
   onAdd: () => void;
   currentSurah?: number;
+  hideSelectionType?: boolean;
 }
 
 // Memorization level options
@@ -25,7 +26,7 @@ const MEMORIZATION_LEVELS = [
   { value: 'mastered', label: 'Mastered', interval: 20, color: 'from-blue-500 to-indigo-500' }
 ];
 
-export default function QuranSelector({ onAdd, currentSurah = 1 }: QuranSelectorProps) {
+export default function QuranSelector({ onAdd, currentSurah = 1, hideSelectionType = false }: QuranSelectorProps) {
   const [surah, setSurah] = useState(currentSurah);
   const [ayahStart, setAyahStart] = useState(1);
   const [ayahEnd, setAyahEnd] = useState(1);
@@ -76,18 +77,20 @@ export default function QuranSelector({ onAdd, currentSurah = 1 }: QuranSelector
 
   return (
     <div className="space-y-4">
-      {/* Selection Type */}
-      <div className="space-y-2">
-        <Label>Selection Type</Label>
-        <Select value="custom" disabled>
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="custom">Custom Range</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {/* Selection Type (hide if prop is true) */}
+      {!hideSelectionType && (
+        <div className="space-y-2">
+          <Label>Selection Type</Label>
+          <Select value="custom" disabled>
+            <SelectTrigger>
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="custom">Custom Range</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       {/* Surah Selection */}
       <div className="space-y-2">

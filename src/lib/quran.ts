@@ -169,10 +169,12 @@ export function formatAyahRange(surah: number, start: number, end: number): stri
 
 export function formatAyahRangeArabic(surah: number, start: number, end: number): string {
   const surahName = getSurahNameArabic(surah);
-  if (start === end) {
-    return `${surahName} ${start}`;
+  const minAyah = Math.min(start, end);
+  const maxAyah = Math.max(start, end);
+  if (minAyah === maxAyah) {
+    return `${surahName} ${maxAyah}`;
   }
-  return `${surahName} ${start}-${end}`;
+  return `${surahName} ${maxAyah}-${minAyah}`;
 }
 
 export function getAyahCount(surah: number): number {

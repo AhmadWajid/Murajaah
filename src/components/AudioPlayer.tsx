@@ -120,7 +120,7 @@ export default function AudioPlayer({
   if (!currentAudio) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-800/95 border-t border-amber-200 dark:border-amber-700 p-4 backdrop-blur-sm z-50">
+    <div className="fixed bottom-0 left-0 right-0 bg-white/95 dark:bg-gray-800/95 border-t border-amber-200 dark:border-amber-700 p-4 backdrop-blur-sm z-50 pb-safe">
       <div className="max-w-6xl mx-auto">
         {/* --- Top Bar Controls --- */}
         <div className="flex items-center gap-4 mb-2 flex-wrap">

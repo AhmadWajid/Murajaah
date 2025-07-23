@@ -20,6 +20,7 @@ interface TajweedAyahTextProps {
   showWordTranslation?: boolean;
   wordByWordData?: any[];
   showWordByWordTooltip?: boolean;
+  disableTajweedColors?: boolean; // NEW PROP
 }
 
 export function TajweedAyahText({ 
@@ -37,6 +38,7 @@ export function TajweedAyahText({
   showWordTranslation = false,
   wordByWordData = [],
   showWordByWordTooltip = true,
+  disableTajweedColors = false, // NEW DEFAULT
 }: TajweedAyahTextProps) {
   const [tajweedWords, setTajweedWords] = useState<TajweedWord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,6 +51,16 @@ export function TajweedAyahText({
   // State for delayed hide words feature
   const [visibleWordIds, setVisibleWordIds] = useState<Set<string>>(new Set());
   const wordTimeoutsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  // Detect Safari (Mac or iOS)
+  const [isSafari, setIsSafari] = useState(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const ua = window.navigator.userAgent;
+      const isSafariBrowser = /Safari/.test(ua) && !/Chrome/.test(ua);
+      setIsSafari(isSafariBrowser);
+    }
+  }, []);
 
   // Cleanup timeouts when component unmounts
   useEffect(() => {
@@ -210,7 +222,7 @@ export function TajweedAyahText({
       return (
         <span
           key={word.id}
-          className="inline-block transition-all duration-200 relative cursor-pointer"
+          className="inline transition-all duration-200 relative cursor-pointer"
           style={{ 
             fontSize: `${currentFontSize}px`,
             fontFeatureSettings: fontLoaded ? "'liga' 1, 'kern' 1, 'calt' 1, 'rlig' 1, 'ccmp' 1, 'locl' 1, 'mark' 1, 'mkmk' 1" : "'liga' 0, 'kern' 0, 'calt' 0, 'rlig' 0, 'ccmp' 0, 'locl' 0, 'mark' 0, 'mkmk' 0"
@@ -260,13 +272,22 @@ export function TajweedAyahText({
         </span>
       );
     }
+
+    // Safari: render plain word
+    if (isSafari) {
+      return (
+        <span key={word.id} className="inline" style={{ fontSize: `${currentFontSize}px` }}>{word.text}</span>
+      );
+    }
+
+    // Non-Safari: render per-segment coloring
     if (word.tajweedRules.length === 0) {
       // No tajweed rules, just render the word (with translation tooltip if enabled)
       if (showWordByWordTooltip && translation) {
         return (
           <span
             key={word.id}
-            className="inline-block group relative cursor-pointer"
+            className="inline group relative cursor-pointer"
             style={{ fontSize: `${currentFontSize}px` }}
           >
             <span>{word.text}</span>
@@ -281,11 +302,8 @@ export function TajweedAyahText({
       return (
         <span 
           key={word.id} 
-          className="inline-block"
-          style={{ 
-            fontSize: `${currentFontSize}px`,
-            fontFeatureSettings: fontLoaded ? "'liga' 1, 'kern' 1, 'calt' 1, 'rlig' 1, 'ccmp' 1, 'locl' 1, 'mark' 1, 'mkmk' 1" : "'liga' 0, 'kern' 0, 'calt' 0, 'rlig' 0, 'ccmp' 0, 'locl' 0, 'mark' 0, 'mkmk' 0"
-          }}
+          className="inline"
+          style={{ fontSize: `${currentFontSize}px` }}
         >
           {word.text}
         </span>
@@ -303,22 +321,17 @@ export function TajweedAyahText({
         segments.push(
           <span 
             key={`text-${word.id}-${ruleIndex}`}
-            style={{ 
-              fontSize: `${currentFontSize}px`,
-              fontFeatureSettings: fontLoaded ? "'liga' 1, 'kern' 1, 'calt' 1, 'rlig' 1, 'ccmp' 1, 'locl' 1, 'mark' 1, 'mkmk' 1" : "'liga' 0, 'kern' 0, 'calt' 0, 'rlig' 0, 'ccmp' 0, 'locl' 0, 'mark' 0, 'mkmk' 0"
-            }}
+            style={{ fontSize: `${currentFontSize}px` }}
           >
             {text.slice(lastIndex, rule.startIndex)}
           </span>
         );
       }
-
       // Add the rule text with tooltip trigger only
       const ruleColor = getTajweedColor(rule.class);
       const ruleDescription = getTajweedDescription(rule.class);
       const tooltipId = `tajweed-tooltip-${word.id}-${ruleIndex}`;
       const bgColor = ruleColorMap[rule.class] || '#222';
-      // Collect tooltip data for later rendering
       tooltipData.push({ id: tooltipId, content: ruleDescription, bgColor });
       segments.push(
         <span
@@ -326,10 +339,7 @@ export function TajweedAyahText({
           className={ruleColor}
           data-tooltip-id={tooltipId}
           data-tooltip-content={ruleDescription}
-          style={{ 
-            fontSize: `${currentFontSize}px`,
-            fontFeatureSettings: fontLoaded ? "'liga' 1, 'kern' 1, 'calt' 1, 'rlig' 1, 'ccmp' 1, 'locl' 1, 'mark' 1, 'mkmk' 1" : "'liga' 0, 'kern' 0, 'calt' 0, 'rlig' 0, 'ccmp' 0, 'locl' 0, 'mark' 0, 'mkmk' 0"
-          }}
+          style={{ fontSize: `${currentFontSize}px` }}
           onMouseEnter={handleTajweedMouseEnter}
           onMouseLeave={handleTajweedMouseLeave}
         >
@@ -342,10 +352,7 @@ export function TajweedAyahText({
       segments.push(
         <span 
           key={`text-${word.id}-end`}
-          style={{ 
-            fontSize: `${currentFontSize}px`,
-            fontFeatureSettings: fontLoaded ? "'liga' 1, 'kern' 1, 'calt' 1, 'rlig' 1, 'ccmp' 1, 'locl' 1, 'mark' 1, 'mkmk' 1" : "'liga' 0, 'kern' 0, 'calt' 0, 'rlig' 0, 'ccmp' 0, 'locl' 0, 'mark' 0, 'mkmk' 0"
-          }}
+          style={{ fontSize: `${currentFontSize}px` }}
         >
           {text.slice(lastIndex)}
         </span>
@@ -356,7 +363,7 @@ export function TajweedAyahText({
       return (
         <span
           key={word.id}
-          className="inline-block group relative cursor-pointer"
+          className="inline group relative cursor-pointer"
           style={{ fontSize: `${currentFontSize}px` }}
         >
           {segments}
@@ -370,8 +377,9 @@ export function TajweedAyahText({
     }
     // Default: just render the segments
     return (
-      <span 
-        key={word.id} 
+      <span
+        key={word.id}
+        className="inline"
         style={{ fontSize: `${currentFontSize}px` }}
       >
         {segments}
@@ -384,20 +392,27 @@ export function TajweedAyahText({
 
   return (
     <div 
-      className={`leading-loose text-amber-900 dark:text-amber-100 font-arabic arabic-text uthmanic-hafs ${className}`} 
+      className={`leading-relaxed sm:leading-loose text-amber-900 dark:text-amber-100 font-arabic arabic-text uthmanic-hafs ${className}`} 
       dir="rtl"
       style={{
         fontFamily: fontLoaded ? qpcFontLoader.getFontFamily(pageNumber || 1) : "'qpc-v2-fallback', 'Amiri', serif",
         fontSize: `${currentFontSize}px`,
-        lineHeight: '2',
+        lineHeight: '1.8',
         textAlign: 'right',
         '--custom-font-size': `${currentFontSize}px`,
         fontFeatureSettings: fontLoaded ? "'liga' 1, 'kern' 1, 'calt' 1, 'rlig' 1, 'ccmp' 1, 'locl' 1, 'mark' 1, 'mkmk' 1" : "'liga' 0, 'kern' 0, 'calt' 0, 'rlig' 0, 'ccmp' 0, 'locl' 0, 'mark' 0, 'mkmk' 0",
         textRendering: 'optimizeLegibility',
         WebkitFontSmoothing: 'antialiased',
         MozOsxFontSmoothing: 'grayscale',
-        // whiteSpace: 'nowrap', // Allow wrapping
-        position: 'relative', // For absolute tooltips if needed
+        wordBreak: 'keep-all',
+        overflowWrap: 'break-word',
+        hyphens: 'none',
+        wordSpacing: '0.1em',
+        whiteSpace: 'normal',
+        position: 'relative',
+        width: '100%',
+        maxWidth: '100%',
+        boxSizing: 'border-box',
       } as React.CSSProperties}
     >
       {loading ? (

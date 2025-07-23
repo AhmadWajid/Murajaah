@@ -259,7 +259,7 @@ export default function AyahCard({
       'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ',
       'بِسْمِ اَللَّهِ اَلرَّحْمَٰنِ اَلرَّحِيمِ',
       'بِسْمِ اللَّهِ الرَّحْمَٰنِ الرَّحِيمِ',
-      'بِسْمِ اللهِ الرَّحْمَٰنِ الرَّحِيمِ'
+      'بِسِمِ اللهِ الرَّحْمَٰنِ الرَّحِيمِ'
     ];
     
     for (const variation of bismillahVariations) {
@@ -307,6 +307,14 @@ export default function AyahCard({
     }
     setLoadingTafsir(false);
   };
+
+  // Mobile detection for tajweed color disabling
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsMobile(window.innerWidth <= 640);
+    }
+  }, []);
 
   return (
     <div key={ayah.number}>
@@ -478,7 +486,7 @@ export default function AyahCard({
         </div>
 
         {/* Arabic Text */}
-        <div className="text-right mb-6">
+        <div className="text-right mb-4 sm:mb-6 px-1 sm:px-0">
           {shouldShowHidden ? (
             <div className="text-center py-8">
               <div className="text-gray-400 dark:text-gray-500 text-lg mb-2">
@@ -541,6 +549,7 @@ export default function AyahCard({
                     hideWordsDelay={hideWordsDelay}
                     wordByWordData={wordByWordData}
                     showWordByWordTooltip={showWordByWordTooltip}
+                    disableTajweedColors={isMobile}
                   />
                 );
               } else {
@@ -564,6 +573,7 @@ export default function AyahCard({
                 hideWordsDelay={hideWordsDelay}
                 wordByWordData={wordByWordData}
                 showWordByWordTooltip={showWordByWordTooltip}
+                disableTajweedColors={isMobile}
               />
             );
           })()}
