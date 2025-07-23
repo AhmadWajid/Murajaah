@@ -57,6 +57,13 @@ export default function EnhancedMemorizationModal({
   const [descriptionEdited, setDescriptionEdited] = useState(false);
   const [selectedSurah, setSelectedSurah] = useState<number | null>(null);
 
+  // Set selectionType to 'custom' if addReview param is present and modal is open
+  useEffect(() => {
+    if (isOpen && searchParams.get('addReview')) {
+      setSelectionType('custom');
+    }
+  }, [isOpen, searchParams]);
+
   // Initialize modal state when it opens
   useEffect(() => {
     if (!isOpen) return;
@@ -67,26 +74,18 @@ export default function EnhancedMemorizationModal({
     if (pageData?.ayahs && pageData.ayahs.length > 0) {
       const uniqueSurahs = Array.from(new Set(pageData.ayahs.map((ayah: any) => ayah.surah?.number))).filter((n): n is number => typeof n === 'number');
       const defaultSurah = uniqueSurahs[0] ?? null;
-      
-      // If there are externally selected ayahs, use ayah selection mode
       if (externalSelectedAyahs && externalSelectedAyahs.size > 0) {
         setSelectionType('ayahs');
         setSelectedAyahs(new Set(externalSelectedAyahs));
-        
-        // Find the surah of the first selected ayah
         const firstSelectedAyah = Array.from(externalSelectedAyahs)[0];
         const ayahObj = pageData.ayahs.find((a: any) => a.surah?.number === firstSelectedAyah.surah && a.numberInSurah === firstSelectedAyah.ayah);
         const targetSurah = ayahObj?.surah?.number ?? defaultSurah;
-        
         setSelectedSurah(targetSurah);
-        
-        // Set customRange to min/max of ALL selected ayahs (not filtered by surah)
         const sorted = Array.from(externalSelectedAyahs).sort((a, b) => a.ayah - b.ayah);
         const minAyah = sorted[0].ayah;
         const maxAyah = sorted[sorted.length - 1].ayah;
         setCustomRange({ start: minAyah, end: maxAyah });
       } else {
-        // No external selection, default to page mode
         setSelectionType('page');
         setSelectedSurah(defaultSurah);
         setSelectedAyahs(new Set());
@@ -94,6 +93,19 @@ export default function EnhancedMemorizationModal({
       }
     }
   }, [isOpen, pageData, externalSelectedAyahs, searchParams]);
+
+  // All variable and function declarations
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setName(e.target.value);
+    setNameEdited(true);
+  };
+  const handleDescriptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setDescription(e.target.value);
+    setDescriptionEdited(true);
+  };
+
+  // Early return after all hooks and variable declarations
+  if (!isOpen) return null;
 
   // When selectedSurah changes, update ayah grid, range, and name/description if not edited
   // But skip this during initialization when we have external selected ayahs
@@ -196,155 +208,114 @@ export default function EnhancedMemorizationModal({
   //   }
   // }, [isOpen, selectedSurah, fullSurahData, selectionType]);
 
-  // Set selectionType to 'custom' if addReview param is present and modal is open
-  useEffect(() => {
-    if (isOpen && searchParams.get('addReview')) {
-      setSelectionType('custom');
-    }
-  }, [isOpen, searchParams]);
+  // In the ayah selection UI, count and highlight only selected ayahs for the selectedSurah
+  const selectedAyahsForSurah = Array.from(selectedAyahs).filter(ayah => {
+    if (!fullSurahData?.ayahs) return false;
+    return fullSurahData.ayahs.some((a: any) => a.numberInSurah === ayah.ayah);
+  });
 
-  const handleAyahToggle = (ayah: {surah: number, ayah: number}) => {
+  // Get total count of all selected ayahs (from all surahs)
+  const totalSelectedAyahs = selectedAyahs.size;
+  // Get count of selected ayahs for the current surah only
+  const selectedAyahsForCurrentSurah = selectedAyahsForSurah.length;
+
+  // Selection type handler
+  const handleSelectionTypeChange = (value: 'surah' | 'page' | 'ayahs' | 'custom') => {
+    setSelectionType(value);
+  };
+
+  // Function to clear the selection
+  const clearSelection = () => {
+    setSelectedAyahs(new Set());
+    setCustomRange({ start: 1, end: 1 });
+    setNameEdited(false);
+    setDescriptionEdited(false);
+  };
+
+  // Function to select all ayahs for the current surah
+  const selectAllAyahs = () => {
+    if (!fullSurahData?.ayahs) return;
+    const ayahsForSurah = (fullSurahData.ayahs || []).filter((ayah: any) => ayah.surah?.number === selectedSurah);
+    if (ayahsForSurah.length > 0) {
+      setCustomRange({ start: ayahsForSurah[0].numberInSurah, end: ayahsForSurah[ayahsForSurah.length - 1].numberInSurah });
+      setSelectedAyahs(new Set(ayahsForSurah.map((ayah: any) => ({ surah: selectedSurah, ayah: ayah.numberInSurah }))));
+    }
+  };
+
+  // Function to handle ayah toggle
+  const handleAyahToggle = (ayah: { surah: number; ayah: number }) => {
     setSelectedAyahs(prev => {
       const newSet = new Set(prev);
-      const key = JSON.stringify(ayah);
-      let found = false;
-      for (const item of newSet) {
-        if (JSON.stringify(item) === key) {
-          newSet.delete(item);
-          found = true;
-          break;
-        }
-      }
-      if (!found) {
-        newSet.add(ayah);
-      }
-      // When toggling in the grid, update customRange to min/max of selected
-      if (newSet.size > 0) {
-        const sorted = Array.from(newSet).sort((a, b) => a.ayah - b.ayah);
-        setCustomRange({ start: sorted[0].ayah, end: sorted[sorted.length - 1].ayah });
+      if (newSet.has(ayah)) {
+        newSet.delete(ayah);
       } else {
-        setCustomRange({ start: 1, end: 1 });
+        newSet.add(ayah);
       }
       return newSet;
     });
+    setNameEdited(true);
+    setDescriptionEdited(true);
   };
 
-  const selectAllAyahs = () => {
-    if (fullSurahData?.ayahs && selectedSurah) {
-      // All ayahs in fullSurahData.ayahs belong to selectedSurah
-      const surahAyahs = fullSurahData.ayahs;
-      const allAyahNumbers = surahAyahs.map((ayah: any) => ({ surah: selectedSurah, ayah: ayah.numberInSurah }));
-      setSelectedAyahs(new Set(allAyahNumbers));
-      if (surahAyahs.length > 0) {
-        setCustomRange({ start: surahAyahs[0].numberInSurah, end: surahAyahs[surahAyahs.length - 1].numberInSurah });
-      }
-    }
+  // Function to handle range change
+  const handleRangeChange = (type: 'start' | 'end', value: number) => {
+    setCustomRange(prev => ({ ...prev, [type]: value }));
+    setNameEdited(true);
+    setDescriptionEdited(true);
   };
 
-  const clearSelection = () => {
-    setSelectedAyahs(new Set());
-    if (fullSurahData?.ayahs && selectedSurah) {
-      const surahAyahs = fullSurahData.ayahs;
-      if (surahAyahs.length > 0) {
-        setCustomRange({ start: surahAyahs[0].numberInSurah, end: surahAyahs[surahAyahs.length - 1].numberInSurah });
-      } else {
-        setCustomRange({ start: 1, end: 1 });
-      }
-    } else {
-      setCustomRange({ start: 1, end: 1 });
-    }
-  };
-
-  // Update loadFullSurah to accept a surah number
-  const loadFullSurah = async (surahNum: number) => {
-    if (loadingSurah) return;
+  // Function to load full surah data
+  const loadFullSurah = async (surahNumber: number) => {
     setLoadingSurah(true);
     try {
-      const surahData = await getSurah(surahNum);
-      setFullSurahData(surahData);
+      const surah = await getSurah(surahNumber);
+      setFullSurahData(surah);
+      setSelectedSurah(surahNumber);
+      setNameEdited(false);
+      setDescriptionEdited(false);
     } catch (error) {
-      console.error('Error loading full surah:', error);
+      console.error('Error loading surah:', error);
+      // Optionally show an error message to the user
     } finally {
       setLoadingSurah(false);
     }
   };
 
-  const scrollToCurrentPageAyahs = () => {
-    if (!surahContainerRef || !pageData?.ayahs || !fullSurahData?.ayahs) return;
-    
-    // Find the first ayah from the current page
-    const firstCurrentPageAyah = pageData.ayahs[0]?.numberInSurah;
-    if (!firstCurrentPageAyah) return;
-    
-    // Find the button element for this ayah
-    const ayahButton = surahContainerRef.querySelector(`[data-ayah="${firstCurrentPageAyah}"]`) as HTMLElement;
-    if (ayahButton) {
-      // Scroll to the button with some offset for better visibility
-      ayahButton.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'center',
-        inline: 'nearest'
-      });
-    }
-  };
-
+  // Function to scroll to the first selected ayah
   const scrollToFirstSelectedAyah = () => {
-    if (!surahContainerRef || selectedAyahs.size === 0) return;
-    
-    // Find the first selected ayah
-    const firstSelectedAyah = Math.min(...Array.from(selectedAyahs).map(ayah => ayah.ayah));
-    
-    // Find the button element for this ayah
-    const ayahButton = surahContainerRef.querySelector(`[data-ayah="${firstSelectedAyah}"]`) as HTMLElement;
-    if (ayahButton) {
-      // Scroll to the button with some offset for better visibility
-      ayahButton.scrollIntoView({ 
-        behavior: 'smooth', 
-        block: 'center',
-        inline: 'nearest'
-      });
+    if (!surahContainerRef) return;
+    const firstSelectedAyah = Array.from(selectedAyahs)[0];
+    if (firstSelectedAyah) {
+      const ayahElement = surahContainerRef.querySelector(`[data-ayah="${firstSelectedAyah.ayah}"]`);
+      if (ayahElement) {
+        ayahElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
     }
   };
 
-  const updateRangeFromSelectedAyahs = () => {
-    if (selectedAyahs.size === 0) {
-      setCustomRange({ start: 1, end: 1 });
+  // Function to scroll to the current page's ayahs
+  const scrollToCurrentPageAyahs = () => {
+    if (!surahContainerRef) return;
+    const currentPageAyahs = (pageData?.ayahs || []).filter((ayah: any) => ayah.surah?.number === selectedSurah);
+    if (currentPageAyahs.length > 0) {
+      const firstAyahElement = surahContainerRef.querySelector(`[data-ayah="${currentPageAyahs[0].numberInSurah}"]`);
+      if (firstAyahElement) {
+        firstAyahElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+  };
+
+  // Function to handle confirm
+  const handleConfirm = () => {
+    if (selections.length === 0 || !name.trim()) {
+      alert('Please select ayahs and provide a name.');
       return;
     }
-    
-    const sortedAyahs = Array.from(selectedAyahs).sort((a, b) => a.ayah - b.ayah);
-    const minAyah = sortedAyahs[0].ayah;
-    const maxAyah = sortedAyahs[sortedAyahs.length - 1].ayah;
-    
-    // Always update range to show the min/max of selected ayahs
-    setCustomRange({ start: minAyah, end: maxAyah });
+    onConfirm(selections, name, description, memorizationLevel);
+    onClose();
   };
 
-  const handleRangeChange = (field: 'start' | 'end', value: number) => {
-    const newRange = { ...customRange, [field]: value };
-    setCustomRange(newRange);
-    if (
-      newRange.start &&
-      newRange.end &&
-      newRange.end >= newRange.start &&
-      fullSurahData?.ayahs &&
-      selectedSurah
-    ) {
-      // Always update selectedAyahs to match the range
-      const rangeAyahs = fullSurahData.ayahs
-        .filter(
-          (ayah: any) =>
-            ayah.numberInSurah >= newRange.start &&
-            ayah.numberInSurah <= newRange.end
-        )
-        .map((ayah: any) => ({ surah: selectedSurah, ayah: ayah.numberInSurah }));
-      setSelectedAyahs(new Set(rangeAyahs));
-    } else {
-      // If range is invalid, clear selection
-      setSelectedAyahs(new Set());
-    }
-  };
-
+  // Function to get the current selections for the modal
   const getSelectedAyahsInfo = () => {
     if (selectionType === 'surah') {
       const surahAyahs = (pageData?.ayahs || []).filter((ayah: any) => ayah.surah?.number === selectedSurah);
@@ -367,27 +338,35 @@ export default function EnhancedMemorizationModal({
         ayahEnd: lastAyah.numberInSurah,
         surahName: firstAyah.surah?.name
       }];
+    } else if (selectionType === 'custom') {
+      // For custom, use selectedAyahs and customRange
+      if (selectedAyahs.size === 0) return [];
+      const sorted = Array.from(selectedAyahs).sort((a, b) => a.ayah - b.ayah);
+      const minAyah = sorted[0].ayah;
+      const maxAyah = sorted[sorted.length - 1].ayah;
+      return [{
+        surah: selectedSurah,
+        ayahStart: minAyah,
+        ayahEnd: maxAyah,
+        surahName: fullSurahData?.name || ''
+      }];
     } else {
       // Ayah selection mode - handle multi-surah selections
       if (selectedAyahs.size === 0) return [];
-      
       // Group selected ayahs by surah
       const groupedBySurah: { [key: number]: { surah: number, ayah: number }[] } = {};
       Array.from(selectedAyahs).forEach(sel => {
         if (!groupedBySurah[sel.surah]) groupedBySurah[sel.surah] = [];
         groupedBySurah[sel.surah].push(sel);
       });
-      
       // Process each surah group
       const selections: Array<{surah: number, ayahStart: number, ayahEnd: number, surahName: string}> = [];
       for (const [surahNumber, ayahs] of Object.entries(groupedBySurah)) {
         const sortedAyahs = ayahs.sort((a, b) => a.ayah - b.ayah);
-        
         // Group consecutive ayahs within each surah
         const groups = [];
         let start = sortedAyahs[0];
         let end = sortedAyahs[0];
-        
         for (let i = 1; i < sortedAyahs.length; i++) {
           if (sortedAyahs[i].ayah === end.ayah + 1) {
             end = sortedAyahs[i];
@@ -398,60 +377,21 @@ export default function EnhancedMemorizationModal({
           }
         }
         groups.push({ start, end });
-        
         // Add each group as a selection
         groups.forEach(group => {
           selections.push({
             surah: Number(surahNumber),
             ayahStart: group.start.ayah,
             ayahEnd: group.end.ayah,
-            surahName: `Surah ${surahNumber}` // You might want to get the actual surah name
+            surahName: `Surah ${surahNumber}`
           });
         });
       }
-      
       return selections;
     }
   };
 
-  const handleConfirm = () => {
-    const selections = getSelectedAyahsInfo();
-    if (selections.length === 0) return;
-    
-    onConfirm(selections, name, description, memorizationLevel);
-  };
-
   const selections = getSelectedAyahsInfo();
-
-
-
-  // After all hooks, do the early return
-  if (!isOpen) return null;
-
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setName(e.target.value);
-    setNameEdited(true);
-  };
-  const handleDescriptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDescription(e.target.value);
-    setDescriptionEdited(true);
-  };
-
-  // In the ayah selection UI, count and highlight only selected ayahs for the selectedSurah
-  const selectedAyahsForSurah = Array.from(selectedAyahs).filter(ayah => {
-    if (!fullSurahData?.ayahs) return false;
-    return fullSurahData.ayahs.some((a: any) => a.numberInSurah === ayah.ayah);
-  });
-
-  // Get total count of all selected ayahs (from all surahs)
-  const totalSelectedAyahs = selectedAyahs.size;
-  // Get count of selected ayahs for the current surah only
-  const selectedAyahsForCurrentSurah = selectedAyahsForSurah.length;
-
-  // Selection type handler
-  const handleSelectionTypeChange = (value: 'surah' | 'page' | 'ayahs' | 'custom') => {
-    setSelectionType(value);
-  };
 
   return (
     <Dialog open={isOpen} onOpenChange={open => { if (!open) onClose(); }}>
