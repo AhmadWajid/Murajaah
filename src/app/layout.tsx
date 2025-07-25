@@ -34,7 +34,33 @@ export const metadata: Metadata = {
       }
     ],
     shortcut: '/icon.svg',
-    apple: '/icon.svg',
+    apple: [
+      {
+        url: '/apple-touch-icon.svg',
+        sizes: '180x180',
+        type: 'image/svg+xml',
+      }
+    ],
+    other: [
+      {
+        rel: 'icon',
+        url: '/icon-192.svg',
+        sizes: '192x192',
+        type: 'image/svg+xml',
+      },
+      {
+        rel: 'icon',
+        url: '/icon-512.svg', 
+        sizes: '512x512',
+        type: 'image/svg+xml',
+      }
+    ]
+  },
+  manifest: '/manifest.json',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Murajaah',
   },
 };
 
@@ -52,6 +78,13 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" dir="ltr">
+      <head>
+        <meta name="apple-mobile-web-app-capable" content="yes" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+        <meta name="apple-mobile-web-app-title" content="Murajaah" />
+        <link rel="apple-touch-icon" href="/apple-touch-icon.svg" />
+        <link rel="mask-icon" href="/icon.svg" color="#10B981" />
+      </head>
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
