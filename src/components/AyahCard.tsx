@@ -684,51 +684,24 @@ export default function AyahCard({
                   if (!reviewItem) return null;
                   
                   // Calculate the current memorization age by adding days passed since creation
-                  let daysSinceCreation: number;
-                  const debugMemorizationAge: number | undefined = reviewItem.memorizationAge;
+                  let currentMemorizationAge: number;
+                  let daysPassedSinceCreation: number;
+                  const originalMemorizationAge: number | undefined = reviewItem.memorizationAge;
                   
                   if (reviewItem.memorizationAge !== undefined) {
                     // Calculate days passed since the item was added to the app
                     const createdAt = new Date(reviewItem.createdAt);
                     const today = new Date();
-                    const daysPassedSinceCreation = Math.floor((today.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+                    daysPassedSinceCreation = Math.floor((today.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
                     
                     // Current memorization age = original memorization age + days passed since creation
-                    daysSinceCreation = reviewItem.memorizationAge + daysPassedSinceCreation;
+                    currentMemorizationAge = reviewItem.memorizationAge + daysPassedSinceCreation;
                   } else {
                     // Fallback to calculating from createdAt (for existing items without memorizationAge)
                     const createdAt = new Date(reviewItem.createdAt);
                     const today = new Date();
-                    daysSinceCreation = Math.floor((today.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
-                  }
-
-                  // Debug output
-                  return (
-                    <div className="mb-2 text-xs text-gray-400">
-                      memorizationAge: {String(debugMemorizationAge)} | daysSinceCreation: {String(daysSinceCreation)}
-                    </div>
-                  );
-                })()}
-                {(() => {
-                  const reviewItem = getReviewItem();
-                  if (!reviewItem) return null;
-                  
-                  // Calculate the current memorization age by adding days passed since creation
-                  let daysSinceCreation: number;
-                  
-                  if (reviewItem.memorizationAge !== undefined) {
-                    // Calculate days passed since the item was added to the app
-                    const createdAt = new Date(reviewItem.createdAt);
-                    const today = new Date();
-                    const daysPassedSinceCreation = Math.floor((today.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
-                    
-                    // Current memorization age = original memorization age + days passed since creation
-                    daysSinceCreation = reviewItem.memorizationAge + daysPassedSinceCreation;
-                  } else {
-                    // Fallback to calculating from createdAt (for existing items without memorizationAge)
-                    const createdAt = new Date(reviewItem.createdAt);
-                    const today = new Date();
-                    daysSinceCreation = Math.floor((today.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+                    daysPassedSinceCreation = Math.floor((today.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+                    currentMemorizationAge = daysPassedSinceCreation;
                   }
                   
                   // Define intervals based on memorization age
@@ -736,11 +709,11 @@ export default function AyahCard({
                   let mediumInterval: number;
                   let hardInterval: number;
                   
-                  if (daysSinceCreation < 10) {
+                  if (currentMemorizationAge < 10) {
                     easyInterval = 1;
                     mediumInterval = 1;
                     hardInterval = 1;
-                  } else if (daysSinceCreation < 180) {
+                  } else if (currentMemorizationAge < 180) {
                     easyInterval = 4;
                     mediumInterval = 2;
                     hardInterval = 1;
@@ -751,7 +724,8 @@ export default function AyahCard({
                   }
                   
                   return (
-                    <div className="space-y-2">
+                    <div className="space-y-4">
+                      <div className="space-y-2">
                       <Button
                         onClick={() => {
                           if (reviewItem) {
@@ -806,6 +780,7 @@ export default function AyahCard({
                           1 day
                         </Badge>
                       </Button>
+                      </div>
                     </div>
                   );
                 })()}
