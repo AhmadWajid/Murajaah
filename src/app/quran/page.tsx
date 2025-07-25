@@ -394,11 +394,6 @@ function QuranPageContent() {
             // Update current position
             setCurrentSurah(memorizationItem.surah);
             setCurrentAyah(memorizationItem.ayahStart);
-            console.log('Set highlighted range:', { 
-              surah: memorizationItem.surah, 
-              start: memorizationItem.ayahStart, 
-              end: memorizationItem.ayahEnd 
-            });
           });
           return;
         } else {
@@ -804,10 +799,8 @@ function QuranPageContent() {
     setShowEnhancedModal(true);
   };
 
-  const handleEnhancedMemorization = async (selections: any[], name: string, description?: string, memorizationLevel?: string) => {
+  const handleEnhancedMemorization = async (selections: any[], name: string, description?: string, memorizationLevel?: string, memorizationAge?: number) => {
     try {
-      console.log('Creating enhanced memorization with selections:', selections);
-      
       // If all selections are from the same surah and are adjacent, create a single item
       const allSameSurah = selections.every(s => s.surah === selections[0].surah);
       const allAdjacent = selections.length === 1 || 
@@ -825,7 +818,9 @@ function QuranPageContent() {
           surah, 
           minAyah, 
           maxAyah, 
-          memorizationLevel
+          memorizationLevel,
+          undefined, // userTimeZone
+          memorizationAge
         );
         
         memorizationItem.name = name;
@@ -833,7 +828,6 @@ function QuranPageContent() {
         memorizationItem.tags = [];
 
         addMemorizationItem(memorizationItem);
-        console.log(`Created 1 memorization item for adjacent ayahs: ${surah}:${minAyah}-${maxAyah}`);
       } else {
         // Create separate memorization items for each selection
         const createdItems = [];
@@ -846,7 +840,9 @@ function QuranPageContent() {
             selection.surah,
             selection.ayahStart,
             selection.ayahEnd,
-            memorizationLevel
+            memorizationLevel,
+            undefined, // userTimeZone
+            memorizationAge
           );
           
           memorizationItem.name = itemName;
@@ -856,8 +852,6 @@ function QuranPageContent() {
           addMemorizationItem(memorizationItem);
           createdItems.push(memorizationItem);
         }
-        
-        console.log(`Created ${createdItems.length} separate memorization items for non-adjacent selections`);
       }
 
       // Clear selections and close modal
@@ -896,7 +890,7 @@ function QuranPageContent() {
         if (!isNaN(surah) && !isNaN(start) && !isNaN(end)) {
           // Create memorization item
           const id = generateMemorizationId(surah, start, end);
-          const item = await createMemorizationItem(surah, start, end, 'active');
+          const item = await createMemorizationItem(surah, start, end, 'active', undefined, 0);
           addMemorizationItem(item);
           
           // Navigate to the page containing the first ayah
@@ -930,7 +924,7 @@ function QuranPageContent() {
         
         if (surah && !isNaN(start) && !isNaN(end)) {
           const id = generateMemorizationId(surah.number, start, end);
-          const item = await createMemorizationItem(surah.number, start, end, 'active');
+          const item = await createMemorizationItem(surah.number, start, end, 'active', undefined, 0);
           addMemorizationItem(item);
           
           getPageForAyah(surah.number, start).then(pageNumber => {

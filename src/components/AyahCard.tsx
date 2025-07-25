@@ -674,70 +674,141 @@ export default function AyahCard({
               {/* Rating Selection */}
               <div className="space-y-4">
                 <div>
-                  <h4 className="text-lg font-semibold mb-2">Knowledge Level</h4>
+                  <h4 className="text-lg font-semibold mb-2">How well did you recall this passage?</h4>
                   <p className="text-sm text-muted-foreground mb-4">
-                    How well did you recall this passage?
+                    Select your recall quality to schedule the next review interval.
                   </p>
                 </div>
-                <div className="space-y-2">
-                  <Button
-                    onClick={() => {
-                      const reviewItem = getReviewItem();
-                      if (reviewItem) {
-                        onReviewComplete?.({ ...reviewItem, rating: 'easy' });
-                      }
-                      setShowReviewRatingDropdown(false);
-                    }}
-                    variant="outline"
-                    className="w-full justify-between h-auto p-4 text-left"
-                  >
-                    <div>
-                      <div className="font-medium">Easy</div>
-                      <div className="text-sm text-muted-foreground">Perfect recall, no mistakes</div>
+                {(() => {
+                  const reviewItem = getReviewItem();
+                  if (!reviewItem) return null;
+                  
+                  // Calculate the current memorization age by adding days passed since creation
+                  let daysSinceCreation: number;
+                  const debugMemorizationAge: number | undefined = reviewItem.memorizationAge;
+                  
+                  if (reviewItem.memorizationAge !== undefined) {
+                    // Calculate days passed since the item was added to the app
+                    const createdAt = new Date(reviewItem.createdAt);
+                    const today = new Date();
+                    const daysPassedSinceCreation = Math.floor((today.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+                    
+                    // Current memorization age = original memorization age + days passed since creation
+                    daysSinceCreation = reviewItem.memorizationAge + daysPassedSinceCreation;
+                  } else {
+                    // Fallback to calculating from createdAt (for existing items without memorizationAge)
+                    const createdAt = new Date(reviewItem.createdAt);
+                    const today = new Date();
+                    daysSinceCreation = Math.floor((today.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+                  }
+
+                  // Debug output
+                  return (
+                    <div className="mb-2 text-xs text-gray-400">
+                      memorizationAge: {String(debugMemorizationAge)} | daysSinceCreation: {String(daysSinceCreation)}
                     </div>
-                    <Badge variant="outline" className="text-xs">
-                      doubles
-                    </Badge>
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      const reviewItem = getReviewItem();
-                      if (reviewItem) {
-                        onReviewComplete?.({ ...reviewItem, rating: 'medium' });
-                      }
-                      setShowReviewRatingDropdown(false);
-                    }}
-                    variant="outline"
-                    className="w-full justify-between h-auto p-4 text-left"
-                  >
-                    <div>
-                      <div className="font-medium">Medium</div>
-                      <div className="text-sm text-muted-foreground">Good recall with minor hesitation</div>
+                  );
+                })()}
+                {(() => {
+                  const reviewItem = getReviewItem();
+                  if (!reviewItem) return null;
+                  
+                  // Calculate the current memorization age by adding days passed since creation
+                  let daysSinceCreation: number;
+                  
+                  if (reviewItem.memorizationAge !== undefined) {
+                    // Calculate days passed since the item was added to the app
+                    const createdAt = new Date(reviewItem.createdAt);
+                    const today = new Date();
+                    const daysPassedSinceCreation = Math.floor((today.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+                    
+                    // Current memorization age = original memorization age + days passed since creation
+                    daysSinceCreation = reviewItem.memorizationAge + daysPassedSinceCreation;
+                  } else {
+                    // Fallback to calculating from createdAt (for existing items without memorizationAge)
+                    const createdAt = new Date(reviewItem.createdAt);
+                    const today = new Date();
+                    daysSinceCreation = Math.floor((today.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
+                  }
+                  
+                  // Define intervals based on memorization age
+                  let easyInterval: number;
+                  let mediumInterval: number;
+                  let hardInterval: number;
+                  
+                  if (daysSinceCreation < 10) {
+                    easyInterval = 1;
+                    mediumInterval = 1;
+                    hardInterval = 1;
+                  } else if (daysSinceCreation < 180) {
+                    easyInterval = 4;
+                    mediumInterval = 2;
+                    hardInterval = 1;
+                  } else {
+                    easyInterval = 7;
+                    mediumInterval = 4;
+                    hardInterval = 1;
+                  }
+                  
+                  return (
+                    <div className="space-y-2">
+                      <Button
+                        onClick={() => {
+                          if (reviewItem) {
+                            onReviewComplete?.({ ...reviewItem, rating: 'easy' });
+                          }
+                          setShowReviewRatingDropdown(false);
+                        }}
+                        variant="outline"
+                        className="w-full justify-between h-auto p-4 text-left"
+                      >
+                        <div>
+                          <div className="font-medium">Easy</div>
+                          <div className="text-sm text-muted-foreground">Perfect recall, no mistakes</div>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {easyInterval} day{easyInterval !== 1 ? 's' : ''}
+                        </Badge>
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          if (reviewItem) {
+                            onReviewComplete?.({ ...reviewItem, rating: 'medium' });
+                          }
+                          setShowReviewRatingDropdown(false);
+                        }}
+                        variant="outline"
+                        className="w-full justify-between h-auto p-4 text-left"
+                      >
+                        <div>
+                          <div className="font-medium">Medium</div>
+                          <div className="text-sm text-muted-foreground">Good recall with minor hesitation</div>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {mediumInterval} day{mediumInterval !== 1 ? 's' : ''}
+                        </Badge>
+                      </Button>
+                      <Button
+                        onClick={() => {
+                          if (reviewItem) {
+                            onReviewComplete?.({ ...reviewItem, rating: 'hard' });
+                          }
+                          setShowReviewRatingDropdown(false);
+                        }}
+                        variant="outline"
+                        className="w-full justify-between h-auto p-4 text-left"
+                      >
+                        <div>
+                          <div className="font-medium">Hard</div>
+                          <div className="text-sm text-muted-foreground">Difficult recall, needed help</div>
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          1 day
+                        </Badge>
+                      </Button>
                     </div>
-                    <Badge variant="outline" className="text-xs">
-                      maintains
-                    </Badge>
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      const reviewItem = getReviewItem();
-                      if (reviewItem) {
-                        onReviewComplete?.({ ...reviewItem, rating: 'hard' });
-                      }
-                      setShowReviewRatingDropdown(false);
-                    }}
-                    variant="outline"
-                    className="w-full justify-between h-auto p-4 text-left"
-                  >
-                    <div>
-                      <div className="font-medium">Hard</div>
-                      <div className="text-sm text-muted-foreground">Difficult recall, needed help</div>
-                    </div>
-                    <Badge variant="outline" className="text-xs">
-                      resets
-                    </Badge>
-                  </Button>
-                </div>
+                  );
+                })()}
               </div>
             </div>
           </Card>

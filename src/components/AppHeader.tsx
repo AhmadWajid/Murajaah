@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import { RefreshCw, BarChart3, Plus } from 'lucide-react';
+import { RefreshCw, BarChart3, Target } from 'lucide-react';
 
 interface AppHeaderProps {
   pageType: 'home' | 'quran';
@@ -62,8 +62,8 @@ export default function AppHeader({
               </Button>
               <Button variant="outline" size="sm" asChild className="px-2 sm:px-4">
                 <Link href="/quran?addReview=1">
-                  <Plus className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Add New</span>
+                  <Target className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Add Review</span>
                 </Link>
               </Button>
             </div>

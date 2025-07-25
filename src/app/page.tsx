@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { getAllMemorizationItems, updateMemorizationItem, removeMemorizationItem, cleanupDuplicateItems, getMistakesList, MistakeData, removeMistake, addMemorizationItem } from '@/lib/storage';
 import { generateMemorizationId, getTodayISODate } from '@/lib/utils';
 import { MemorizationItem, updateInterval, resetDailyCompletions, getDueItems, getUpcomingReviews } from '@/lib/spacedRepetition';
@@ -13,6 +14,7 @@ import { Badge } from '@/components/ui/badge';
 import { ChevronDown, ChevronRight, Trash2, CheckCircle, Edit } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import AppHeader from '@/components/AppHeader';
+import ReviewCard from '@/components/ReviewCard';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -163,6 +165,7 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
 
 
 export default function Dashboard() {
+  const router = useRouter();
   const [items, setItems] = useState<MemorizationItem[]>([]);
   const [dueItems, setDueItems] = useState<MemorizationItem[]>([]);
   const [upcomingItems, setUpcomingItems] = useState<MemorizationItem[]>([]);
@@ -652,7 +655,11 @@ export default function Dashboard() {
                       {getCompletedTodayItems().map((item) => {
                         const reviewDate = parseLocalDate(item.nextReview).toLocaleDateString();
                         return (
-                          <tr key={item.id} className="border-b hover:bg-green-50/30 dark:hover:bg-green-950/10">
+                          <tr 
+                            key={item.id} 
+                            className="border-b hover:bg-green-50/30 dark:hover:bg-green-950/10 cursor-pointer"
+                            onClick={() => router.push(`/quran?review=${encodeURIComponent(item.id)}`)}
+                          >
                             <td className="p-2">
                               <div>
                                 <div className="font-medium text-sm">
@@ -720,7 +727,7 @@ export default function Dashboard() {
                               <Link
                                 key={item.id}
                                 href={`/quran?review=${encodeURIComponent(item.id)}`}
-                                className={`flex items-center justify-between px-3 py-2 border-b last:border-b-0 bg-white dark:bg-black/30 ${isCompletedToday ? 'bg-green-50/50 dark:bg-green-950/20 border-l-4 border-l-green-500' : ''} transition hover:bg-muted/40`}
+                                className={`flex items-center justify-between px-3 py-2 border-b last:border-b-0 bg-white dark:bg-black/30 ${isCompletedToday ? 'bg-green-50/50 dark:bg-green-950/20 border-l-4 border-l-green-500' : ''} transition hover:bg-muted/40 cursor-pointer`}
                                 style={{ textDecoration: 'none' }}
                               >
                                 <div className="flex-1 min-w-0">
@@ -802,6 +809,30 @@ export default function Dashboard() {
                     const isToday = label === 'Today';
                     const expanded = expandedDates[date] ?? isToday;
                     const rowColor = dateColorMap[date] || '';
+
+                    // Map rowColor to a specific hover:bg-* class
+                    const colorToHoverClass: Record<string, string> = {
+                      'bg-blue-50': 'hover:bg-blue-50',
+                      'bg-yellow-50': 'hover:bg-yellow-50',
+                      'bg-purple-50': 'hover:bg-purple-50',
+                      'bg-pink-50': 'hover:bg-pink-50',
+                      'bg-orange-50': 'hover:bg-orange-50',
+                      'bg-cyan-50': 'hover:bg-cyan-50',
+                      'bg-lime-50': 'hover:bg-lime-50',
+                      'dark:bg-blue-950/20': 'dark:hover:bg-blue-950/20',
+                      'dark:bg-yellow-950/20': 'dark:hover:bg-yellow-950/20',
+                      'dark:bg-purple-950/20': 'dark:hover:bg-purple-950/20',
+                      'dark:bg-pink-950/20': 'dark:hover:bg-pink-950/20',
+                      'dark:bg-orange-950/20': 'dark:hover:bg-orange-950/20',
+                      'dark:bg-cyan-950/20': 'dark:hover:bg-cyan-950/20',
+                      'dark:bg-lime-950/20': 'dark:hover:bg-lime-950/20',
+                    };
+                    // Extract the base color (e.g., bg-blue-50) from rowColor
+                    const baseColor = (rowColor.match(/bg-[a-z]+-\d+/) || [])[0] || '';
+                    const darkColor = (rowColor.match(/dark:bg-[a-z]+-\d+\/\d+/) || [])[0] || '';
+                    const hoverClass = colorToHoverClass[baseColor] || '';
+                    const darkHoverClass = colorToHoverClass[darkColor] || '';
+
                     return (
                       <React.Fragment key={date}>
                         <tr className={`border-b cursor-pointer ${rowColor}`}
@@ -820,9 +851,15 @@ export default function Dashboard() {
                           const today = getTodayISODate();
                           const isCompletedToday = item.completedToday === today;
                           return (
-                            <tr key={item.id} className={`border-b hover:bg-muted/50 ${
-                              isCompletedToday ? 'bg-green-50/50 dark:bg-green-950/20 border-l-4 border-l-green-500' : ''
-                            }`}>
+                            <tr
+                              key={item.id}
+                              className={`border-b cursor-pointer ${
+                                isCompletedToday ? 'bg-green-50/50 dark:bg-green-950/20 border-l-4 border-l-green-500' : ''
+                              } ${hoverClass} ${darkHoverClass}`}
+                              onClick={() => {
+                                window.location.href = `/quran?review=${encodeURIComponent(item.id)}`;
+                              }}
+                            >
                               <td className="p-3">
                                 <div>
                                   <div className="font-medium text-sm">
@@ -864,6 +901,7 @@ export default function Dashboard() {
                                     <button
                                       className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-green-100 dark:hover:bg-green-900/30 focus:outline-none"
                                       onClick={e => {
+                                        e.stopPropagation();
                                         e.preventDefault();
                                         setReviewingItem(item);
                                       }}
@@ -879,6 +917,7 @@ export default function Dashboard() {
                                     variant="outline"
                                     className="w-8 h-8 p-0"
                                     onClick={e => {
+                                      e.stopPropagation();
                                       e.preventDefault();
                                       handleEdit(item);
                                     }}
@@ -888,6 +927,7 @@ export default function Dashboard() {
                                   <button
                                     className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/50 focus:outline-none"
                                     onClick={e => {
+                                      e.stopPropagation();
                                       e.preventDefault();
                                       setShowDeleteConfirm(item.id);
                                     }}
@@ -956,31 +996,119 @@ export default function Dashboard() {
           </Dialog>
         )}
 
-        {/* Add the review modal, similar to the edit modal, but for reviewing the item */}
+        {/* Review Modal */}
         {reviewingItem && (
-          <Dialog open={!!reviewingItem} onOpenChange={() => setReviewingItem(null)}>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Review Item</DialogTitle>
-              </DialogHeader>
-              {/* Place your review UI/modal content here, e.g., quick review buttons or details */}
-              <div className="flex flex-col gap-4">
-                <div>
-                  <div className="font-medium text-sm">
-                    {formatAyahRange(reviewingItem.surah, reviewingItem.ayahStart, reviewingItem.ayahEnd)}
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-60 p-4">
+            <div className="bg-card text-card-foreground gap-6 rounded-xl py-6 w-full max-w-lg max-h-[90vh] shadow-2xl border flex flex-col" data-modal="review-rating">
+              {/* Header */}
+              <div className="flex items-center justify-between p-6 border-b">
+                <div className="flex items-center space-x-3">
+                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Complete Review</h3>
+                  <span className="inline-flex items-center justify-center rounded-md border px-2 py-0.5 font-medium w-fit whitespace-nowrap shrink-0 border-transparent bg-secondary text-secondary-foreground text-xs">
+                    {reviewingItem.surah === 1 ? 'Al-Fatihah' : 
+                     reviewingItem.surah === 2 ? 'Al-Baqarah' : 
+                     `Surah ${reviewingItem.surah}`} {reviewingItem.ayahStart}{reviewingItem.ayahStart !== reviewingItem.ayahEnd ? `-${reviewingItem.ayahEnd}` : ''}
+                  </span>
+                  <span className="text-sm text-muted-foreground">
+                    {reviewingItem.surah === 1 ? 'الفاتحة' : 
+                     reviewingItem.surah === 2 ? 'البقرة' : 
+                     `سورة ${reviewingItem.surah}`} {reviewingItem.ayahStart}{reviewingItem.ayahStart !== reviewingItem.ayahEnd ? `-${reviewingItem.ayahEnd}` : ''}
+                  </span>
+                </div>
+                <button 
+                  onClick={() => setReviewingItem(null)}
+                  className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 rounded-md gap-1.5 h-8 w-8 p-0"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="space-y-2">
+                  <div className="flex justify-center gap-4 text-sm text-muted-foreground">
+                    <span>Reviews: {reviewingItem.reviewCount}</span>
+                    <span>Interval: {(() => {
+                      const today = new Date();
+                      const nextReview = new Date(reviewingItem.nextReview);
+                      const diffTime = nextReview.getTime() - today.getTime();
+                      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                      return diffDays > 0 ? `${diffDays}d` : 'Today';
+                    })()}</span>
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatAyahRangeArabic(reviewingItem.surah, reviewingItem.ayahStart, reviewingItem.ayahEnd)}
+                  <div className="text-center text-sm text-muted-foreground">
+                    {reviewingItem.name}
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <Button onClick={() => { handleQuickReview(reviewingItem, 'easy'); setReviewingItem(null); }}>Easy</Button>
-                  <Button onClick={() => { handleQuickReview(reviewingItem, 'medium'); setReviewingItem(null); }}>Medium</Button>
-                  <Button onClick={() => { handleQuickReview(reviewingItem, 'hard'); setReviewingItem(null); }}>Hard</Button>
+
+                <div className="space-y-4">
+                  <div>
+                    <h4 className="text-lg font-semibold mb-2">How well did you recall this passage?</h4>
+                    <p className="text-sm text-muted-foreground mb-4">Select your recall quality to schedule the next review interval.</p>
+                  </div>
+
+                  {/* Rating buttons */}
+                  <div className="space-y-2">
+                    <button 
+                      onClick={() => {
+                        const updatedItem = { ...reviewingItem, rating: 5, completed: true };
+                        updateMemorizationItem(updatedItem);
+                        loadAllData();
+                        setReviewingItem(null);
+                      }}
+                      className="inline-flex items-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 w-full justify-between h-auto p-4 text-left"
+                    >
+                      <div>
+                        <div className="font-medium">Easy</div>
+                        <div className="text-sm text-muted-foreground">Perfect recall, no mistakes</div>
+                      </div>
+                      <span className="inline-flex items-center justify-center rounded-md border px-2 py-0.5 font-medium w-fit whitespace-nowrap shrink-0 text-foreground text-xs">
+                        4 days
+                      </span>
+                    </button>
+
+                    <button 
+                      onClick={() => {
+                        const updatedItem = { ...reviewingItem, rating: 3, completed: true };
+                        updateMemorizationItem(updatedItem);
+                        loadAllData();
+                        setReviewingItem(null);
+                      }}
+                      className="inline-flex items-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 w-full justify-between h-auto p-4 text-left"
+                    >
+                      <div>
+                        <div className="font-medium">Medium</div>
+                        <div className="text-sm text-muted-foreground">Good recall with minor hesitation</div>
+                      </div>
+                      <span className="inline-flex items-center justify-center rounded-md border px-2 py-0.5 font-medium w-fit whitespace-nowrap shrink-0 text-foreground text-xs">
+                        2 days
+                      </span>
+                    </button>
+
+                    <button 
+                      onClick={() => {
+                        const updatedItem = { ...reviewingItem, rating: 1, completed: true };
+                        updateMemorizationItem(updatedItem);
+                        loadAllData();
+                        setReviewingItem(null);
+                      }}
+                      className="inline-flex items-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 w-full justify-between h-auto p-4 text-left"
+                    >
+                      <div>
+                        <div className="font-medium">Hard</div>
+                        <div className="text-sm text-muted-foreground">Difficult recall, needed help</div>
+                      </div>
+                      <span className="inline-flex items-center justify-center rounded-md border px-2 py-0.5 font-medium w-fit whitespace-nowrap shrink-0 text-foreground text-xs">
+                        1 day
+                      </span>
+                    </button>
+                  </div>
                 </div>
               </div>
-            </DialogContent>
-          </Dialog>
+            </div>
+          </div>
         )}
 
         {/* Delete Confirmation */}
@@ -996,9 +1124,10 @@ export default function Dashboard() {
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => showDeleteConfirm && handleDelete(showDeleteConfirm)}
-                className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-                  >
-                    Delete
+                className="bg-red-600 text-white hover:bg-red-700 focus:ring-red-500"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
@@ -1035,8 +1164,9 @@ export default function Dashboard() {
                     }
                   }
                 }}
-                className="bg-red-600 text-white hover:bg-red-700"
+                className="bg-red-600 text-white hover:bg-red-700 focus:ring-red-500"
               >
+                <Trash2 className="h-4 w-4 mr-2" />
                 {showMistakeDeleteConfirm?.deleteAll ? 'Remove All Mistakes' : 'Remove Mistake'}
               </AlertDialogAction>
             </AlertDialogFooter>

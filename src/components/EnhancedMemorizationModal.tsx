@@ -19,18 +19,13 @@ interface EnhancedMemorizationModalProps {
   currentSurah: number;
   pageData: any;
   selectedAyahs?: Set<{surah: number, ayah: number}>;
-  onConfirm: (selections: any[], name: string, description?: string, memorizationLevel?: string) => void;
+  onConfirm: (selections: any[], name: string, description?: string, memorizationLevel?: string, memorizationAge?: number) => void;
   onClose: () => void;
 }
 
-// Memorization level options
-const MEMORIZATION_LEVELS = [
-  { value: 'new', label: 'New to Me', interval: 1, color: 'from-red-500 to-pink-500' },
-  { value: 'beginner', label: 'Beginner', interval: 2, color: 'from-orange-500 to-red-500' },
-  { value: 'intermediate', label: 'Intermediate', interval: 5, color: 'from-yellow-500 to-orange-500' },
-  { value: 'advanced', label: 'Advanced', interval: 10, color: 'from-green-500 to-emerald-500' },
-  { value: 'mastered', label: 'Mastered', interval: 20, color: 'from-blue-500 to-indigo-500' }
-];
+// Remove MEMORIZATION_LEVELS and memorizationLevel state
+// Remove knowledge level selection UI
+// In onConfirm, do not pass memorizationLevel
 
 export default function EnhancedMemorizationModal({
   isOpen,
@@ -41,21 +36,26 @@ export default function EnhancedMemorizationModal({
   onConfirm,
   onClose
 }: EnhancedMemorizationModalProps) {
-  if (!isOpen) return null;
   const searchParams = useSearchParams();
   // All useState and useEffect hooks must be at the top
   const [selectionType, setSelectionType] = useState<'surah' | 'page' | 'ayahs' | 'custom'>('page');
   const [selectedAyahs, setSelectedAyahs] = useState<Set<{surah: number, ayah: number}>>(new Set());
   const [customRange, setCustomRange] = useState({ start: 1, end: 1 });
-  const [memorizationLevel, setMemorizationLevel] = useState('new');
+  // Remove MEMORIZATION_LEVELS and memorizationLevel state
+  // Remove knowledge level selection UI
+  // In onConfirm, do not pass memorizationLevel
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [memorizationAge, setMemorizationAge] = useState<number>(0); // Days since first memorized
   const [fullSurahData, setFullSurahData] = useState<any>(null);
   const [loadingSurah, setLoadingSurah] = useState(false);
   const [surahContainerRef, setSurahContainerRef] = useState<HTMLDivElement | null>(null);
   const [nameEdited, setNameEdited] = useState(false);
   const [descriptionEdited, setDescriptionEdited] = useState(false);
   const [selectedSurah, setSelectedSurah] = useState<number | null>(null);
+  // Remove initialRating state
+  // Remove the entire Easy/Medium/Hard selector UI block
+  // In onConfirm, do not pass memorizationLevel
 
   // Set selectionType to 'custom' if addReview param is present and modal is open
   useEffect(() => {
@@ -308,7 +308,7 @@ export default function EnhancedMemorizationModal({
       alert('Please select ayahs and provide a name.');
       return;
     }
-    onConfirm(selections, name, description, memorizationLevel);
+    onConfirm(selections, name, description, undefined, memorizationAge);
     onClose();
   };
 
@@ -390,46 +390,58 @@ export default function EnhancedMemorizationModal({
 
   const selections = getSelectedAyahsInfo();
 
+  // Helper to merge and summarize selections
+  function summarizeSelections(selections: any[]) {
+    // Group by surah
+    const grouped: Record<string, Array<{start: number, end: number}>> = {};
+    selections.forEach(sel => {
+      const surah = sel.surahName || `Surah ${sel.surah}`;
+      const start = Math.min(sel.ayahStart, sel.ayahEnd);
+      const end = Math.max(sel.ayahStart, sel.ayahEnd);
+      if (!grouped[surah]) grouped[surah] = [];
+      grouped[surah].push({ start, end });
+    });
+    // Merge ranges for each surah
+    const merged: Record<string, Array<{start: number, end: number}>> = {};
+    Object.entries(grouped).forEach(([surah, ranges]) => {
+      // Sort and merge
+      const sorted = ranges.sort((a, b) => a.start - b.start);
+      const mergedRanges: Array<{start: number, end: number}> = [];
+      for (const range of sorted) {
+        if (!mergedRanges.length) {
+          mergedRanges.push(range);
+        } else {
+          const last = mergedRanges[mergedRanges.length - 1];
+          if (range.start <= last.end + 1) {
+            last.end = Math.max(last.end, range.end);
+          } else {
+            mergedRanges.push(range);
+          }
+        }
+      }
+      merged[surah] = mergedRanges;
+    });
+    // Render summary
+    return Object.entries(merged).map(([surah, ranges]) => (
+      <span key={surah}>
+        {surah} {ranges.map((r, i) => `${r.start}${r.start !== r.end ? `-${r.end}` : ''}${i < ranges.length - 1 ? ', ' : ''}`).join('')}
+      </span>
+    ));
+  }
+
   return (
     <Dialog open={isOpen} onOpenChange={open => { if (!open) onClose(); }}>
       <DialogContent className="max-w-2xl p-0 bg-transparent border-none shadow-none">
         <DialogTitle className="sr-only">Add for Review</DialogTitle>
         <DialogDescription className="sr-only">Select ayahs, pages, or surahs to add for memorization review</DialogDescription>
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-60 p-4">
-          <Card className="w-full max-w-2xl max-h-[90vh] shadow-2xl border flex flex-col pb-32">
+          <Card className="w-full max-w-2xl max-h-[90vh] shadow-2xl border flex flex-col pb-6">
             {/* Header */}
             <div className="flex items-center justify-between p-6 border-b">
               <div className="flex items-center space-x-3">
                 <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                  Add for Review
+                  Select Content for Review
                 </h3>
-                {selections.length > 0 && (
-                  <div className="flex items-center space-x-2">
-                    <Badge variant="secondary" className="text-xs">
-                      {selections.length} selection{selections.length > 1 ? 's' : ''}
-                    </Badge>
-                    <span className="text-sm text-muted-foreground">
-                      {selections.map((selection, index) => {
-                        const start = Math.min(selection.ayahStart, selection.ayahEnd);
-                        const end = Math.max(selection.ayahStart, selection.ayahEnd);
-                        return (
-                          <span key={index}>
-                            {selection.surahName} {start}{start !== end ? `-${end}` : ''}
-                            {index < selections.length - 1 ? ', ' : ''}
-                          </span>
-                        );
-                      })}
-                    </span>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={clearSelection}
-                      className="h-6 px-2 text-xs"
-                    >
-                      Clear
-                    </Button>
-                  </div>
-                )}
               </div>
               <Button
                 variant="ghost"
@@ -467,7 +479,7 @@ export default function EnhancedMemorizationModal({
 
               {/* Render QuranSelector for Custom mode */}
               {selectionType === 'custom' ? (
-                <QuranSelector onAdd={onClose} hideSelectionType={true} />
+                <QuranSelector onAdd={onClose} hideSelectionType={true} hideInternalControls={true} memorizationAge={memorizationAge} setMemorizationAge={setMemorizationAge} />
               ) : (
                 <>
                   {/* Surah selection dropdown if multiple surahs on page */}
@@ -655,46 +667,76 @@ export default function EnhancedMemorizationModal({
 
                   <Separator />
 
-                  {/* Knowledge Level */}
-                  <div className="space-y-2">
-                    <Label>Knowledge Level</Label>
-                    <div className="grid grid-cols-1 gap-2">
-                      {MEMORIZATION_LEVELS.map((level) => (
-                        <Button
-                          key={level.value}
-                          variant={memorizationLevel === level.value ? "default" : "outline"}
-                          onClick={() => setMemorizationLevel(level.value)}
-                          className="justify-between h-10"
-                        >
-                          <span className="text-sm">{level.label}</span>
-                          <Badge variant={memorizationLevel === level.value ? "secondary" : "outline"} className="text-xs">
-                            {level.interval}d
-                          </Badge>
-                        </Button>
-                      ))}
-                    </div>
-                  </div>
+                  {/* Initial Review Difficulty Selector */}
+                  {/* Remove MEMORIZATION_LEVELS and memorizationLevel state */}
+                  {/* Remove knowledge level selection UI */}
+                  {/* In onConfirm, do not pass memorizationLevel */}
 
 
                 </>
               )}
             </div>
 
-            {/* Action Buttons (hide in custom mode, handled by QuranSelector) */}
-            {selectionType !== 'custom' && (
-              <div className="flex gap-3 p-6 border-t bg-background">
+            {/* Sticky Memorization Age Section */}
+            <div className="sticky bottom-0 left-0 right-0 bg-white dark:bg-gray-800 p-4 border-t border-b z-20">
+              <div className="space-y-1">
+                <Label htmlFor="memorization-age">How long have you been memorizing this?</Label>
+                <Select value={memorizationAge.toString()} onValueChange={(value) => {
+                  const age = parseInt(value);
+                  setMemorizationAge(age);
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select memorization age" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="0">Recently memorized</SelectItem>
+                    <SelectItem value="90">About 3+ months ago</SelectItem>
+                    <SelectItem value="180">About 6+ months ago</SelectItem>
+                  </SelectContent>
+                </Select>
+                <div className="text-xs text-muted-foreground">
+                  This helps determine appropriate review intervals. If you&apos;ve been memorizing this for a while, select the approximate time.
+                </div>
+              </div>
+            </div>
+
+            {/* Move the selection summary and Clear button to always appear above the sticky footer */}
+            <div className="flex items-center justify-between px-6 py-2 border-t bg-gray-50 dark:bg-gray-900/30">
+              <div className="flex items-center space-x-2">
+                <span className="font-semibold">{selections.length} selection{selections.length > 1 ? 's' : ''}</span>
+                <span className="text-sm text-muted-foreground">
+                  {summarizeSelections(selections)}
+                </span>
                 <Button
-                  onClick={handleConfirm}
-                  disabled={selections.length === 0 || !name.trim()}
-                  className="flex-1"
+                  variant="outline"
+                  size="sm"
+                  onClick={clearSelection}
+                  className="h-6 px-2 text-xs"
                 >
-                  Add for Review
-                </Button>
-                <Button variant="outline" onClick={onClose}>
-                  Cancel
+                  Clear
                 </Button>
               </div>
-            )}
+            </div>
+            {/* Debug output for selection troubleshooting */}
+            {/* Remove the debug output <pre> block below the preview bar */}
+
+            {/* Action Buttons (hide in custom mode, handled by QuranSelector) */}
+            {/* Always render the sticky footer with Add for Review and Cancel buttons */}
+            <div className="sticky bottom-0 left-0 right-0 bg-white dark:bg-gray-800 p-6 border-t flex gap-3 z-10">
+              <Button
+                onClick={selectionType === 'custom' ? () => {
+                  const addBtn = document.querySelector('[data-quranselector-add]') as HTMLElement | null;
+                  if (addBtn) addBtn.click();
+                } : handleConfirm}
+                disabled={selectionType !== 'custom' && (selections.length === 0 || !name.trim())}
+                className="flex-1"
+              >
+                Add for Review
+              </Button>
+              <Button variant="outline" onClick={onClose} className="flex-1">
+                Cancel
+              </Button>
+            </div>
           </Card>
         </div>
       </DialogContent>

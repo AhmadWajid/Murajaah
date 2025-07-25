@@ -10,6 +10,7 @@ export interface MemorizationItem {
   lastReviewed?: string;
   completedToday?: string; // ISO date string for daily completion tracking
   createdAt: string;
+  memorizationAge?: number; // Days since first memorized (user-specified)
   individualRatings?: Record<number, 'easy' | 'medium' | 'hard'>;
   individualRecallQuality?: Record<number, RecallQuality>;
   rukuStart?: number;
@@ -37,32 +38,44 @@ export function updateInterval(
 ): MemorizationItem {
   const tz = userTimeZone || getUserTimeZone();
   const today = getTodayInUserTimeZone(tz);
+
+  // Calculate the current memorization age by adding days passed since creation
+  let daysSinceCreation: number;
   
-  // Special handling for "hard" rating - always schedule for next day
-  let newInterval: number;
-  let nextReviewDate: string;
-  
-  if (rating === 'hard') {
-    newInterval = 1; // Always 1 day for hard
-    nextReviewDate = addDaysInUserTimeZone(today, 1, tz);
+  if (item.memorizationAge !== undefined) {
+    // Calculate days passed since the item was added to the app
+    const createdAt = DateTime.fromISO(item.createdAt, { zone: tz });
+    const todayDate = DateTime.now().setZone(tz).startOf('day');
+    const daysPassedSinceCreation = todayDate.diff(createdAt, 'days').days;
+    
+    // Current memorization age = original memorization age + days passed since creation
+    daysSinceCreation = item.memorizationAge + daysPassedSinceCreation;
   } else {
-    // For easy and medium, use the normal spaced repetition algorithm
-    const multiplier = SPACED_REPETITION.RATING_MULTIPLIERS[rating];
-    newInterval = Math.max(1, Math.round(item.interval * multiplier));
-    
-    // Check if this item was already reviewed today
-    const wasAlreadyReviewedToday = item.completedToday === today;
-    
-    if (wasAlreadyReviewedToday) {
-      // If already reviewed today, recalculate based on new rating
-      // This allows updating the rating and interval on the same day
-      nextReviewDate = addDaysInUserTimeZone(today, newInterval, tz);
-    } else {
-      // First review of the day - calculate new nextReview date
-      nextReviewDate = addDaysInUserTimeZone(today, newInterval, tz);
-    }
+    // Fallback to calculating from createdAt (for existing items without memorizationAge)
+    const createdAt = DateTime.fromISO(item.createdAt, { zone: tz });
+    const todayDate = DateTime.now().setZone(tz).startOf('day');
+    daysSinceCreation = todayDate.diff(createdAt, 'days').days;
   }
-  
+
+  // Define intervals based on both rating and how "new" the memorization is
+  let newInterval: number;
+
+  if (daysSinceCreation < 10) {
+    // First 10 days: always daily review
+    newInterval = 1;
+  } else if (daysSinceCreation < 180) {
+    // 10 days to 6 months
+    if (rating === 'easy') newInterval = 4;
+    else if (rating === 'medium') newInterval = 2;
+    else newInterval = 1;
+  } else {
+    // 6+ months
+    if (rating === 'easy') newInterval = 7;
+    else if (rating === 'medium') newInterval = 4;
+    else newInterval = 1;
+  }
+
+  const nextReviewDate = addDaysInUserTimeZone(today, newInterval, tz);
   const newEaseFactor = calculateNewEaseFactor(item.easeFactor, rating);
 
   return {
@@ -145,22 +158,42 @@ export function updateIndividualAyahRating(
       currentReviewCount: item.reviewCount
     });
     
-    // Special handling for "hard" rating - always schedule for next day
+    // Calculate the current memorization age by adding days passed since creation
+    let daysSinceCreation: number;
+    
+    if (item.memorizationAge !== undefined) {
+      // Calculate days passed since the item was added to the app
+      const createdAt = DateTime.fromISO(item.createdAt, { zone: tz });
+      const todayDate = DateTime.now().setZone(tz).startOf('day');
+      const daysPassedSinceCreation = todayDate.diff(createdAt, 'days').days;
+      
+      // Current memorization age = original memorization age + days passed since creation
+      daysSinceCreation = item.memorizationAge + daysPassedSinceCreation;
+    } else {
+      // Fallback to calculating from createdAt (for existing items without memorizationAge)
+      const createdAt = DateTime.fromISO(item.createdAt, { zone: tz });
+      const todayDate = DateTime.now().setZone(tz).startOf('day');
+      daysSinceCreation = todayDate.diff(createdAt, 'days').days;
+    }
+
+    // Define intervals based on both rating and how "new" the memorization is
     let newInterval: number;
     let nextReviewDate: string;
-    
-    if (rating === 'hard') {
-      newInterval = 1; // Always 1 day for hard
-      nextReviewDate = addDaysInUserTimeZone(today, 1, tz);
-      
-      console.log('updateIndividualAyahRating - Hard rating applied:', {
-        newInterval,
-        nextReviewDate
-      });
+
+    if (daysSinceCreation < 10) {
+      // First 10 days: always daily review
+      newInterval = 1;
+    } else if (daysSinceCreation < 180) {
+      // 10 days to 6 months
+      if (rating === 'easy') newInterval = 4;
+      else if (rating === 'medium') newInterval = 2;
+      else newInterval = 1;
     } else {
-      // For easy and medium, use the normal spaced repetition algorithm
-      const multiplier = SPACED_REPETITION.RATING_MULTIPLIERS[rating];
-      newInterval = Math.max(1, Math.round(item.interval * multiplier));
+      // 6+ months
+      if (rating === 'easy') newInterval = 7;
+      else if (rating === 'medium') newInterval = 4;
+      else newInterval = 1;
+    }
       
       // Check if this item was already reviewed today
       const wasAlreadyReviewedToday = item.completedToday === today;
@@ -188,14 +221,12 @@ export function updateIndividualAyahRating(
         console.log('First review of the day - setting next review date to:', nextReviewDate);
       }
       
-      console.log('updateIndividualAyahRating - Normal rating applied:', {
+      console.log('updateIndividualAyahRating - Rating applied:', {
         rating,
-        multiplier,
         newInterval,
         nextReviewDate,
         wasAlreadyReviewedToday
       });
-    }
     
     // Only increment review count if this is the first time all ayahs are being rated in this session
     // Check if we already have individual ratings for all ayahs (meaning this is a subsequent call)
@@ -279,41 +310,44 @@ function createSplitItem(
   const tz = userTimeZone || getUserTimeZone();
   const today = getTodayInUserTimeZone(tz);
   
-  // Special handling for "hard" rating - always schedule for next day
-  let newInterval: number;
-  let nextReviewDate: string;
+  // Calculate the current memorization age by adding days passed since creation
+  let daysSinceCreation: number;
   
-  if (rating === 'hard') {
-    newInterval = 1; // Always 1 day for hard
-    nextReviewDate = addDaysInUserTimeZone(today, 1, tz);
+  if (originalItem.memorizationAge !== undefined) {
+    // Calculate days passed since the item was added to the app
+    const createdAt = DateTime.fromISO(originalItem.createdAt, { zone: tz });
+    const todayDate = DateTime.now().setZone(tz).startOf('day');
+    const daysPassedSinceCreation = todayDate.diff(createdAt, 'days').days;
+    
+    // Current memorization age = original memorization age + days passed since creation
+    daysSinceCreation = originalItem.memorizationAge + daysPassedSinceCreation;
   } else {
-    // For easy and medium, use the normal spaced repetition algorithm
-    const multiplier = SPACED_REPETITION.RATING_MULTIPLIERS[rating];
-    newInterval = Math.max(1, Math.round(originalItem.interval * multiplier));
-    
-    // Check if this item was already reviewed today
-    const wasAlreadyReviewedToday = originalItem.completedToday === today;
-    
-    if (wasAlreadyReviewedToday) {
-      // If already reviewed today, check if the rating changed
-      const previousRating = originalItem.individualRatings ? Object.values(originalItem.individualRatings)[0] : null;
-      
-      if (previousRating && previousRating !== rating) {
-        // Rating changed - recalculate next review date
-        const nextReview = new Date();
-        nextReview.setDate(nextReview.getDate() + newInterval);
-        nextReviewDate = formatToISODate(nextReview);
-      } else {
-        // Same rating or no previous rating - keep existing next review date
-        nextReviewDate = originalItem.nextReview;
-      }
-    } else {
-      // First review of the day - calculate new nextReview date
-      const nextReview = new Date();
-      nextReview.setDate(nextReview.getDate() + newInterval);
-      nextReviewDate = formatToISODate(nextReview);
-    }
+    // Fallback to calculating from createdAt (for existing items without memorizationAge)
+    const createdAt = DateTime.fromISO(originalItem.createdAt, { zone: tz });
+    const todayDate = DateTime.now().setZone(tz).startOf('day');
+    daysSinceCreation = todayDate.diff(createdAt, 'days').days;
   }
+
+  // Define intervals based on both rating and how "new" the memorization is
+  let newInterval: number;
+
+  if (daysSinceCreation < 10) {
+    // First 10 days: always daily review
+    newInterval = 1;
+  } else if (daysSinceCreation < 180) {
+    // 10 days to 6 months
+    if (rating === 'easy') newInterval = 4;
+    else if (rating === 'medium') newInterval = 2;
+    else newInterval = 1;
+  } else {
+    // 6+ months
+    if (rating === 'easy') newInterval = 7;
+    else if (rating === 'medium') newInterval = 4;
+    else newInterval = 1;
+  }
+  
+  // Calculate next review date
+  const nextReviewDate = addDaysInUserTimeZone(today, newInterval, tz);
   
   const newEaseFactor = calculateNewEaseFactor(originalItem.easeFactor, rating);
   
@@ -370,47 +404,34 @@ export async function createMemorizationItem(
   surah: number,
   ayahStart: number,
   ayahEnd: number,
-  memorizationLevel?: string,
   difficultyLevel?: string,
-  userTimeZone?: string
+  userTimeZone?: string,
+  memorizationAge?: number
 ): Promise<MemorizationItem> {
-  console.log('createMemorizationItem called with:', { surah, ayahStart, ayahEnd, memorizationLevel, difficultyLevel });
-  
   const id = generateMemorizationId(surah, ayahStart, ayahEnd);
   const tz = userTimeZone || getUserTimeZone();
   const today = getTodayInUserTimeZone(tz);
-  
-  console.log('Generated ID:', id, 'Today:', today);
   
   // Get ruku information
   const { getRukuReferences, getRukuRange } = await import('./rukuService');
   const rukuReferences = await getRukuReferences();
   const rukuInfo = getRukuRange(surah, ayahStart, ayahEnd, rukuReferences);
   
-  // Determine initial interval based on memorization level
-  let initialInterval: number = SPACED_REPETITION.INITIAL_INTERVAL;
-  if (memorizationLevel) {
-    switch (memorizationLevel) {
-      case 'new':
-        initialInterval = 1;
-        break;
-      case 'beginner':
-        initialInterval = 2;
-        break;
-      case 'intermediate':
-        initialInterval = 5;
-        break;
-      case 'advanced':
-        initialInterval = 10;
-        break;
-      case 'mastered':
-        initialInterval = 20;
-        break;
-      default:
-        initialInterval = SPACED_REPETITION.INITIAL_INTERVAL;
-    }
-  }
+  // Set initial interval based on memorization age
+  let initialInterval: number;
+  const age = memorizationAge || 0;
   
+  if (age <= 7) {
+    // New memorization phase - use medium interval (1 day)
+    initialInterval = 1;
+  } else if (age <= 14) {
+    // Consolidation phase - use medium interval (2 days)
+    initialInterval = 2;
+  } else {
+    // Established memorization phase - use medium interval (5 days)
+    initialInterval = 5;
+  }
+
   const result = {
     id,
     surah,
@@ -421,13 +442,13 @@ export async function createMemorizationItem(
     easeFactor: SPACED_REPETITION.INITIAL_EASE_FACTOR,
     reviewCount: 0,
     createdAt: today,
+    memorizationAge: memorizationAge || 0, // Default to 0 if not specified
     rukuStart: rukuInfo.startRuku,
     rukuEnd: rukuInfo.endRuku,
     rukuCount: rukuInfo.rukuCount,
     difficultyLevel: difficultyLevel as 'easy' | 'medium' | 'hard' | undefined,
   };
   
-  console.log('createMemorizationItem returning:', result);
   return result;
 }
 

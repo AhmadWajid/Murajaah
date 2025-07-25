@@ -60,17 +60,6 @@ export default function StatisticsPage() {
     return { surah: parseInt(maxSurah[0]), reviews: maxSurah[1] };
   };
 
-  const getProgressByLevel = () => {
-    const levels = {
-      new: items.filter(item => item.interval <= 1).length,
-      beginner: items.filter(item => item.interval > 1 && item.interval <= 3).length,
-      intermediate: items.filter(item => item.interval > 3 && item.interval <= 7).length,
-      advanced: items.filter(item => item.interval > 7 && item.interval <= 14).length,
-      mastered: items.filter(item => item.interval > 14).length,
-    };
-    return levels;
-  };
-
   const getRecentActivity = () => {
     return items
       .filter(item => item.reviewCount > 0)
@@ -79,7 +68,8 @@ export default function StatisticsPage() {
   };
 
   const mostReviewed = getMostReviewedSurah();
-  const progressByLevel = getProgressByLevel();
+  // Remove getProgressByLevel and all UI for progress by level
+  // Optionally, show stats by review count or interval length instead
   const recentActivity = getRecentActivity();
 
   return (
@@ -367,31 +357,8 @@ export default function StatisticsPage() {
                 </div>
               )}
               <Separator />
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium">Progress by Level</h4>
-                <div className="space-y-1">
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-muted-foreground">New to Me</span>
-                    <Badge variant="outline">{progressByLevel.new}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-muted-foreground">Beginner</span>
-                    <Badge variant="outline">{progressByLevel.beginner}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-muted-foreground">Intermediate</span>
-                    <Badge variant="outline">{progressByLevel.intermediate}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-muted-foreground">Advanced</span>
-                    <Badge variant="outline">{progressByLevel.advanced}</Badge>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-xs text-muted-foreground">Mastered</span>
-                    <Badge variant="outline">{progressByLevel.mastered}</Badge>
-                  </div>
-                </div>
-              </div>
+              {/* Remove getProgressByLevel and all UI for progress by level */}
+              {/* Optionally, show stats by review count or interval length instead */}
             </CardContent>
           </Card>
 

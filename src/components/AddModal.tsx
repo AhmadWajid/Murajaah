@@ -14,48 +14,9 @@ interface AddModalProps {
   currentSurah: number;
   addRange: { start: number; end: number };
   surahList: any[];
-  onConfirm: (selections: MemorizationSelection[], name: string, description?: string, memorizationLevel?: string) => void;
+  onConfirm: (selections: MemorizationSelection[], name: string, description?: string, difficultyLevel?: 'easy' | 'medium' | 'hard') => void;
   onClose: () => void;
 }
-
-// Memorization level options with descriptions
-const MEMORIZATION_LEVELS = [
-  {
-    value: 'new',
-    label: 'New to Me',
-    description: 'I have never memorized this before',
-    initialInterval: 1,
-    color: 'from-red-500 to-pink-500'
-  },
-  {
-    value: 'beginner',
-    label: 'Beginner',
-    description: 'I have started learning this but need regular review',
-    initialInterval: 2,
-    color: 'from-orange-500 to-red-500'
-  },
-  {
-    value: 'intermediate',
-    label: 'Intermediate',
-    description: 'I know this fairly well but need occasional review',
-    initialInterval: 5,
-    color: 'from-yellow-500 to-orange-500'
-  },
-  {
-    value: 'advanced',
-    label: 'Advanced',
-    description: 'I know this well but want to maintain it',
-    initialInterval: 10,
-    color: 'from-green-500 to-emerald-500'
-  },
-  {
-    value: 'mastered',
-    label: 'Mastered',
-    description: 'I know this very well, just occasional maintenance',
-    initialInterval: 20,
-    color: 'from-blue-500 to-indigo-500'
-  }
-];
 
 export default function AddModal({
   isOpen,
@@ -69,12 +30,12 @@ export default function AddModal({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [mode, setMode] = useState<'simple' | 'complex'>('simple');
-  const [memorizationLevel, setMemorizationLevel] = useState('new');
   const [newSelection, setNewSelection] = useState({
     surah: currentSurah,
     ayahStart: addRange.start,
     ayahEnd: addRange.end
   });
+  const [initialRating, setInitialRating] = useState<'easy' | 'medium' | 'hard'>('medium');
 
   useEffect(() => {
     if (isOpen) {
@@ -88,7 +49,6 @@ export default function AddModal({
       }]);
       setName(`Surah ${currentSurah} Ayahs ${addRange.start}-${addRange.end}`);
       setMode('simple');
-      setMemorizationLevel('new');
     }
   }, [isOpen, currentSurah, addRange, surahList]);
 
@@ -115,10 +75,10 @@ export default function AddModal({
     
     if (mode === 'simple' && selections.length === 1) {
       // Use the original simple format for backward compatibility
-      onConfirm(selections, name, description, memorizationLevel);
+      onConfirm(selections, name, description, initialRating);
     } else {
       // Use the new complex format
-      onConfirm(selections, name, description, memorizationLevel);
+      onConfirm(selections, name, description, initialRating);
     }
   };
 
@@ -139,6 +99,39 @@ export default function AddModal({
           <p className="text-sm text-amber-600 dark:text-amber-400">
             Select the Quran passages you want to memorize
           </p>
+        </div>
+
+        {/* Initial Review Difficulty Selector */}
+        <div className="mb-6">
+          <h4 className="text-lg font-semibold text-amber-800 dark:text-amber-200 mb-3">
+            How difficult do you expect this to be?
+          </h4>
+          <div className="flex gap-3 justify-center">
+            <button
+              type="button"
+              className={`px-4 py-2 rounded-lg border-2 transition-all font-medium text-base ${initialRating === 'easy' ? 'border-green-500 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200' : 'border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-700/80 text-gray-900 dark:text-gray-100 hover:border-green-300'}`}
+              onClick={() => setInitialRating('easy')}
+            >
+              Easy
+              <span className="block text-xs font-normal text-gray-500 dark:text-gray-300">7 days</span>
+            </button>
+            <button
+              type="button"
+              className={`px-4 py-2 rounded-lg border-2 transition-all font-medium text-base ${initialRating === 'medium' ? 'border-yellow-500 bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200' : 'border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-700/80 text-gray-900 dark:text-gray-100 hover:border-yellow-300'}`}
+              onClick={() => setInitialRating('medium')}
+            >
+              Medium
+              <span className="block text-xs font-normal text-gray-500 dark:text-gray-300">5 days</span>
+            </button>
+            <button
+              type="button"
+              className={`px-4 py-2 rounded-lg border-2 transition-all font-medium text-base ${initialRating === 'hard' ? 'border-red-500 bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-200' : 'border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-700/80 text-gray-900 dark:text-gray-100 hover:border-red-300'}`}
+              onClick={() => setInitialRating('hard')}
+            >
+              Hard
+              <span className="block text-xs font-normal text-gray-500 dark:text-gray-300">1 day</span>
+            </button>
+          </div>
         </div>
 
         {/* Mode Toggle */}
@@ -280,49 +273,6 @@ export default function AddModal({
               rows={2}
               className="w-full px-4 py-3 rounded-xl border border-amber-200 dark:border-amber-700 bg-white/80 dark:bg-gray-700/80 text-amber-900 dark:text-amber-100 placeholder-amber-500/50 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent resize-none"
             />
-          </div>
-        </div>
-
-        {/* Memorization Level Selection */}
-        <div className="mb-6">
-          <h4 className="text-lg font-semibold text-amber-800 dark:text-amber-200 mb-3">
-            How well do you know this content?
-          </h4>
-          <p className="text-sm text-amber-600 dark:text-amber-400 mb-4">
-            This helps us set the right review intervals for optimal learning
-          </p>
-          <div className="grid grid-cols-1 gap-3">
-            {MEMORIZATION_LEVELS.map((level) => (
-              <button
-                key={level.value}
-                onClick={() => setMemorizationLevel(level.value)}
-                className={`p-4 rounded-xl border-2 transition-all duration-300 text-left ${
-                  memorizationLevel === level.value
-                    ? `border-amber-500 bg-gradient-to-r ${level.color} text-white shadow-lg`
-                    : 'border-gray-200 dark:border-gray-600 bg-white/80 dark:bg-gray-700/80 text-gray-900 dark:text-gray-100 hover:border-amber-300 dark:hover:border-amber-600'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <h5 className="font-semibold mb-1">{level.label}</h5>
-                    <p className={`text-sm ${
-                      memorizationLevel === level.value 
-                        ? 'text-white/90' 
-                        : 'text-gray-600 dark:text-gray-400'
-                    }`}>
-                      {level.description}
-                    </p>
-                  </div>
-                  <div className={`ml-3 px-2 py-1 rounded-lg text-xs font-medium ${
-                    memorizationLevel === level.value
-                      ? 'bg-white/20 text-white'
-                      : 'bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300'
-                  }`}>
-                    {level.initialInterval} day{level.initialInterval !== 1 ? 's' : ''}
-                  </div>
-                </div>
-              </button>
-            ))}
           </div>
         </div>
 
