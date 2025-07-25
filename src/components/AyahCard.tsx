@@ -302,11 +302,18 @@ export default function AyahCard({
     setLoadingTafsir(false);
   };
 
-  // Mobile detection for tajweed color disabling
+  // Mobile detection for tajweed color disabling and verse selection behavior
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setIsMobile(window.innerWidth <= 640);
+      
+      const handleResize = () => {
+        setIsMobile(window.innerWidth <= 640);
+      };
+      
+      window.addEventListener('resize', handleResize);
+      return () => window.removeEventListener('resize', handleResize);
     }
   }, []);
 
@@ -374,13 +381,13 @@ export default function AyahCard({
       <div
         id={`ayah-${surahNumber}-${ayahNumber}`}
         data-ayah={ayahNumber}
-        className={`rounded-2xl transition-all duration-300 cursor-pointer shadow-sm hover:shadow-md p-3 sm:p-4 lg:p-6 ${
+        className={`rounded-2xl transition-all duration-300 ${isMobile ? 'cursor-default' : 'cursor-pointer'} shadow-sm hover:shadow-md p-3 sm:p-4 lg:p-6 ${
           isMemorization ? `border-l-4 ${highlightClass}` : ''
         } ${isSelected ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-300 dark:border-blue-600 shadow-lg' : ''} ${
           isInHighlightedRange ? 'bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-300 dark:border-purple-600 shadow-xl' : ''
-        } ${!isSelected && !isInHighlightedRange ? 'hover:bg-gradient-to-r hover:from-amber-50 hover:to-orange-50 dark:hover:from-amber-900/10 dark:hover:to-orange-900/10' : ''} bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm`}
+        } ${!isSelected && !isInHighlightedRange && !isMobile ? 'hover:bg-gradient-to-r hover:from-amber-50 hover:to-orange-50 dark:hover:from-amber-900/10 dark:hover:to-orange-900/10' : ''} bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm`}
         style={{ padding }}
-        onClick={() => onAyahClick(ayahNumber)}
+        onClick={!isMobile ? () => onAyahClick(ayahNumber) : undefined}
       >
         {/* Ayah Number */}
         <div className="flex items-center justify-between mb-3 sm:mb-4">
@@ -545,6 +552,7 @@ export default function AyahCard({
                     wordByWordData={wordByWordData}
                     showWordByWordTooltip={showWordByWordTooltip}
                     disableTajweedColors={isMobile}
+                    isMobile={isMobile}
                   />
                 );
               } else {
@@ -569,6 +577,7 @@ export default function AyahCard({
                 wordByWordData={wordByWordData}
                 showWordByWordTooltip={showWordByWordTooltip}
                 disableTajweedColors={isMobile}
+                isMobile={isMobile}
               />
             );
           })()}

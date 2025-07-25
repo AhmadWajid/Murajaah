@@ -21,6 +21,7 @@ interface TajweedAyahTextProps {
   wordByWordData?: any[];
   showWordByWordTooltip?: boolean;
   disableTajweedColors?: boolean; // NEW PROP
+  isMobile?: boolean; // Add mobile detection prop
 }
 
 export function TajweedAyahText({ 
@@ -39,6 +40,7 @@ export function TajweedAyahText({
   wordByWordData = [],
   showWordByWordTooltip = true,
   disableTajweedColors = false, // NEW DEFAULT
+  isMobile = false, // NEW DEFAULT
 }: TajweedAyahTextProps) {
   const [tajweedWords, setTajweedWords] = useState<TajweedWord[]>([]);
   const [loading, setLoading] = useState(false);
@@ -49,6 +51,9 @@ export function TajweedAyahText({
   // State for delayed hide words feature
   const [visibleWordIds, setVisibleWordIds] = useState<Set<string>>(new Set());
   const wordTimeoutsRef = React.useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  // State for mobile click-to-show tooltips
+  const [clickedWordId, setClickedWordId] = useState<string | null>(null);
 
   // Detect Safari (Mac or iOS)
   const [isSafari, setIsSafari] = useState(false);
@@ -67,6 +72,22 @@ export function TajweedAyahText({
       wordTimeoutsRef.current.clear();
     };
   }, []);
+
+  // Handle clicking outside to close mobile tooltip
+  useEffect(() => {
+    if (isMobile && clickedWordId) {
+      const handleClickOutside = (event: MouseEvent) => {
+        const target = event.target as Element;
+        // Check if the click is outside the tooltip and word
+        if (!target.closest('[data-word-tooltip]')) {
+          setClickedWordId(null);
+        }
+      };
+      
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [isMobile, clickedWordId]);
 
   // Handlers for hide words delay feature
   const handleWordMouseEnter = (wordId: string, wordIndex: number) => {
@@ -185,6 +206,15 @@ export function TajweedAyahText({
       }
     }
 
+    // Handle word click for mobile tooltip
+    const handleWordClick = (e: React.MouseEvent) => {
+      if (isMobile && showWordByWordTooltip && translation) {
+        e.stopPropagation(); // Prevent ayah selection
+        const wordId = String(word.id);
+        setClickedWordId(clickedWordId === wordId ? null : wordId);
+      }
+    };
+
     // Handlers to set/clear hovered word for tajweed segments
     const handleTajweedMouseEnter = () => {
       if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
@@ -282,15 +312,23 @@ export function TajweedAyahText({
     if (word.tajweedRules.length === 0) {
       // No tajweed rules, just render the word (with translation tooltip if enabled)
       if (showWordByWordTooltip && translation) {
+        const wordId = String(word.id);
+        const shouldShowTooltip = isMobile ? clickedWordId === wordId : hoveredTajweedWordId !== wordId;
         return (
           <span
             key={word.id}
-            className="inline group relative cursor-pointer"
+            className={`inline ${isMobile ? 'cursor-pointer' : 'group'} relative`}
             style={{ fontSize: `${currentFontSize}px` }}
+            onClick={handleWordClick}
+            data-word-tooltip
           >
             <span>{word.text}</span>
-            {hoveredTajweedWordId !== String(word.id) && (
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
+            {shouldShowTooltip && (isMobile ? clickedWordId === wordId : true) && (
+              <span className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-20 ${
+                isMobile 
+                  ? 'opacity-100' 
+                  : 'opacity-0 group-hover:opacity-100 transition-opacity'
+              }`}>
                 {translation}
               </span>
             )}
@@ -358,15 +396,23 @@ export function TajweedAyahText({
     }
     // If translation tooltip is enabled, wrap the whole word in a tooltip container
     if (showWordByWordTooltip && translation) {
+      const wordId = String(word.id);
+      const shouldShowTooltip = isMobile ? clickedWordId === wordId : hoveredTajweedWordId !== wordId;
       return (
         <span
           key={word.id}
-          className="inline group relative cursor-pointer"
+          className={`inline ${isMobile ? 'cursor-pointer' : 'group'} relative`}
           style={{ fontSize: `${currentFontSize}px` }}
+          onClick={handleWordClick}
+          data-word-tooltip
         >
           {segments}
-          {hoveredTajweedWordId !== String(word.id) && (
-            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded shadow-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-20">
+          {shouldShowTooltip && (isMobile ? clickedWordId === wordId : true) && (
+            <span className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-20 ${
+              isMobile 
+                ? 'opacity-100' 
+                : 'opacity-0 group-hover:opacity-100 transition-opacity'
+            }`}>
               {translation}
             </span>
           )}
