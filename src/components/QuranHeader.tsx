@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -341,8 +342,14 @@ export default function QuranHeader({
           <div className="flex items-center space-x-6 flex-shrink-0">
             {/* Logo */}
             <Link href="/" className="flex items-center space-x-3 group">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm group-hover:shadow-md transition-all duration-200">
-                <span className="text-white font-bold text-lg" style={{ fontFamily: 'Amiri, serif' }}>م</span>
+              <div className="w-10 h-10 rounded-lg flex items-center justify-center shadow-sm group-hover:shadow-md transition-all duration-200 overflow-hidden">
+                <Image 
+                  src="/icon.svg" 
+                  alt="Murajaah Logo" 
+                  width={40} 
+                  height={40} 
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div>
                 <span className="text-xl font-bold text-gray-900 dark:text-gray-100">

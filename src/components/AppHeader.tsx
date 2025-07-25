@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, BarChart3, Target } from 'lucide-react';
 
@@ -26,8 +27,14 @@ export default function AppHeader({
           <div className="flex items-center space-x-3 sm:space-x-6 flex-shrink-0">
             {/* Logo */}
             <Link href="/" className="flex items-center space-x-2 sm:space-x-3 group">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-blue-600 rounded-lg flex items-center justify-center shadow-sm group-hover:shadow-md transition-all duration-200">
-                <span className="text-white font-bold text-lg sm:text-xl" style={{ fontFamily: 'Amiri, serif' }}>م</span>
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg flex items-center justify-center shadow-sm group-hover:shadow-md transition-all duration-200 overflow-hidden">
+                <Image 
+                  src="/icon.svg" 
+                  alt="Murajaah Logo" 
+                  width={48} 
+                  height={48} 
+                  className="w-full h-full object-cover"
+                />
               </div>
               <div className="hidden min-[380px]:block">
                 <span className="text-lg sm:text-2xl font-bold text-gray-900 dark:text-gray-100">
