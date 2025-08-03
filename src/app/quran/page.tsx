@@ -3,7 +3,8 @@
 import { Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
-import { getAllMemorizationItems, addMemorizationItem, updateMemorizationItem, getMemorizationItem, getMistakes, toggleMistake, getHideMistakesSetting, saveHideMistakesSetting, saveLastPage, loadLastPage, saveSelectedReciter, loadSelectedReciter, saveFontSettings, loadFontSettings } from '@/lib/storageService';
+import { addMemorizationItem, updateMemorizationItem, getMemorizationItem, toggleMistake, saveHideMistakesSetting, saveLastPage, loadLastPage, saveSelectedReciter, saveFontSettings } from '@/lib/storageService';
+import { useOptimizedData } from '@/lib/hooks/useOptimizedData';
 import { MistakeData } from '@/lib/supabase/database';
 import { MemorizationItem, updateInterval, createMemorizationItem } from '@/lib/spacedRepetition';
 import { getSurah, getQuranMeta, getPage, getAyah, fetchPageWithTranslation, SurahListItem } from '@/lib/quranService';
@@ -48,6 +49,21 @@ export default function QuranPage() {
 function QuranPageContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
+  
+  // Use optimized data hook for settings and data
+  const {
+    hideMistakes,
+    selectedReciter: optimizedSelectedReciter,
+    fontSettings,
+    memorizationItems,
+    mistakes,
+    isLoadingSettings,
+    isLoadingData,
+    refreshSettings,
+    refreshData,
+    invalidateSettingsCache
+  } = useOptimizedData();
+  
   const [currentPage, setCurrentPage] = useState(1);
   const [isInitialized, setIsInitialized] = useState(false);
   const [currentSurah, setCurrentSurah] = useState(1);
@@ -55,7 +71,6 @@ function QuranPageContent() {
   const [pageData, setPageData] = useState<PageData | null>(null);
   const [previousPageData, setPreviousPageData] = useState<PageData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [memorizationItems, setMemorizationItems] = useState<MemorizationItem[]>([]);
   const [surahList, setSurahList] = useState<SurahListItem[]>([]);
   const [highlightedRange, setHighlightedRange] = useState<{surah: number, start: number, end: number} | null>(null);
   const [selectedAyahs, setSelectedAyahs] = useState<Set<{surah: number, ayah: number}>>(new Set());
@@ -72,7 +87,6 @@ function QuranPageContent() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [currentPlayingAyah, setCurrentPlayingAyah] = useState<{surah: number, ayah: number} | null>(null);
-  // Set default reciter to 'Ayman Sowaid' in useState for selectedReciter.
   const [selectedReciter, setSelectedReciter] = useState('Ayman Sowaid');
   const [showTranslation, setShowTranslation] = useState(true);
   
@@ -86,28 +100,27 @@ function QuranPageContent() {
   const [selectedLanguage, setSelectedLanguage] = useState('en');
   const [selectedTranslation, setSelectedTranslation] = useState('en.asad');
   
-  // Load font settings asynchronously
+  // Load font settings from optimized hook
   useEffect(() => {
-    const loadSettings = async () => {
-      try {
-        const savedFontSettings = await loadFontSettings();
-        setLayoutMode(savedFontSettings.layoutMode);
-        setArabicFontSize(savedFontSettings.arabicFontSize);
-        setTranslationFontSize(savedFontSettings.translationFontSize);
-        setPadding(savedFontSettings.padding);
-        setFontTargetArabic(savedFontSettings.fontTargetArabic);
-        setSelectedLanguage(savedFontSettings.selectedLanguage || 'en');
-        setSelectedTranslation(savedFontSettings.selectedTranslation || 'en.asad');
-      } catch (error) {
-        console.error('Error loading font settings:', error);
-      }
-    };
-    loadSettings();
-  }, []);
+    if (fontSettings) {
+      setLayoutMode(fontSettings.layoutMode || 'single');
+      setArabicFontSize(fontSettings.arabicFontSize || 24);
+      setTranslationFontSize(fontSettings.translationFontSize || 20);
+      setPadding(fontSettings.padding || 16);
+      setFontTargetArabic(fontSettings.fontTargetArabic !== false);
+      setSelectedLanguage(fontSettings.selectedLanguage || 'en');
+      setSelectedTranslation(fontSettings.selectedTranslation || 'en.asad');
+    }
+  }, [fontSettings]);
+  
+  // Update selected reciter from optimized hook
+  useEffect(() => {
+    if (optimizedSelectedReciter) {
+      setSelectedReciter(optimizedSelectedReciter);
+    }
+  }, [optimizedSelectedReciter]);
   
 
-  const [mistakes, setMistakes] = useState<Record<string, boolean | MistakeData>>({});
-  const [hideMistakes, setHideMistakes] = useState(false);
   const [revealedMistakes, setRevealedMistakes] = useState<Set<string>>(new Set());
   const [hideWords, setHideWords] = useState(false);
   const [hideWordsDelay, setHideWordsDelay] = useState(500);
@@ -171,12 +184,8 @@ function QuranPageContent() {
   useEffect(() => {
     if (!isInitialized) return;
     
-    loadMemorizationItems();
     loadSurahList();
     loadPageData(currentPage);
-    loadMistakes();
-    loadHideMistakesSetting();
-    loadSelectedReciterSetting();
   }, [currentPage, isInitialized]);
 
   // Reload page data when layout mode changes to handle previous page loading
@@ -488,39 +497,13 @@ function QuranPageContent() {
     try {
       // Get regular memorization items only
       // Complex items are handled separately and should not be mixed with regular items
-      const regularItems = await getAllMemorizationItems();
-      setMemorizationItems(regularItems);
+      // This function is no longer needed as data is loaded via useOptimizedData hook
     } catch (error) {
       console.error('Error loading memorization items:', error);
     }
   };
 
-  const loadMistakes = async () => {
-    try {
-      const mistakesData = await getMistakes();
-      setMistakes(mistakesData);
-    } catch (error) {
-      console.error('Error loading mistakes:', error);
-    }
-  };
-
-  const loadHideMistakesSetting = async () => {
-    try {
-      const hideMistakesSetting = await getHideMistakesSetting();
-      setHideMistakes(hideMistakesSetting);
-    } catch (error) {
-      console.error('Error loading hide mistakes setting:', error);
-    }
-  };
-
-  const loadSelectedReciterSetting = async () => {
-    try {
-      const reciter = await loadSelectedReciter();
-      setSelectedReciter(reciter);
-    } catch (error) {
-      console.error('Error loading selected reciter:', error);
-    }
-  };
+  // These functions are no longer needed as data is loaded via useOptimizedData hook
 
   const saveFontSettingsToStorage = async () => {
     try {
@@ -1007,8 +990,7 @@ function QuranPageContent() {
   const handleQuickReview = async (surahNumber: number, ayahNumber: number, rating: 'easy' | 'medium' | 'hard') => {
     try {
       // Find the memorization item that contains this ayah
-      const allItems = await getAllMemorizationItems();
-      const item = allItems.find((item: MemorizationItem) => 
+      const item = memorizationItems.find((item: MemorizationItem) => 
         item.surah === surahNumber && 
         ayahNumber >= item.ayahStart && 
         ayahNumber <= item.ayahEnd
@@ -1024,8 +1006,8 @@ function QuranPageContent() {
         // Update the item
         await updateMemorizationItem(updatedItem);
         
-        // Reload memorization items to reflect changes
-        await loadMemorizationItems();
+        // Refresh data to reflect changes
+        await refreshData();
         
         console.log(`Range review completed for ${surahNumber}:${item.ayahStart}-${item.ayahEnd} with rating: ${rating}`);
         console.log('Item ID:', item.id);
@@ -1048,8 +1030,8 @@ function QuranPageContent() {
       const updatedItem = updateInterval(item, rating);
       updateMemorizationItem(updatedItem);
       
-      // Reload memorization items to reflect changes
-      loadMemorizationItems();
+      // Refresh data to reflect changes
+      refreshData();
       
       console.log(`Complete review finished for ${item.surah}:${item.ayahStart}-${item.ayahEnd} with rating: ${rating}`);
     } else {
@@ -1060,7 +1042,7 @@ function QuranPageContent() {
   const handleToggleMistake = (surahNumber: number, ayahNumber: number) => {
     // Always toggle the mistake, regardless of hideMistakes mode
     toggleMistake(surahNumber, ayahNumber);
-    loadMistakes();
+    refreshData();
   };
 
   const handleRevealMistake = (surahNumber: number, ayahNumber: number) => {
@@ -1074,8 +1056,8 @@ function QuranPageContent() {
     const reviews: ReviewItem[] = [];
     
     try {
-      // Get all memorization items (unified storage)
-      const allItems = await getAllMemorizationItems();
+      // Use memorization items from optimized hook
+      const allItems = memorizationItems;
       
       currentPageData.ayahs.forEach((ayah: any) => {
         const surahNumber = ayah.surah?.number;
@@ -1282,8 +1264,8 @@ function QuranPageContent() {
             hideMistakes={hideMistakes}
             onToggleHideMistakes={() => {
               const newHideMistakes = !hideMistakes;
-              setHideMistakes(newHideMistakes);
               saveHideMistakesSetting(newHideMistakes);
+              refreshSettings();
             }}
             selectedLanguage={selectedLanguage}
             selectedTranslation={selectedTranslation}

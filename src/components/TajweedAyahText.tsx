@@ -4,6 +4,7 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { TajweedWord } from '@/lib/tajweedService';
 import { qpcFontLoader } from '@/lib/qpcFontLoader';
 import { Tooltip } from 'react-tooltip';
+import { useTajweedCache } from '@/lib/hooks/useTajweedCache';
 
 interface TajweedAyahTextProps {
   ayahText: string;
@@ -42,8 +43,8 @@ export function TajweedAyahText({
   disableTajweedColors = false, // NEW DEFAULT
   isMobile = false, // NEW DEFAULT
 }: TajweedAyahTextProps) {
+  const { getTajweedWords, isTajweedLoading } = useTajweedCache();
   const [tajweedWords, setTajweedWords] = useState<TajweedWord[]>([]);
-  const [loading, setLoading] = useState(false);
   const [fontLoaded, setFontLoaded] = useState(false);
   const [hoveredTajweedWordId, setHoveredTajweedWordId] = useState<string | null>(null);
   const hoverTimeoutRef = React.useRef<NodeJS.Timeout | null>(null);
@@ -162,18 +163,14 @@ export function TajweedAyahText({
       setTajweedWords([]);
       return;
     }
-    setLoading(true);
     try {
-      // Use the original tajweed endpoint
-      const response = await fetch(`/api/tajweed?action=words&surah=${surahNumber}&ayah=${ayahNumber}`);
-      const data = await response.json();
-      setTajweedWords(data.words || []);
+      // Use optimized tajweed cache
+      const words = await getTajweedWords(surahNumber, ayahNumber);
+      setTajweedWords(words as unknown as TajweedWord[]);
     } catch {
       setTajweedWords([]);
-    } finally {
-      setLoading(false);
     }
-  }, [surahNumber, ayahNumber, ayahText]);
+  }, [surahNumber, ayahNumber, ayahText, getTajweedWords]);
 
   useEffect(() => {
     loadTajweedData();
@@ -459,7 +456,7 @@ export function TajweedAyahText({
         boxSizing: 'border-box',
       } as React.CSSProperties}
     >
-      {loading ? (
+              {isTajweedLoading(surahNumber, ayahNumber) ? (
         <div className="text-center py-4">
           <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-600 mx-auto"></div>
           <p className="mt-2 text-sm text-amber-600">Loading tajweed...</p>

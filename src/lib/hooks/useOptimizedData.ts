@@ -1,184 +1,149 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getAllMemorizationItems, getMistakesList, getDailyReviewData } from '@/lib/storageService';
-import { MemorizationItem, resetDailyCompletions, getDueItems, getUpcomingReviews } from '@/lib/spacedRepetition';
-import { MistakeData, DailyReviewData } from '@/lib/supabase/database';
+import { 
+  getHideMistakesSetting, 
+  loadSelectedReciter, 
+  loadFontSettings,
+  getAllMemorizationItems,
+  getMistakes,
+  invalidateCache
+} from '@/lib/storageService';
+
+// Cache for user settings to prevent redundant API calls
+const settingsCache = new Map<string, { data: any; timestamp: number; ttl: number }>();
+
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 interface UseOptimizedDataReturn {
+  // User settings
+  hideMistakes: boolean;
+  selectedReciter: string;
+  fontSettings: any;
+  
   // Data
-  items: MemorizationItem[];
-  dueItems: MemorizationItem[];
-  upcomingItems: MemorizationItem[];
-  mistakes: MistakeData[];
-  chartData: DailyReviewData[];
+  memorizationItems: any[];
+  mistakes: Record<string, any>;
   
   // Loading states
-  isLoading: boolean;
-  isRefreshing: boolean;
-  error: string | null;
+  isLoadingSettings: boolean;
+  isLoadingData: boolean;
   
   // Actions
-  refresh: () => Promise<void>;
-  refreshSilently: () => Promise<void>;
+  refreshSettings: () => Promise<void>;
+  refreshData: () => Promise<void>;
+  invalidateSettingsCache: () => void;
 }
 
-interface UseOptimizedDataOptions {
-  autoRefresh?: boolean;
-  refreshInterval?: number; // in milliseconds
-  enableChartData?: boolean;
-  chartDays?: number;
-}
-
-export function useOptimizedData(options: UseOptimizedDataOptions = {}): UseOptimizedDataReturn {
-  const {
-    autoRefresh = true,
-    refreshInterval = 300000, // 5 minutes
-    enableChartData = false,
-    chartDays = 30
-  } = options;
-
-  // State
-  const [items, setItems] = useState<MemorizationItem[]>([]);
-  const [dueItems, setDueItems] = useState<MemorizationItem[]>([]);
-  const [upcomingItems, setUpcomingItems] = useState<MemorizationItem[]>([]);
-  const [mistakes, setMistakes] = useState<MistakeData[]>([]);
-  const [chartData, setChartData] = useState<DailyReviewData[]>([]);
+export function useOptimizedData(): UseOptimizedDataReturn {
+  const [hideMistakes, setHideMistakes] = useState(false);
+  const [selectedReciter, setSelectedReciter] = useState('Ayman Sowaid');
+  const [fontSettings, setFontSettings] = useState<any>(null);
+  const [memorizationItems, setMemorizationItems] = useState<any[]>([]);
+  const [mistakes, setMistakes] = useState<Record<string, any>>({});
   
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [isLoadingSettings, setIsLoadingSettings] = useState(true);
+  const [isLoadingData, setIsLoadingData] = useState(true);
+  
+  const isInitialized = useRef(false);
 
-  // Refs for cleanup
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
-  const abortControllerRef = useRef<AbortController | null>(null);
-
-  // Load data function
-  const loadData = useCallback(async (showLoading = true, signal?: AbortSignal) => {
-    try {
-      if (showLoading) {
-        setIsLoading(true);
-      }
-      setError(null);
-
-      // Create promises for parallel loading
-      const promises: Array<Promise<MemorizationItem[]> | Promise<MistakeData[]> | Promise<DailyReviewData[]>> = [
-        getAllMemorizationItems(),
-        getMistakesList()
-      ];
-
-      // Add chart data if enabled
-      if (enableChartData) {
-        promises.push(getDailyReviewData(chartDays));
-      }
-
-      // Load data in parallel
-      const results = await Promise.all(promises);
-      const [allItems, mistakesList] = results as [MemorizationItem[], MistakeData[], ...any[]];
-      const dailyData = enableChartData ? results[2] as DailyReviewData[] : [];
-
-      // Check if request was cancelled
-      if (signal?.aborted) return;
-
-      // Reset daily completions for items completed on previous days
-      const resetItems = resetDailyCompletions(allItems);
-      
-      const due = getDueItems(resetItems);
-      const upcoming = getUpcomingReviews(resetItems, 7); // Next 7 days
-
-      // Update state
-      setItems(resetItems);
-      setDueItems(due);
-      setUpcomingItems(upcoming);
-      setMistakes(mistakesList);
-      if (enableChartData) {
-        setChartData(dailyData);
-      }
-    } catch (err) {
-      if (signal?.aborted) return;
-      
-      console.error('Error loading data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load data');
-    } finally {
-      if (showLoading) {
-        setIsLoading(false);
-      }
-    }
-  }, [enableChartData, chartDays]);
-
-  // Refresh function
-  const refresh = useCallback(async () => {
-    setIsRefreshing(true);
-    try {
-      await loadData(false);
-    } finally {
-      setIsRefreshing(false);
-    }
-  }, [loadData]);
-
-  // Silent refresh function
-  const refreshSilently = useCallback(async () => {
-    try {
-      await loadData(false);
-    } catch (err) {
-      console.error('Silent refresh failed:', err);
-    }
-  }, [loadData]);
-
-  // Initial load
-  useEffect(() => {
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
+  // Load settings with caching
+  const loadSettings = useCallback(async (forceRefresh = false) => {
+    if (!forceRefresh && isInitialized.current) return;
     
-    loadData(true, controller.signal);
-
-    return () => {
-      controller.abort();
-    };
-  }, [loadData]);
-
-  // Auto refresh setup
-  useEffect(() => {
-    if (!autoRefresh) return;
-
-    // Clear existing interval
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
+    setIsLoadingSettings(true);
+    
+    try {
+      // Load settings in parallel with caching
+      const [hideMistakesResult, reciterResult, fontSettingsResult] = await Promise.all([
+        getCachedSetting('hideMistakes', getHideMistakesSetting),
+        getCachedSetting('selectedReciter', loadSelectedReciter),
+        getCachedSetting('fontSettings', loadFontSettings)
+      ]);
+      
+      setHideMistakes(hideMistakesResult);
+      setSelectedReciter(reciterResult);
+      setFontSettings(fontSettingsResult);
+      
+      isInitialized.current = true;
+    } catch (error) {
+      console.error('Error loading settings:', error);
+    } finally {
+      setIsLoadingSettings(false);
     }
-
-    // Set up new interval
-    intervalRef.current = setInterval(() => {
-      refreshSilently();
-    }, refreshInterval);
-
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    };
-  }, [autoRefresh, refreshInterval, refreshSilently]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
   }, []);
 
+  // Load data (memorization items and mistakes)
+  const loadData = useCallback(async (forceRefresh = false) => {
+    setIsLoadingData(true);
+    
+    try {
+      const [items, mistakesData] = await Promise.all([
+        getAllMemorizationItems(),
+        getMistakes()
+      ]);
+      
+      setMemorizationItems(items);
+      setMistakes(mistakesData);
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setIsLoadingData(false);
+    }
+  }, []);
+
+  // Cache helper function
+  const getCachedSetting = async (key: string, fetchFn: () => Promise<any>): Promise<any> => {
+    const cacheKey = `settings_${key}`;
+    const cached = settingsCache.get(cacheKey);
+    
+    if (cached && Date.now() - cached.timestamp < cached.ttl) {
+      return cached.data;
+    }
+    
+    const data = await fetchFn();
+    settingsCache.set(cacheKey, {
+      data,
+      timestamp: Date.now(),
+      ttl: CACHE_TTL
+    });
+    
+    return data;
+  };
+
+  // Refresh functions
+  const refreshSettings = useCallback(async () => {
+    settingsCache.clear();
+    await loadSettings(true);
+  }, [loadSettings]);
+
+  const refreshData = useCallback(async () => {
+    invalidateCache();
+    await loadData(true);
+  }, [loadData]);
+
+  const invalidateSettingsCache = useCallback(() => {
+    settingsCache.clear();
+  }, []);
+
+  // Load settings on mount
+  useEffect(() => {
+    loadSettings();
+  }, [loadSettings]);
+
+  // Load data on mount
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
   return {
-    items,
-    dueItems,
-    upcomingItems,
+    hideMistakes,
+    selectedReciter,
+    fontSettings,
+    memorizationItems,
     mistakes,
-    chartData,
-    isLoading,
-    isRefreshing,
-    error,
-    refresh,
-    refreshSilently
+    isLoadingSettings,
+    isLoadingData,
+    refreshSettings,
+    refreshData,
+    invalidateSettingsCache
   };
 } 
