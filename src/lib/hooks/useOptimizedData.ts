@@ -60,7 +60,7 @@ export function useOptimizedData(options: UseOptimizedDataOptions = {}): UseOpti
       setError(null);
 
       // Create promises for parallel loading
-      const promises = [
+      const promises: Array<Promise<MemorizationItem[]> | Promise<MistakeData[]> | Promise<DailyReviewData[]>> = [
         getAllMemorizationItems(),
         getMistakesList()
       ];
@@ -72,7 +72,7 @@ export function useOptimizedData(options: UseOptimizedDataOptions = {}): UseOpti
 
       // Load data in parallel
       const results = await Promise.all(promises);
-      const [allItems, mistakesList] = results;
+      const [allItems, mistakesList] = results as [MemorizationItem[], MistakeData[], ...any[]];
       const dailyData = enableChartData ? results[2] as DailyReviewData[] : [];
 
       // Check if request was cancelled
