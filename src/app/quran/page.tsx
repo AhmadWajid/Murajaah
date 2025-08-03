@@ -3,7 +3,8 @@
 import { Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
-import { getAllMemorizationItems, addMemorizationItem, updateMemorizationItem, getMemorizationItem, getMistakes, toggleMistake, getHideMistakesSetting, saveHideMistakesSetting, saveLastPage, loadLastPage, saveSelectedReciter, loadSelectedReciter, saveFontSettings, loadFontSettings, MistakeData } from '@/lib/storage';
+import { getAllMemorizationItems, addMemorizationItem, updateMemorizationItem, getMemorizationItem, getMistakes, toggleMistake, getHideMistakesSetting, saveHideMistakesSetting, saveLastPage, loadLastPage, saveSelectedReciter, loadSelectedReciter, saveFontSettings, loadFontSettings } from '@/lib/storageService';
+import { MistakeData } from '@/lib/supabase/database';
 import { MemorizationItem, updateInterval, createMemorizationItem } from '@/lib/spacedRepetition';
 import { getSurah, getQuranMeta, getPage, getAyah, fetchPageWithTranslation, SurahListItem } from '@/lib/quranService';
 import { generateMemorizationId } from '@/lib/utils';
@@ -75,16 +76,34 @@ function QuranPageContent() {
   const [selectedReciter, setSelectedReciter] = useState('Ayman Sowaid');
   const [showTranslation, setShowTranslation] = useState(true);
   
-  // Load font settings from localStorage
-  const savedFontSettings = loadFontSettings();
-  const [layoutMode, setLayoutMode] = useState<'spread' | 'single'>(savedFontSettings.layoutMode);
-  const [fontSize] = useState(savedFontSettings.fontSize); // Remove unused setFontSize
-  const [arabicFontSize, setArabicFontSize] = useState(savedFontSettings.arabicFontSize);
-  const [translationFontSize, setTranslationFontSize] = useState(savedFontSettings.translationFontSize);
-  const [padding, setPadding] = useState(savedFontSettings.padding);
-  const [fontTargetArabic, setFontTargetArabic] = useState(savedFontSettings.fontTargetArabic);
-  const [selectedLanguage, setSelectedLanguage] = useState(savedFontSettings.selectedLanguage || 'en');
-  const [selectedTranslation, setSelectedTranslation] = useState(savedFontSettings.selectedTranslation || 'en.asad');
+  // Font settings state (will be loaded asynchronously)
+  const [layoutMode, setLayoutMode] = useState<'spread' | 'single'>('single');
+  const [fontSize] = useState(24); // Remove unused setFontSize
+  const [arabicFontSize, setArabicFontSize] = useState(24);
+  const [translationFontSize, setTranslationFontSize] = useState(20);
+  const [padding, setPadding] = useState(16);
+  const [fontTargetArabic, setFontTargetArabic] = useState(true);
+  const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const [selectedTranslation, setSelectedTranslation] = useState('en.asad');
+  
+  // Load font settings asynchronously
+  useEffect(() => {
+    const loadSettings = async () => {
+      try {
+        const savedFontSettings = await loadFontSettings();
+        setLayoutMode(savedFontSettings.layoutMode);
+        setArabicFontSize(savedFontSettings.arabicFontSize);
+        setTranslationFontSize(savedFontSettings.translationFontSize);
+        setPadding(savedFontSettings.padding);
+        setFontTargetArabic(savedFontSettings.fontTargetArabic);
+        setSelectedLanguage(savedFontSettings.selectedLanguage || 'en');
+        setSelectedTranslation(savedFontSettings.selectedTranslation || 'en.asad');
+      } catch (error) {
+        console.error('Error loading font settings:', error);
+      }
+    };
+    loadSettings();
+  }, []);
   
 
   const [mistakes, setMistakes] = useState<Record<string, boolean | MistakeData>>({});
@@ -136,9 +155,17 @@ function QuranPageContent() {
     }
     
     // Otherwise, load the last page the user was on
-    const lastPage = loadLastPage();
-    setCurrentPage(lastPage);
-    setIsInitialized(true);
+    const loadInitialPage = async () => {
+      try {
+        const lastPage = await loadLastPage();
+        setCurrentPage(lastPage);
+      } catch (error) {
+        console.error('Error loading last page:', error);
+        setCurrentPage(1); // fallback to page 1
+      }
+      setIsInitialized(true);
+    };
+    loadInitialPage();
   }, [searchParams, isInitialized]);
 
   useEffect(() => {
@@ -191,10 +218,17 @@ function QuranPageContent() {
 
   // Detect reviews whenever page data or memorization items change
   useEffect(() => {
-    if (pageData && memorizationItems.length > 0) {
-      const reviews = getReviewsOnCurrentPage(pageData);
-      setReviewsOnCurrentPage(reviews);
-    }
+    const loadReviews = async () => {
+      if (pageData && memorizationItems.length > 0) {
+        try {
+          const reviews = await getReviewsOnCurrentPage(pageData);
+          setReviewsOnCurrentPage(reviews);
+        } catch (error) {
+          console.error('Error loading reviews on current page:', error);
+        }
+      }
+    };
+    loadReviews();
   }, [pageData, memorizationItems]);
 
   // Scroll to highlighted ayah when page loads
@@ -374,34 +408,37 @@ function QuranPageContent() {
     
     // Handle review navigation (existing functionality)
     if (reviewId) {
-      try {
-        const decodedId = decodeURIComponent(reviewId);
-        
-        // First try to find in regular memorization items
-        const memorizationItem = getMemorizationItem(decodedId);
-        
-        // All items are now in unified storage, so no need to check complex items separately
-        
-        if (memorizationItem) {
-          // Navigate to the page containing the first ayah
-          getPageForAyah(memorizationItem.surah, memorizationItem.ayahStart).then(pageNumber => {
-            goToPage(pageNumber, true); // Skip saving for URL navigation
-            setHighlightedRange({ 
-              surah: memorizationItem.surah, 
-              start: memorizationItem.ayahStart, 
-              end: memorizationItem.ayahEnd 
+      const handleReviewNavigation = async () => {
+        try {
+          const decodedId = decodeURIComponent(reviewId);
+          
+          // First try to find in regular memorization items
+          const memorizationItem = await getMemorizationItem(decodedId);
+          
+          // All items are now in unified storage, so no need to check complex items separately
+          
+          if (memorizationItem) {
+            // Navigate to the page containing the first ayah
+            getPageForAyah(memorizationItem.surah, memorizationItem.ayahStart).then(pageNumber => {
+              goToPage(pageNumber, true); // Skip saving for URL navigation
+              setHighlightedRange({ 
+                surah: memorizationItem.surah, 
+                start: memorizationItem.ayahStart, 
+                end: memorizationItem.ayahEnd 
+              });
+              // Update current position
+              setCurrentSurah(memorizationItem.surah);
+              setCurrentAyah(memorizationItem.ayahStart);
             });
-            // Update current position
-            setCurrentSurah(memorizationItem.surah);
-            setCurrentAyah(memorizationItem.ayahStart);
-          });
-          return;
-        } else {
-          console.log('No memorization item found for ID:', decodedId);
+            return;
+          } else {
+            console.log('No memorization item found for ID:', decodedId);
+          }
+        } catch (err) {
+          console.error('Failed to load review item:', err);
         }
-      } catch (err) {
-        console.error('Failed to load review item:', err);
-      }
+      };
+      handleReviewNavigation();
     }
     
     // Handle legacy surah/ayahStart/ayahEnd parameters
@@ -447,39 +484,59 @@ function QuranPageContent() {
     };
   }, [currentAudio]);
 
-  const loadMemorizationItems = () => {
-    // Get regular memorization items only
-    // Complex items are handled separately and should not be mixed with regular items
-    const regularItems = getAllMemorizationItems();
-    setMemorizationItems(regularItems);
+  const loadMemorizationItems = async () => {
+    try {
+      // Get regular memorization items only
+      // Complex items are handled separately and should not be mixed with regular items
+      const regularItems = await getAllMemorizationItems();
+      setMemorizationItems(regularItems);
+    } catch (error) {
+      console.error('Error loading memorization items:', error);
+    }
   };
 
-  const loadMistakes = () => {
-    const mistakesData = getMistakes();
-    setMistakes(mistakesData);
+  const loadMistakes = async () => {
+    try {
+      const mistakesData = await getMistakes();
+      setMistakes(mistakesData);
+    } catch (error) {
+      console.error('Error loading mistakes:', error);
+    }
   };
 
-  const loadHideMistakesSetting = () => {
-    const hideMistakesSetting = getHideMistakesSetting();
-    setHideMistakes(hideMistakesSetting);
+  const loadHideMistakesSetting = async () => {
+    try {
+      const hideMistakesSetting = await getHideMistakesSetting();
+      setHideMistakes(hideMistakesSetting);
+    } catch (error) {
+      console.error('Error loading hide mistakes setting:', error);
+    }
   };
 
-  const loadSelectedReciterSetting = () => {
-    const reciter = loadSelectedReciter();
-    setSelectedReciter(reciter);
+  const loadSelectedReciterSetting = async () => {
+    try {
+      const reciter = await loadSelectedReciter();
+      setSelectedReciter(reciter);
+    } catch (error) {
+      console.error('Error loading selected reciter:', error);
+    }
   };
 
-  const saveFontSettingsToStorage = () => {
-    saveFontSettings({
-      arabicFontSize,
-      translationFontSize,
-      fontTargetArabic,
-      fontSize,
-      padding,
-      layoutMode,
-      selectedLanguage,
-      selectedTranslation,
-    });
+  const saveFontSettingsToStorage = async () => {
+    try {
+      await saveFontSettings({
+        arabicFontSize,
+        translationFontSize,
+        fontTargetArabic,
+        fontSize,
+        padding,
+        layoutMode,
+        selectedLanguage,
+        selectedTranslation,
+      });
+    } catch (error) {
+      console.error('Error saving font settings:', error);
+    }
   };
 
   const loadSurahList = async () => {
@@ -827,7 +884,7 @@ function QuranPageContent() {
         memorizationItem.description = description || '';
         memorizationItem.tags = [];
 
-        addMemorizationItem(memorizationItem);
+        await addMemorizationItem(memorizationItem);
       } else {
         // Create separate memorization items for each selection
         const createdItems = [];
@@ -849,7 +906,7 @@ function QuranPageContent() {
           memorizationItem.description = itemDescription;
           memorizationItem.tags = [];
 
-          addMemorizationItem(memorizationItem);
+          await addMemorizationItem(memorizationItem);
           createdItems.push(memorizationItem);
         }
       }
@@ -863,7 +920,7 @@ function QuranPageContent() {
       
       // Also immediately update reviews on current page to show highlighting
       if (pageData) {
-        const updatedReviews = getReviewsOnCurrentPage(pageData);
+        const updatedReviews = await getReviewsOnCurrentPage(pageData);
         setReviewsOnCurrentPage(updatedReviews);
       }
       
@@ -891,7 +948,7 @@ function QuranPageContent() {
           // Create memorization item
           const id = generateMemorizationId(surah, start, end);
           const item = await createMemorizationItem(surah, start, end, 'active', undefined, 0);
-          addMemorizationItem(item);
+          await addMemorizationItem(item);
           
           // Navigate to the page containing the first ayah
           getPageForAyah(surah, start).then(pageNumber => {
@@ -925,7 +982,7 @@ function QuranPageContent() {
         if (surah && !isNaN(start) && !isNaN(end)) {
           const id = generateMemorizationId(surah.number, start, end);
           const item = await createMemorizationItem(surah.number, start, end, 'active', undefined, 0);
-          addMemorizationItem(item);
+          await addMemorizationItem(item);
           
           getPageForAyah(surah.number, start).then(pageNumber => {
             setCurrentPage(pageNumber);
@@ -947,32 +1004,36 @@ function QuranPageContent() {
     }
   };
 
-  const handleQuickReview = (surahNumber: number, ayahNumber: number, rating: 'easy' | 'medium' | 'hard') => {
-    // Find the memorization item that contains this ayah
-    const allItems = getAllMemorizationItems();
-    const item = allItems.find(item => 
-      item.surah === surahNumber && 
-      ayahNumber >= item.ayahStart && 
-      ayahNumber <= item.ayahEnd
-    );
+  const handleQuickReview = async (surahNumber: number, ayahNumber: number, rating: 'easy' | 'medium' | 'hard') => {
+    try {
+      // Find the memorization item that contains this ayah
+      const allItems = await getAllMemorizationItems();
+      const item = allItems.find((item: MemorizationItem) => 
+        item.surah === surahNumber && 
+        ayahNumber >= item.ayahStart && 
+        ayahNumber <= item.ayahEnd
+      );
 
     if (item) {
       // Rate the entire range as one unit
       console.log(`Rating entire range ${item.ayahStart}-${item.ayahEnd} with ${rating}`);
       
-      // Use updateInterval for the entire range, not individual ayahs
-      const updatedItem = updateInterval(item, rating);
-      
-      // Update the item
-      updateMemorizationItem(updatedItem);
-      
-      // Reload memorization items to reflect changes
-      loadMemorizationItems();
-      
-      console.log(`Range review completed for ${surahNumber}:${item.ayahStart}-${item.ayahEnd} with rating: ${rating}`);
-      console.log('Item ID:', item.id);
-    } else {
-      console.log(`No memorization item found for ayah ${surahNumber}:${ayahNumber}`);
+        // Use updateInterval for the entire range, not individual ayahs
+        const updatedItem = updateInterval(item, rating);
+        
+        // Update the item
+        await updateMemorizationItem(updatedItem);
+        
+        // Reload memorization items to reflect changes
+        await loadMemorizationItems();
+        
+        console.log(`Range review completed for ${surahNumber}:${item.ayahStart}-${item.ayahEnd} with rating: ${rating}`);
+        console.log('Item ID:', item.id);
+      } else {
+        console.log(`No memorization item found for ayah ${surahNumber}:${ayahNumber}`);
+      }
+    } catch (error) {
+      console.error('Error in handleQuickReview:', error);
     }
   };
 
@@ -1007,38 +1068,43 @@ function QuranPageContent() {
     setRevealedMistakes(prev => new Set([...prev, mistakeKey]));
   };
 
-  const getReviewsOnCurrentPage = (currentPageData: PageData): ReviewItem[] => {
+  const getReviewsOnCurrentPage = async (currentPageData: PageData): Promise<ReviewItem[]> => {
     if (!currentPageData || !currentPageData.ayahs) return [];
 
     const reviews: ReviewItem[] = [];
     
-    // Get all memorization items (unified storage)
-    const allItems = getAllMemorizationItems();
-    
-    currentPageData.ayahs.forEach((ayah: any) => {
-      const surahNumber = ayah.surah?.number;
-      const ayahNumber = ayah.numberInSurah;
+    try {
+      // Get all memorization items (unified storage)
+      const allItems = await getAllMemorizationItems();
       
-      if (surahNumber && ayahNumber) {
-        const item = allItems.find(item => 
-          item.surah === surahNumber && 
-          ayahNumber >= item.ayahStart && 
-          ayahNumber <= item.ayahEnd
-        );
+      currentPageData.ayahs.forEach((ayah: any) => {
+        const surahNumber = ayah.surah?.number;
+        const ayahNumber = ayah.numberInSurah;
         
-        // Show ALL memorization items on this page, regardless of completion status
-        // This allows multiple reviews per day - no filtering by nextReview or completedToday
-        if (item) {
-          const reviewItem: ReviewItem = {
-            ...item,
-            currentAyah: { surah: surahNumber, ayah: ayahNumber }
-          };
-          reviews.push(reviewItem);
+        if (surahNumber && ayahNumber) {
+          const item = allItems.find((item: MemorizationItem) => 
+            item.surah === surahNumber && 
+            ayahNumber >= item.ayahStart && 
+            ayahNumber <= item.ayahEnd
+          );
+          
+          // Show ALL memorization items on this page, regardless of completion status
+          // This allows multiple reviews per day - no filtering by nextReview or completedToday
+          if (item) {
+            const reviewItem: ReviewItem = {
+              ...item,
+              currentAyah: { surah: surahNumber, ayah: ayahNumber }
+            };
+            reviews.push(reviewItem);
+          }
         }
-      }
-    });
-    
-    return reviews;
+      });
+      
+      return reviews;
+    } catch (error) {
+      console.error('Error getting reviews on current page:', error);
+      return [];
+    }
   };
 
   const playAyahAudio = async (surahNumber: number, ayahNumber: number) => {

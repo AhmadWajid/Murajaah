@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { MemorizationItem } from '@/lib/spacedRepetition';
-import { getAllMemorizationItems, removeMemorizationItem } from '@/lib/storage';
+import { getAllMemorizationItems, removeMemorizationItem } from '@/lib/storageService';
 import { getDueItems, getUpcomingReviews } from '@/lib/spacedRepetition';
 import { formatAyahRange, getSurahName } from '@/lib/quran';
 import { getTodayISODate } from '@/lib/utils';
@@ -21,16 +21,24 @@ export default function MemorizationList({ onReview, onRefresh }: MemorizationLi
     loadItems();
   }, []);
 
-  const loadItems = () => {
-    const allItems = getAllMemorizationItems();
-    setItems(allItems);
+  const loadItems = async () => {
+    try {
+      const allItems = await getAllMemorizationItems();
+      setItems(allItems);
+    } catch (error) {
+      console.error('Error loading memorization items:', error);
+    }
   };
 
-  const handleRemove = (id: string) => {
+  const handleRemove = async (id: string) => {
     if (confirm('Are you sure you want to remove this memorization item?')) {
-      removeMemorizationItem(id);
-      loadItems();
-      onRefresh();
+      try {
+        await removeMemorizationItem(id);
+        await loadItems();
+        onRefresh();
+      } catch (error) {
+        console.error('Error removing memorization item:', error);
+      }
     }
   };
 

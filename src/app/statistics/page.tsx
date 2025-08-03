@@ -1,56 +1,74 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback, useTransition } from 'react';
 import Link from 'next/link';
-import { getAllMemorizationItems, getDailyReviewData, DailyReviewData } from '@/lib/storage';
+import { getAllMemorizationItems, getDailyReviewData } from '@/lib/storageService';
+import { DailyReviewData } from '@/lib/supabase/database';
 import { MemorizationItem, getDueItems, getUpcomingReviews, resetDailyCompletions } from '@/lib/spacedRepetition';
 import { formatAyahRange } from '@/lib/quran';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { Calendar, Clock, CheckCircle, BookOpen, ArrowLeft, BarChart3, TrendingUp, Target } from 'lucide-react';
+import { Calendar, Clock, CheckCircle, BookOpen, ArrowLeft, BarChart3, TrendingUp, Target, Loader2 } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 export default function StatisticsPage() {
+  const [isPending, startTransition] = useTransition();
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
   const [items, setItems] = useState<MemorizationItem[]>([]);
   const [dueItems, setDueItems] = useState<MemorizationItem[]>([]);
   const [upcomingItems, setUpcomingItems] = useState<MemorizationItem[]>([]);
   const [chartData, setChartData] = useState<DailyReviewData[]>([]);
 
-  useEffect(() => {
-    loadData();
+  const loadData = useCallback(async (showLoading = true) => {
+    try {
+      if (showLoading) {
+        setIsLoading(true);
+      }
+      
+      // Load data in parallel for better performance
+      const [allItems, dailyData] = await Promise.all([
+        getAllMemorizationItems(),
+        getDailyReviewData(30) // Last 30 days
+      ]);
+      
+      // Reset daily completions for items completed on previous days
+      const resetItems = resetDailyCompletions(allItems);
+      
+      const due = getDueItems(resetItems);
+      const upcoming = getUpcomingReviews(resetItems, 7); // Next 7 days
+
+      setItems(resetItems);
+      setDueItems(due);
+      setUpcomingItems(upcoming);
+      setChartData(dailyData);
+    } catch (error) {
+      console.error('Error loading statistics data:', error);
+    } finally {
+      if (showLoading) {
+        setIsLoading(false);
+      }
+    }
   }, []);
 
-  const loadData = () => {
-    // Get all memorization items
-    const allItems = getAllMemorizationItems();
-    
-    // Reset daily completions for items completed on previous days
-    const resetItems = resetDailyCompletions(allItems);
-    
-    const due = getDueItems(resetItems);
-    const upcoming = getUpcomingReviews(resetItems, 7); // Next 7 days
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
 
-    setItems(resetItems);
-    setDueItems(due);
-    setUpcomingItems(upcoming);
-    
-    // Load chart data
-    const dailyData = getDailyReviewData(30); // Last 30 days
-    setChartData(dailyData);
-  };
+  // Memoized computed values to prevent unnecessary recalculations
+  const totalItems = useMemo(() => items.length, [items]);
+  const completedToday = useMemo(() => items.filter(item => item.reviewCount > 0).length, [items]);
 
-  const totalItems = items.length;
-  const completedToday = items.filter(item => item.reviewCount > 0).length;
-
-  const getAverageInterval = () => {
+  const getAverageInterval = useCallback(() => {
     if (items.length === 0) return 0;
     const totalInterval = items.reduce((sum, item) => sum + item.interval, 0);
     return Math.round(totalInterval / items.length);
-  };
+  }, [items]);
 
-  const getMostReviewedSurah = () => {
+  const getMostReviewedSurah = useCallback(() => {
     if (items.length === 0) return null;
     const surahCounts: { [key: number]: number } = {};
     items.forEach(item => {
@@ -58,19 +76,62 @@ export default function StatisticsPage() {
     });
     const maxSurah = Object.entries(surahCounts).reduce((a, b) => a[1] > b[1] ? a : b);
     return { surah: parseInt(maxSurah[0]), reviews: maxSurah[1] };
-  };
+  }, [items]);
 
-  const getRecentActivity = () => {
+  const getRecentActivity = useCallback(() => {
     return items
       .filter(item => item.reviewCount > 0)
       .sort((a, b) => new Date(b.lastReviewed || '').getTime() - new Date(a.lastReviewed || '').getTime())
       .slice(0, 10);
-  };
+  }, [items]);
 
-  const mostReviewed = getMostReviewedSurah();
-  // Remove getProgressByLevel and all UI for progress by level
-  // Optionally, show stats by review count or interval length instead
-  const recentActivity = getRecentActivity();
+  const mostReviewed = useMemo(() => getMostReviewedSurah(), [getMostReviewedSurah]);
+  const recentActivity = useMemo(() => getRecentActivity(), [getRecentActivity]);
+
+  const handleRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    startTransition(() => {
+      loadData(false).finally(() => {
+        setIsRefreshing(false);
+      });
+    });
+  }, [loadData]);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <header className="border-b bg-card">
+          <div className="container mx-auto px-4 py-6">
+            <div className="flex justify-between items-center">
+              <div className="flex items-center space-x-4">
+                <Button variant="ghost" size="sm" asChild>
+                  <Link href="/">
+                    <ArrowLeft className="h-4 w-4 mr-2" />
+                    Dashboard
+                  </Link>
+                </Button>
+                <div>
+                  <h1 className="text-3xl font-bold">Statistics</h1>
+                  <p className="text-muted-foreground">
+                    Track your Quran memorization progress and insights
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </header>
+        <main className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+              <p className="text-muted-foreground">Loading statistics...</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -92,9 +153,18 @@ export default function StatisticsPage() {
                 </p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={loadData}>
-              <BarChart3 className="h-4 w-4 mr-2" />
-              Refresh
+            <Button variant="outline" size="sm" onClick={handleRefresh} disabled={isRefreshing}>
+              {isRefreshing ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Refreshing...
+                </>
+              ) : (
+                <>
+                  <BarChart3 className="h-4 w-4 mr-2" />
+                  Refresh
+                </>
+              )}
             </Button>
           </div>
         </div>
@@ -357,8 +427,6 @@ export default function StatisticsPage() {
                 </div>
               )}
               <Separator />
-              {/* Remove getProgressByLevel and all UI for progress by level */}
-              {/* Optionally, show stats by review count or interval length instead */}
             </CardContent>
           </Card>
 

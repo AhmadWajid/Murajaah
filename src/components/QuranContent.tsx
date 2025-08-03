@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import AyahCard from './AyahCard';
-import { MistakeData } from '@/lib/storage';
+import { MistakeData } from '@/lib/supabase/database';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MistakeData } from '@/lib/storage';
+import { MistakeData } from '@/lib/supabase/database';
 import { TajweedAyahText } from './TajweedAyahText';
 import ReactMarkdown from 'react-markdown';
 import { Card } from '@/components/ui/card';

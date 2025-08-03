@@ -1,9 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback, useTransition } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getAllMemorizationItems, updateMemorizationItem, removeMemorizationItem, cleanupDuplicateItems, getMistakesList, MistakeData, removeMistake, addMemorizationItem } from '@/lib/storage';
+import { getAllMemorizationItems, updateMemorizationItem, removeMemorizationItem, cleanupDuplicateItems, getMistakesList, removeMistake, addMemorizationItem, batchUpdateMemorizationItems } from '@/lib/storageService';
+import { MistakeData } from '@/lib/supabase/database';
 import { generateMemorizationId, getTodayISODate } from '@/lib/utils';
 import { MemorizationItem, updateInterval, resetDailyCompletions, getDueItems, getUpcomingReviews } from '@/lib/spacedRepetition';
 import { formatAyahRange, formatAyahRangeArabic } from '@/lib/quran';
@@ -11,7 +12,7 @@ import { getSurahList, SurahListItem } from '@/lib/quranService';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronRight, Trash2, CheckCircle, Edit } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, CheckCircle, Edit, Loader2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import AppHeader from '@/components/AppHeader';
 import ReviewCard from '@/components/ReviewCard';
@@ -32,7 +33,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import React from 'react'; // Added for React.Fragment
+import React from 'react';
 
 interface GroupedItems {
   [date: string]: MemorizationItem[];
@@ -162,40 +163,56 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
   );
 }
 
-
-
 export default function Dashboard() {
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+  
+  // Loading states
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  
+  // Data states
   const [items, setItems] = useState<MemorizationItem[]>([]);
   const [dueItems, setDueItems] = useState<MemorizationItem[]>([]);
   const [upcomingItems, setUpcomingItems] = useState<MemorizationItem[]>([]);
   const [mistakes, setMistakes] = useState<MistakeData[]>([]);
   const [surahList, setSurahList] = useState<SurahListItem[]>([]);
+  
+  // UI states
   const [expandedSurahs, setExpandedSurahs] = useState<Set<number>>(new Set());
   const [editingItem, setEditingItem] = useState<MemorizationItem | null>(null);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [showMistakeDeleteConfirm, setShowMistakeDeleteConfirm] = useState<{ surah: number; ayah?: number; deleteAll?: boolean } | null>(null);
   const [reviewingItem, setReviewingItem] = useState<MemorizationItem | null>(null);
-  // No longer needed with unified storage
+  const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
+  const [collapseAll, setCollapseAll] = useState(false);
 
-  // Helper function to load all data
-  const loadAllData = () => {
-      // Clean up duplicates first
-      cleanupDuplicateItems();
+  // Optimized data loading with caching
+  const loadAllData = useCallback(async (showLoading = true) => {
+    try {
+      if (showLoading) {
+        setIsLoading(true);
+      }
       
-      // Get all memorization items (unified storage)
-      const allItems = getAllMemorizationItems();
+      // Load data in parallel
+      const [allItems, mistakesList] = await Promise.all([
+        getAllMemorizationItems(),
+        getMistakesList()
+      ]);
       
       // Reset daily completions for items completed on previous days
       const resetItems = resetDailyCompletions(allItems);
       
-      // Save any items that were reset (if they changed)
-      resetItems.forEach(item => {
+      // Batch save items that were reset (if they changed) - only save if there are changes
+      const itemsToUpdate = resetItems.filter(item => {
         const originalItem = allItems.find(original => original.id === item.id);
-        if (originalItem && originalItem.completedToday !== item.completedToday) {
-          updateMemorizationItem(item);
-        }
+        return originalItem && originalItem.completedToday !== item.completedToday;
       });
+      
+      // Update items in parallel instead of sequentially
+      if (itemsToUpdate.length > 0) {
+        await batchUpdateMemorizationItems(itemsToUpdate);
+      }
       
       // Update allItems with the reset items
       const finalItems = resetItems;
@@ -206,19 +223,31 @@ export default function Dashboard() {
       setItems(finalItems);
       setDueItems(due);
       setUpcomingItems(upcoming);
-      
-      // Load mistakes
-      const mistakesList = getMistakesList();
       setMistakes(mistakesList);
-    };
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      if (showLoading) {
+        setIsLoading(false);
+      }
+    }
+  }, []);
 
+  // Load data on mount
   useEffect(() => {
     loadAllData();
     loadSurahList();
-    // Refresh data every minute
-    const interval = setInterval(loadAllData, 60000);
+  }, [loadAllData]);
+
+  // Refresh data every 5 minutes instead of every minute to reduce load
+  useEffect(() => {
+    const interval = setInterval(() => {
+      startTransition(() => {
+        loadAllData(false);
+      });
+    }, 300000);
     return () => clearInterval(interval);
-  }, []);
+  }, [loadAllData]);
 
   const loadSurahList = async () => {
     try {
@@ -229,9 +258,7 @@ export default function Dashboard() {
     }
   };
 
-  // Remove unused getPriorityColor function
-
-  const getPriorityText = (item: MemorizationItem) => {
+  const getPriorityText = useCallback((item: MemorizationItem) => {
     const today = getTodayISODate();
     
     if (item.nextReview < today) return 'Overdue';
@@ -241,20 +268,20 @@ export default function Dashboard() {
     const daysUntilReview = Math.ceil((new Date(item.nextReview).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
     if (daysUntilReview <= 3) return 'Due Soon';
     return 'Upcoming';
-  };
+  }, []);
 
-  const getCompletedTodayItems = () => {
+  // Memoized computed values
+  const getCompletedTodayItems = useMemo(() => {
     const today = getTodayISODate();
     return items.filter(item => item.completedToday === today);
-  };
+  }, [items]);
 
-  // Filter out items that were completed today from upcoming reviews
-  const getUpcomingItemsExcludingCompleted = () => {
+  const getUpcomingItemsExcludingCompleted = useMemo(() => {
     const today = getTodayISODate();
     return upcomingItems.filter(item => item.completedToday !== today);
-  };
+  }, [upcomingItems]);
 
-  const groupItemsByDate = (items: MemorizationItem[]): GroupedItems => {
+  const groupItemsByDate = useCallback((items: MemorizationItem[]): GroupedItems => {
     const grouped: GroupedItems = {};
     
     items.forEach(item => {
@@ -269,114 +296,174 @@ export default function Dashboard() {
     return Object.fromEntries(
       Object.entries(grouped).sort(([a], [b]) => new Date(a).getTime() - new Date(b).getTime())
     );
-  };
+  }, []);
 
   // Helper function to parse ISO date string as local date
-  const parseLocalDate = (isoDateString: string) => {
+  const parseLocalDate = useCallback((isoDateString: string) => {
     const [year, month, day] = isoDateString.split('-').map(Number);
     return new Date(year, month - 1, day); // month - 1 because months are 0-indexed
-  };
+  }, []);
 
-  const getDateLabel = (date: string) => {
+  const getDateLabel = useCallback((date: string) => {
     const today = new Date().toLocaleDateString();
     const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000).toLocaleDateString();
     
     if (date === today) return 'Today';
     if (date === tomorrow) return 'Tomorrow';
     return date;
-  };
+  }, []);
 
-  const handleQuickReview = (item: MemorizationItem, rating: 'easy' | 'medium' | 'hard') => {
-    // Update the item with the new rating
-    const updatedItem = updateInterval(item, rating);
-    updateMemorizationItem(updatedItem);
-    
-    // Reload data
-    loadAllData();
-    
-    // Show success message
-    const ratingText = rating === 'easy' ? 'Easy' : rating === 'medium' ? 'Medium' : 'Hard';
-    alert(`✅ Rated ${formatAyahRange(item.surah, item.ayahStart, item.ayahEnd)} as ${ratingText}`);
-  };
-
-  const handleDelete = (itemId: string) => {
-    
-    // Delete the item from unified storage
-    removeMemorizationItem(itemId);
-    
-    setShowDeleteConfirm(null);
-    
-    // Reload data
-    loadAllData();
-  };
-
-  const handleDeleteMistake = (surahNumber: number, ayahNumber: number) => {
-    
-    // Delete the mistake from storage
-    removeMistake(surahNumber, ayahNumber);
-    
-    setShowMistakeDeleteConfirm(null);
-    
-    // Reload data
-    loadAllData();
-  };
-
-  const handleDeleteAllMistakesInSurah = (surahNumber: number) => {
-    
-    // Get all mistakes for this surah and delete them
-    const surahMistakes = groupedMistakes[surahNumber] || [];
-    surahMistakes.forEach(mistake => {
-      removeMistake(surahNumber, mistake.ayah);
-    });
-    
-    setShowMistakeDeleteConfirm(null);
-    
-    // Reload data
-    loadAllData();
-  };
-
-  const handleEdit = (item: MemorizationItem) => {
-    setEditingItem(item);
-  };
-
-  const handleSaveEdit = (updatedItem: MemorizationItem) => {
-    
-    // If the ID has changed (range was modified), we need to handle it carefully
-    if (editingItem && updatedItem.id !== editingItem.id) {
+  const handleQuickReview = useCallback(async (item: MemorizationItem, rating: 'easy' | 'medium' | 'hard') => {
+    try {
+      // Optimistic update - update UI immediately
+      const updatedItem = updateInterval(item, rating);
       
-      // First, add the new item
-      addMemorizationItem(updatedItem);
+      // Update local state immediately for better UX
+      setItems(prevItems => 
+        prevItems.map(prevItem => 
+          prevItem.id === item.id ? updatedItem : prevItem
+        )
+      );
       
-      // Then remove the old item (only if the new item was successfully added)
-      const allItems = getAllMemorizationItems();
-      const newItemExists = allItems.some(item => item.id === updatedItem.id);
+      // Update due and upcoming items
+      setDueItems(prevDue => 
+        prevDue.map(prevItem => 
+          prevItem.id === item.id ? updatedItem : prevItem
+        )
+      );
       
-      if (newItemExists) {
-        removeMemorizationItem(editingItem.id);
-      } else {
-        // If adding failed, just update the old item with new properties but keep old ID
-        updateMemorizationItem({
-          ...updatedItem,
-          id: editingItem.id // Keep the old ID
-        });
-      }
-    } else {
-      // Just update the existing item
-      updateMemorizationItem(updatedItem);
+      setUpcomingItems(prevUpcoming => 
+        prevUpcoming.map(prevItem => 
+          prevItem.id === item.id ? updatedItem : prevItem
+        )
+      );
+      
+      // Save to storage in background
+      await updateMemorizationItem(updatedItem);
+      
+      // Show success message
+      const ratingText = rating === 'easy' ? 'Easy' : rating === 'medium' ? 'Medium' : 'Hard';
+      alert(`✅ Rated ${formatAyahRange(item.surah, item.ayahStart, item.ayahEnd)} as ${ratingText}`);
+    } catch (error) {
+      console.error('Error updating item:', error);
+      alert('Failed to update item. Please try again.');
+      // Reload data on error to ensure consistency
+      await loadAllData(false);
     }
-    
-    setEditingItem(null);
-    
-    // Reload data
-    loadAllData();
-  };
+  }, [loadAllData]);
 
-  const handleCancelEdit = () => {
-    setEditingItem(null);
-  };
+  const handleDelete = useCallback(async (itemId: string) => {
+    try {
+      // Optimistic update - remove from UI immediately
+      setItems(prevItems => prevItems.filter(item => item.id !== itemId));
+      setDueItems(prevDue => prevDue.filter(item => item.id !== itemId));
+      setUpcomingItems(prevUpcoming => prevUpcoming.filter(item => item.id !== itemId));
+      
+      setShowDeleteConfirm(null);
+      
+      // Delete from storage in background
+      await removeMemorizationItem(itemId);
+    } catch (error) {
+      console.error('Error deleting item:', error);
+      alert('Failed to delete item. Please try again.');
+      // Reload data on error to ensure consistency
+      await loadAllData(false);
+    }
+  }, [loadAllData]);
 
-  // Group mistakes by surah
-  const groupMistakesBySurah = (mistakes: MistakeData[]) => {
+  const handleDeleteMistake = useCallback(async (surahNumber: number, ayahNumber: number) => {
+    try {
+      // Optimistic update - remove from UI immediately
+      setMistakes(prevMistakes => 
+        prevMistakes.filter(mistake => 
+          !(mistake.surah === surahNumber && mistake.ayah === ayahNumber)
+        )
+      );
+      
+      setShowMistakeDeleteConfirm(null);
+      
+      // Delete from storage in background
+      await removeMistake(surahNumber, ayahNumber);
+    } catch (error) {
+      console.error('Error deleting mistake:', error);
+      alert('Failed to delete mistake. Please try again.');
+      // Reload data on error to ensure consistency
+      await loadAllData(false);
+    }
+  }, [loadAllData]);
+
+  const handleDeleteAllMistakesInSurah = useCallback(async (surahNumber: number) => {
+    try {
+      // Optimistic update - remove all mistakes for this surah from UI immediately
+      setMistakes(prevMistakes => 
+        prevMistakes.filter(mistake => mistake.surah !== surahNumber)
+      );
+      
+      setShowMistakeDeleteConfirm(null);
+      
+      // Delete from storage in background
+      const surahMistakes = groupedMistakes[surahNumber] || [];
+      for (const mistake of surahMistakes) {
+        await removeMistake(surahNumber, mistake.ayah);
+      }
+    } catch (error) {
+      console.error('Error deleting mistakes:', error);
+      alert('Failed to delete mistakes. Please try again.');
+      // Reload data on error to ensure consistency
+      await loadAllData(false);
+    }
+  }, [loadAllData]);
+
+  const handleEdit = useCallback((item: MemorizationItem) => {
+    setEditingItem(item);
+  }, []);
+
+  const handleSaveEdit = useCallback(async (updatedItem: MemorizationItem) => {
+    try {
+      // Optimistic update - update UI immediately
+      setItems(prevItems => 
+        prevItems.map(prevItem => 
+          prevItem.id === editingItem?.id ? updatedItem : prevItem
+        )
+      );
+      
+      setDueItems(prevDue => 
+        prevDue.map(prevItem => 
+          prevItem.id === editingItem?.id ? updatedItem : prevItem
+        )
+      );
+      
+      setUpcomingItems(prevUpcoming => 
+        prevUpcoming.map(prevItem => 
+          prevItem.id === editingItem?.id ? updatedItem : prevItem
+        )
+      );
+      
+      setEditingItem(null);
+      
+      // Save to storage in background
+      if (editingItem && updatedItem.id !== editingItem.id) {
+        // If the ID has changed (range was modified), we need to handle it carefully
+        await addMemorizationItem(updatedItem);
+        await removeMemorizationItem(editingItem.id);
+      } else {
+        // Just update the existing item
+        await updateMemorizationItem(updatedItem);
+      }
+    } catch (error) {
+      console.error('Error saving edit:', error);
+      alert('Failed to save changes. Please try again.');
+      // Reload data on error to ensure consistency
+      await loadAllData(false);
+    }
+  }, [editingItem, loadAllData]);
+
+  const handleCancelEdit = useCallback(() => {
+    setEditingItem(null);
+  }, []);
+
+  // Group mistakes by surah - memoized
+  const groupedMistakes = useMemo(() => {
     const grouped: { [surah: number]: MistakeData[] } = {};
     mistakes.forEach(mistake => {
       if (!grouped[mistake.surah]) {
@@ -391,11 +478,9 @@ export default function Dashboard() {
     });
     
     return grouped;
-  };
+  }, [mistakes]);
 
-  const groupedMistakes = groupMistakesBySurah(mistakes);
-
-  const toggleSurahExpansion = (surahNumber: number) => {
+  const toggleSurahExpansion = useCallback((surahNumber: number) => {
     setExpandedSurahs(prev => {
       const newSet = new Set(prev);
       if (newSet.has(surahNumber)) {
@@ -405,49 +490,52 @@ export default function Dashboard() {
       }
       return newSet;
     });
-  };
+  }, []);
 
-  const refreshData = () => {
-    
-    loadAllData();
-  };
-
-  // Function removed - fixBrokenItems is no longer needed
+  const refreshData = useCallback(() => {
+    setIsRefreshing(true);
+    startTransition(() => {
+      loadAllData(false).finally(() => {
+        setIsRefreshing(false);
+      });
+    });
+  }, [loadAllData]);
 
   // Helper to sort items by nextReview ascending, then by surah number ascending for same-day items
-  const sortedItems = [...items].sort((a, b) => {
-    const dateA = new Date(a.nextReview).getTime();
-    const dateB = new Date(b.nextReview).getTime();
-    if (dateA !== dateB) return dateA - dateB;
-    // If same date, sort by surah number ascending
-    if (a.surah !== b.surah) return a.surah - b.surah;
-    // If same surah, sort by ayahStart ascending
-    return a.ayahStart - b.ayahStart;
-  });
+  const sortedItems = useMemo(() => {
+    return [...items].sort((a, b) => {
+      const dateA = new Date(a.nextReview).getTime();
+      const dateB = new Date(b.nextReview).getTime();
+      if (dateA !== dateB) return dateA - dateB;
+      // If same date, sort by surah number ascending
+      if (a.surah !== b.surah) return a.surah - b.surah;
+      // If same surah, sort by ayahStart ascending
+      return a.ayahStart - b.ayahStart;
+    });
+  }, [items]);
 
   // Helper to assign a color class for each date group
-  const dateColorMap: Record<string, string> = {};
-  const colorClasses = [
-    'bg-blue-50 dark:bg-blue-950/20',
-    'bg-yellow-50 dark:bg-yellow-950/20',
-    'bg-purple-50 dark:bg-purple-950/20',
-    'bg-pink-50 dark:bg-pink-950/20',
-    'bg-orange-50 dark:bg-orange-950/20',
-    'bg-cyan-50 dark:bg-cyan-950/20',
-    'bg-lime-50 dark:bg-lime-950/20',
-  ];
-  let colorIndex = 0;
-  sortedItems.forEach(item => {
-    const date = item.nextReview;
-    if (!dateColorMap[date]) {
-      dateColorMap[date] = colorClasses[colorIndex % colorClasses.length];
-      colorIndex++;
-    }
-  });
-
-  // State for expanded/collapsed date groups
-  const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
-  const [collapseAll, setCollapseAll] = useState(false);
+  const dateColorMap = useMemo(() => {
+    const colorMap: Record<string, string> = {};
+    const colorClasses = [
+      'bg-blue-50 dark:bg-blue-950/20',
+      'bg-yellow-50 dark:bg-yellow-950/20',
+      'bg-purple-50 dark:bg-purple-950/20',
+      'bg-pink-50 dark:bg-pink-950/20',
+      'bg-orange-50 dark:bg-orange-950/20',
+      'bg-cyan-50 dark:bg-cyan-950/20',
+      'bg-lime-50 dark:bg-lime-950/20',
+    ];
+    let colorIndex = 0;
+    sortedItems.forEach(item => {
+      const date = item.nextReview;
+      if (!colorMap[date]) {
+        colorMap[date] = colorClasses[colorIndex % colorClasses.length];
+        colorIndex++;
+      }
+    });
+    return colorMap;
+  }, [sortedItems]);
 
   // Effect to collapse/expand all groups when collapseAll changes
   useEffect(() => {
@@ -456,20 +544,39 @@ export default function Dashboard() {
       newState[date] = !collapseAll; // ON = expanded, OFF = collapsed
     });
     setExpandedDates(newState);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [collapseAll, items.length]);
+  }, [collapseAll, items, groupItemsByDate]);
 
   // Group sortedItems by nextReview date
-  const groupedByDate: Record<string, typeof sortedItems> = {};
-  sortedItems.forEach(item => {
-    if (!groupedByDate[item.nextReview]) groupedByDate[item.nextReview] = [];
-    groupedByDate[item.nextReview].push(item);
-  });
+  const groupedByDate = useMemo(() => {
+    const grouped: Record<string, typeof sortedItems> = {};
+    sortedItems.forEach(item => {
+      if (!grouped[item.nextReview]) grouped[item.nextReview] = [];
+      grouped[item.nextReview].push(item);
+    });
+    return grouped;
+  }, [sortedItems]);
 
   // Helper to toggle expand/collapse
-  const toggleDateExpand = (date: string) => {
+  const toggleDateExpand = useCallback((date: string) => {
     setExpandedDates(prev => ({ ...prev, [date]: !prev[date] }));
-  };
+  }, []);
+
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background">
+        <AppHeader pageType="home" />
+        <main className="container mx-auto px-4 py-6">
+          <div className="flex items-center justify-center min-h-[400px]">
+            <div className="text-center">
+              <Loader2 className="h-8 w-8 animate-spin mx-auto mb-4" />
+              <p className="text-muted-foreground">Loading your memorization data...</p>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -480,6 +587,14 @@ export default function Dashboard() {
       />
 
       <main className="container mx-auto px-4 py-6">
+        {/* Loading indicator for refresh */}
+        {isRefreshing && (
+          <div className="fixed top-20 right-4 z-50 bg-background border rounded-lg shadow-lg px-4 py-2 flex items-center space-x-2">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            <span className="text-sm">Refreshing...</span>
+          </div>
+        )}
+
         {/* Mistakes Section */}
         {mistakes.length > 0 && (
           <div className="mb-6">
@@ -631,12 +746,12 @@ export default function Dashboard() {
         )}
 
         {/* Completed Today - Compact */}
-        {getCompletedTodayItems().length > 0 && (
+        {getCompletedTodayItems.length > 0 && (
           <div className="mb-6">
             <div className="flex items-center space-x-3 mb-3">
               <CheckCircle className="h-5 w-5 text-green-600" />
               <h2 className="text-lg font-semibold">
-                Completed Today ({getCompletedTodayItems().length})
+                Completed Today ({getCompletedTodayItems.length})
               </h2>
             </div>
             <Card>
@@ -652,7 +767,7 @@ export default function Dashboard() {
                       </tr>
                     </thead>
                     <tbody>
-                      {getCompletedTodayItems().map((item) => {
+                      {getCompletedTodayItems.map((item) => {
                         const reviewDate = parseLocalDate(item.nextReview).toLocaleDateString();
                         return (
                           <tr 

@@ -24,7 +24,8 @@ import {
   X
 } from 'lucide-react';
 import { getLanguagesWithTranslations } from '@/lib/quranService';
-import { getNextMistakeInVerseOrder, MistakeData } from '@/lib/storage';
+import { getNextMistakeInVerseOrder } from '@/lib/storageService';
+import { MistakeData } from '@/lib/supabase/database';
 
 interface QuranHeaderContentProps {
   currentPage: number;
@@ -121,12 +122,21 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
   });
 
   // Get the next mistake in verse order
-  const getNextMistake = () => {
-    return getNextMistakeInVerseOrder(currentSurah, currentAyah, pageData?.ayahs);
-  };
-
-  const nextMistake = getNextMistake();
+  const [nextMistake, setNextMistake] = useState<MistakeData | null>(null);
   const hasNextMistake = nextMistake !== null;
+  
+  useEffect(() => {
+    const loadNextMistake = async () => {
+      try {
+        const mistake = await getNextMistakeInVerseOrder(currentSurah, currentAyah, pageData?.ayahs);
+        setNextMistake(mistake);
+      } catch (error) {
+        console.error('Error loading next mistake:', error);
+        setNextMistake(null);
+      }
+    };
+    loadNextMistake();
+  }, [currentSurah, currentAyah, pageData]);
 
   // Save mobile header visibility to localStorage
   useEffect(() => {

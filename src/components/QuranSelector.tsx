@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { getSurahName, getAyahCount, validateAyahRange, SURAH_NAMES } from '@/lib/quran';
 import { createMemorizationItem } from '@/lib/spacedRepetition';
-import { addMemorizationItem } from '@/lib/storage';
+import { addMemorizationItem } from '@/lib/storageService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -66,7 +66,7 @@ export default function QuranSelector({ onAdd, currentSurah = 1, hideSelectionTy
         const item = await createMemorizationItem(surah, ayahStart, ayahEnd, undefined, undefined, effectiveMemorizationAge);
         item.name = name;
         item.description = description || '';
-        addMemorizationItem(item);
+        await addMemorizationItem(item);
         // setError(''); // Original code had this line commented out
         onAdd();
       } catch (error) {

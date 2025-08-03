@@ -31,7 +31,8 @@ import {
   Info
 } from 'lucide-react';
 import { getLanguagesWithTranslations } from '@/lib/quranService';
-import { loadFontSettings, saveFontSettings, getNextMistakeInVerseOrder, MistakeData } from '@/lib/storage';
+import { loadFontSettings, saveFontSettings, getNextMistakeInVerseOrder } from '@/lib/storageService';
+import { MistakeData } from '@/lib/supabase/database';
 
 interface QuranHeaderProps {
   currentPage: number;
@@ -127,24 +128,33 @@ export default function QuranHeader({
   const surahListRef = useRef<HTMLDivElement>(null);
 
   // Get the next mistake in verse order
-  const getNextMistake = () => {
-    return getNextMistakeInVerseOrder(currentSurah, currentAyah, pageData?.ayahs);
-  };
-
-  const nextMistake = getNextMistake();
+  const [nextMistake, setNextMistake] = useState<MistakeData | null>(null);
+  
+  useEffect(() => {
+    const loadNextMistake = async () => {
+      try {
+        const mistake = await getNextMistakeInVerseOrder(currentSurah, currentAyah, pageData?.ayahs);
+        setNextMistake(mistake);
+      } catch (error) {
+        console.error('Error loading next mistake:', error);
+        setNextMistake(null);
+      }
+    };
+    loadNextMistake();
+  }, [currentSurah, currentAyah, pageData]);
   const hasNextMistake = nextMistake !== null;
 
   // Language name mapping
   // Save translation settings
-  const saveTranslationSettings = (language: string, translation: string) => {
+  const saveTranslationSettings = async (language: string, translation: string) => {
     try {
-      const currentSettings = loadFontSettings();
+      const currentSettings = await loadFontSettings();
       const updatedSettings = {
         ...currentSettings,
         selectedLanguage: language,
         selectedTranslation: translation
       };
-      saveFontSettings(updatedSettings);
+      await saveFontSettings(updatedSettings);
     } catch (error) {
       console.error('Error saving translation settings:', error);
     }
@@ -314,7 +324,7 @@ export default function QuranHeader({
     const loadSettingsAndTranslations = async () => {
       try {
         // Load saved settings
-        const savedSettings = loadFontSettings();
+        const savedSettings = await loadFontSettings();
         if (savedSettings.selectedLanguage && onLanguageChange) {
           onLanguageChange(savedSettings.selectedLanguage);
         }

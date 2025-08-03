@@ -4,7 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { MemorizationItem, ReviewRating, RecallQuality } from '@/lib/spacedRepetition';
 import { formatAyahRange, formatAyahRangeArabic } from '@/lib/quran';
 import { getAyahRange, getAyahAudioUrl } from '@/lib/quranService';
-import { updateMemorizationItem, updateMemorizationItemWithIndividualRating, getMemorizationItem } from '@/lib/storage';
+import { updateMemorizationItem, updateMemorizationItemWithIndividualRating, getMemorizationItem } from '@/lib/storageService';
 
 interface ReviewCardProps {
   item: MemorizationItem;
@@ -229,7 +229,7 @@ export default function ReviewCard({ item, onComplete, onViewInQuran }: ReviewCa
     setOpenDropdown(prev => prev === index ? null : index);
   };
 
-  const handleIndividualRating = (ayahIndex: number, rating: ReviewRating) => {
+  const handleIndividualRating = async (ayahIndex: number, rating: ReviewRating) => {
     console.log('Individual rating clicked:', { ayahIndex, rating, ayahData: ayahData[ayahIndex] });
     
     // Get the actual ayah number (not the index)
@@ -239,13 +239,17 @@ export default function ReviewCard({ item, onComplete, onViewInQuran }: ReviewCa
       return;
     }
     
-    // Use the individual ayah rating system
-    updateMemorizationItemWithIndividualRating(memorizationItem.id, ayahNumber, rating);
-    
-    // Reload the memorization item to get updated data
-    const updatedItem = getMemorizationItem(memorizationItem.id);
-    if (updatedItem) {
-      setMemorizationItem(updatedItem as ExtendedMemorizationItem);
+    try {
+      // Use the individual ayah rating system
+      await updateMemorizationItemWithIndividualRating(memorizationItem.id, ayahNumber, rating);
+      
+      // Reload the memorization item to get updated data
+      const updatedItem = await getMemorizationItem(memorizationItem.id);
+      if (updatedItem) {
+        setMemorizationItem(updatedItem as ExtendedMemorizationItem);
+      }
+    } catch (error) {
+      console.error('Error updating individual rating:', error);
     }
     
     setOpenDropdown(null);
@@ -295,22 +299,26 @@ export default function ReviewCard({ item, onComplete, onViewInQuran }: ReviewCa
     return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
   };
 
-  const handleRating = (rating: ReviewRating) => {
-    // For overall rating, we need to rate all ayahs in the range with the same rating
-    // This simulates rating the entire passage as one unit
-    const ayahNumbers = ayahData.map(ayah => ayah.numberInSurah);
-    
-    // Rate each ayah individually with the same rating
-    ayahNumbers.forEach(ayahNumber => {
-      updateMemorizationItemWithIndividualRating(memorizationItem.id, ayahNumber, rating);
-    });
-    
-    // Get the updated item after all ratings are applied
-    const updatedItem = getMemorizationItem(memorizationItem.id);
-    if (updatedItem) {
-      onComplete(updatedItem);
-    } else {
-      console.error('Failed to get updated item after rating');
+  const handleRating = async (rating: ReviewRating) => {
+    try {
+      // For overall rating, we need to rate all ayahs in the range with the same rating
+      // This simulates rating the entire passage as one unit
+      const ayahNumbers = ayahData.map(ayah => ayah.numberInSurah);
+      
+      // Rate each ayah individually with the same rating
+      for (const ayahNumber of ayahNumbers) {
+        await updateMemorizationItemWithIndividualRating(memorizationItem.id, ayahNumber, rating);
+      }
+      
+      // Get the updated item after all ratings are applied
+      const updatedItem = await getMemorizationItem(memorizationItem.id);
+      if (updatedItem) {
+        onComplete(updatedItem);
+      } else {
+        console.error('Failed to get updated item after rating');
+      }
+    } catch (error) {
+      console.error('Error handling rating:', error);
     }
   };
 
