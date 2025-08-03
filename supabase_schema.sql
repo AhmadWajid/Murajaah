@@ -131,7 +131,7 @@ CREATE TABLE public.user_settings (
     padding INTEGER DEFAULT 16 CHECK (padding >= 8 AND padding <= 32),
     layout_mode TEXT DEFAULT 'single' CHECK (layout_mode IN ('single', 'spread')),
     selected_language TEXT DEFAULT 'en',
-    selected_translation TEXT DEFAULT 'en.asad',
+    selected_translation TEXT DEFAULT 'en.hilali',
     enable_tajweed BOOLEAN DEFAULT TRUE,
     
     -- Audio settings

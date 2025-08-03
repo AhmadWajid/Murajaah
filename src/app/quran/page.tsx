@@ -100,7 +100,7 @@ function QuranPageContent() {
   const [padding, setPadding] = useState(16);
   const [fontTargetArabic, setFontTargetArabic] = useState(true);
   const [selectedLanguage, setSelectedLanguage] = useState('en');
-  const [selectedTranslation, setSelectedTranslation] = useState('en.asad');
+  const [selectedTranslation, setSelectedTranslation] = useState('en.hilali');
   
   // Load font settings from optimized hook
   useEffect(() => {
@@ -111,7 +111,7 @@ function QuranPageContent() {
       setPadding(fontSettings.padding || 16);
       setFontTargetArabic(fontSettings.fontTargetArabic !== false);
       setSelectedLanguage(fontSettings.selectedLanguage || 'en');
-      setSelectedTranslation(fontSettings.selectedTranslation || 'en.asad');
+      setSelectedTranslation(fontSettings.selectedTranslation || 'en.hilali');
     }
   }, [fontSettings]);
   

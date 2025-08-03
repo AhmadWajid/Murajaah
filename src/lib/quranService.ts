@@ -89,7 +89,7 @@ export async function getQuranMeta(): Promise<any> {
   return response.data;
 }
 
-export async function getPage(pageNumber: number, translation: string = 'en.asad'): Promise<any> {
+export async function getPage(pageNumber: number, translation: string = 'en.hilali'): Promise<any> {
   const response = await fetchWithCache(`/page/${pageNumber}/${translation}`);
   return response.data;
 }

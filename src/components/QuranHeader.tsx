@@ -101,7 +101,7 @@ export default function QuranHeader({
   hideWordsDelay = 500,
   onHideWordsDelayChange,
   selectedLanguage = 'en',
-  selectedTranslation = 'en.asad',
+  selectedTranslation = 'en.hilali',
   onLanguageChange,
   onTranslationChange,
   showWordByWordTooltip = true,

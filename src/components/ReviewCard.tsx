@@ -46,7 +46,7 @@ export default function ReviewCard({ item, onComplete, onViewInQuran }: ReviewCa
         setError('');
         
         const arabicAyahs = await getAyahRange(item.surah, item.ayahStart, item.ayahEnd, 'quran-uthmani');
-        const englishAyahs = await getAyahRange(item.surah, item.ayahStart, item.ayahEnd, 'en.asad');
+        const englishAyahs = await getAyahRange(item.surah, item.ayahStart, item.ayahEnd, 'en.hilali');
         
         const combinedAyahs = arabicAyahs.map((arabicAyah, index) => ({
           ...arabicAyah,

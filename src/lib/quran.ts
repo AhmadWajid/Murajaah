@@ -147,7 +147,7 @@ export const ALQURAN_API_BASE = 'https://api.alquran.cloud/v1';
 // Default editions for different purposes
 export const DEFAULT_EDITIONS = {
   arabic: 'quran-uthmani',
-  english: 'en.asad',
+  english: 'en.hilali',
   audio: 'ar.alafasy',
 } as const;
 

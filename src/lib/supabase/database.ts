@@ -732,7 +732,7 @@ export async function saveFontSettings(fontSettings: {
     padding: fontSettings.padding,
     layout_mode: fontSettings.layoutMode,
     selected_language: fontSettings.selectedLanguage || 'en',
-    selected_translation: fontSettings.selectedTranslation || 'en.asad',
+    selected_translation: fontSettings.selectedTranslation || 'en.hilali',
     enable_tajweed: fontSettings.enableTajweed ?? true,
   });
 }
@@ -760,7 +760,7 @@ export async function loadFontSettings() {
       padding: 16,
       layoutMode: 'single' as const,
       selectedLanguage: 'en',
-      selectedTranslation: 'en.asad',
+      selectedTranslation: 'en.hilali',
       enableTajweed: true,
     };
   }

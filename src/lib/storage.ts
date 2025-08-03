@@ -546,7 +546,7 @@ export const loadFontSettings = () => {
         padding: 16,
         layoutMode: 'single' as const,
         selectedLanguage: 'en',
-        selectedTranslation: 'en.asad',
+        selectedTranslation: 'en.hilali',
         enableTajweed: true
       };
     }
@@ -560,7 +560,7 @@ export const loadFontSettings = () => {
         padding: 16,
         layoutMode: 'single' as const,
         selectedLanguage: 'en',
-        selectedTranslation: 'en.asad',
+        selectedTranslation: 'en.hilali',
         enableTajweed: true
       };
     }
@@ -579,7 +579,7 @@ export const loadFontSettings = () => {
       padding: 16,
       layoutMode: 'single' as const,
       selectedLanguage: 'en',
-      selectedTranslation: 'en.asad',
+      selectedTranslation: 'en.hilali',
       enableTajweed: true
     };
   }
