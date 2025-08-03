@@ -3,6 +3,7 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
+import { clearUserCache } from '@/lib/supabase/database';
 
 interface AuthContextType {
   user: User | null;
@@ -50,6 +51,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
         async (event, session) => {
           setUser(session?.user ?? null);
           setLoading(false);
+          
+          // Clear user cache on auth state changes
+          if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
+            clearUserCache();
+          }
         }
       );
 

@@ -73,6 +73,11 @@ export default function AyahCard({
   showWordByWordTooltip = true,
   padding = 0,
 }: AyahCardProps) {
+  // Local state for immediate visual feedback
+  const [localMistakeState, setLocalMistakeState] = useState<Record<string, boolean>>({});
+  const [isMistakeLoading, setIsMistakeLoading] = useState(false);
+
+
   const [showReviewRatingDropdown, setShowReviewRatingDropdown] = useState(false);
   // Tafsir modal state
   const [showTafsir, setShowTafsir] = useState(false);
@@ -97,6 +102,38 @@ export default function AyahCard({
     };
   }, [showReviewRatingDropdown]);
   
+  const handleMistakeToggle = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    if (isMistakeLoading) return; // Prevent multiple clicks
+    
+    const newMistakeState = !hasMistake;
+    
+    // Immediately update local state for instant visual feedback
+    setLocalMistakeState(prev => ({
+      ...prev,
+      [mistakeKey]: newMistakeState
+    }));
+    
+    setIsMistakeLoading(true);
+    
+    try {
+      // Call the actual toggle function
+      if (onToggleMistake) {
+        await onToggleMistake(surahNumber, ayahNumber);
+      }
+    } catch (error) {
+      console.error('Error toggling mistake:', error);
+      // Revert local state on error
+      setLocalMistakeState(prev => ({
+        ...prev,
+        [mistakeKey]: !newMistakeState
+      }));
+    } finally {
+      setIsMistakeLoading(false);
+    }
+  };
+
   const handleTafsirClick = async () => {
     setShowTafsir(true);
     await fetchTafsir();
@@ -206,8 +243,21 @@ export default function AyahCard({
 
   // Check if this ayah has been marked as a mistake
   const mistakeKey = `${surahNumber}:${ayahNumber}`;
-  const hasMistake = mistakes[mistakeKey] || false;
+  // Use local state for immediate feedback, fallback to props for initial state
+  const hasMistake = localMistakeState[mistakeKey] !== undefined 
+    ? localMistakeState[mistakeKey] 
+    : (mistakes[mistakeKey] || false);
   const isMistakeHidden = hasMistake && hideMistakes;
+
+  // Sync local state with props when mistakes change
+  useEffect(() => {
+    if (mistakes[mistakeKey] !== undefined) {
+      setLocalMistakeState(prev => ({
+        ...prev,
+        [mistakeKey]: Boolean(mistakes[mistakeKey])
+      }));
+    }
+  }, [mistakes, mistakeKey]);
   const isRevealed = revealedMistakes.has(mistakeKey);
   const shouldShowHidden = isMistakeHidden && !isRevealed;
 
@@ -457,16 +507,20 @@ export default function AyahCard({
                   hasMistake 
                     ? 'text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-200 hover:bg-red-100 dark:hover:bg-red-900/30' 
                     : 'text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-900/30'
-                }`}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onToggleMistake(surahNumber, ayahNumber);
-                }}
+                } ${isMistakeLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                onClick={handleMistakeToggle}
+                disabled={isMistakeLoading}
                 title={hasMistake ? 'Remove mistake mark' : 'Mark as mistake'}
               >
-                <svg className="w-4 h-4 sm:w-5 sm:h-5" fill={hasMistake ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
+                {isMistakeLoading ? (
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4 sm:w-5 sm:h-5" fill={hasMistake ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                )}
               </button>
             )}
 

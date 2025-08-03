@@ -282,7 +282,10 @@ export async function toggleMistake(surahNumber: number, ayahNumber: number): Pr
     () => localStorageService.toggleMistake(surahNumber, ayahNumber),
     {}
   );
+  // Invalidate all mistake-related caches to ensure consistency
   cache.invalidate('mistakes');
+  cache.invalidate('mistakesList');
+  cache.invalidate('mistakesInVerseOrder');
   return result;
 }
 
@@ -292,7 +295,10 @@ export async function showMistake(surahNumber: number, ayahNumber: number): Prom
     () => localStorageService.showMistake(surahNumber, ayahNumber),
     {}
   );
+  // Invalidate all mistake-related caches to ensure consistency
   cache.invalidate('mistakes');
+  cache.invalidate('mistakesList');
+  cache.invalidate('mistakesInVerseOrder');
   return result;
 }
 
@@ -302,7 +308,10 @@ export async function removeMistake(surahNumber: number, ayahNumber: number): Pr
     () => localStorageService.removeMistake(surahNumber, ayahNumber),
     {}
   );
+  // Invalidate all mistake-related caches to ensure consistency
   cache.invalidate('mistakes');
+  cache.invalidate('mistakesList');
+  cache.invalidate('mistakesInVerseOrder');
   return result;
 }
 

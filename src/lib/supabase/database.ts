@@ -76,12 +76,29 @@ function getSupabaseClient() {
   return supabase;
 }
 
+// Cache for current user to avoid redundant auth calls
+let currentUserCache: { user: any; timestamp: number } | null = null;
+const USER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 async function getCurrentUser() {
+  // Check cache first
+  if (currentUserCache && Date.now() - currentUserCache.timestamp < USER_CACHE_TTL) {
+    return currentUserCache.user;
+  }
+  
   const client = getSupabaseClient();
   const { data: { user }, error } = await client.auth.getUser();
   if (error) throw error;
   if (!user) throw new Error('User not authenticated');
+  
+  // Cache the user
+  currentUserCache = { user, timestamp: Date.now() };
   return user;
+}
+
+// Function to clear user cache (call this on logout or when user changes)
+export function clearUserCache() {
+  currentUserCache = null;
 }
 
 // =============================================
@@ -449,7 +466,26 @@ export async function toggleMistake(surahNumber: number, ayahNumber: number): Pr
     if (insertError) throw insertError;
   }
   
-  return await getMistakes();
+  // Return the updated mistake data without making another API call
+  const { data: allMistakes, error: getAllError } = await getSupabaseClient()
+    .from('mistakes')
+    .select('*')
+    .eq('user_id', user.id);
+    
+  if (getAllError) throw getAllError;
+  
+  // Convert to the expected format
+  const mistakesRecord: Record<string, MistakeData> = {};
+  allMistakes.forEach(mistake => {
+    const key = `${mistake.surah}:${mistake.ayah}`;
+    mistakesRecord[key] = {
+      timestamp: mistake.timestamp,
+      surah: mistake.surah,
+      ayah: mistake.ayah,
+    };
+  });
+  
+  return mistakesRecord;
 }
 
 export async function showMistake(surahNumber: number, ayahNumber: number): Promise<Record<string, MistakeData>> {
@@ -466,7 +502,26 @@ export async function showMistake(surahNumber: number, ayahNumber: number): Prom
     
   if (error) throw error;
   
-  return await getMistakes();
+  // Return the updated mistake data without making another API call
+  const { data: allMistakes, error: getAllError } = await getSupabaseClient()
+    .from('mistakes')
+    .select('*')
+    .eq('user_id', user.id);
+    
+  if (getAllError) throw getAllError;
+  
+  // Convert to the expected format
+  const mistakesRecord: Record<string, MistakeData> = {};
+  allMistakes.forEach(mistake => {
+    const key = `${mistake.surah}:${mistake.ayah}`;
+    mistakesRecord[key] = {
+      timestamp: mistake.timestamp,
+      surah: mistake.surah,
+      ayah: mistake.ayah,
+    };
+  });
+  
+  return mistakesRecord;
 }
 
 export async function removeMistake(surahNumber: number, ayahNumber: number): Promise<Record<string, MistakeData>> {
@@ -481,7 +536,26 @@ export async function removeMistake(surahNumber: number, ayahNumber: number): Pr
     
   if (error) throw error;
   
-  return await getMistakes();
+  // Return the updated mistake data without making another API call
+  const { data: allMistakes, error: getAllError } = await getSupabaseClient()
+    .from('mistakes')
+    .select('*')
+    .eq('user_id', user.id);
+    
+  if (getAllError) throw getAllError;
+  
+  // Convert to the expected format
+  const mistakesRecord: Record<string, MistakeData> = {};
+  allMistakes.forEach(mistake => {
+    const key = `${mistake.surah}:${mistake.ayah}`;
+    mistakesRecord[key] = {
+      timestamp: mistake.timestamp,
+      surah: mistake.surah,
+      ayah: mistake.ayah,
+    };
+  });
+  
+  return mistakesRecord;
 }
 
 export async function clearAllMistakes(): Promise<void> {

@@ -57,10 +57,12 @@ function QuranPageContent() {
     fontSettings,
     memorizationItems,
     mistakes,
+    setMistakes,
     isLoadingSettings,
     isLoadingData,
     refreshSettings,
     refreshData,
+    refreshMistakesOnly,
     invalidateSettingsCache
   } = useOptimizedData();
   
@@ -1039,10 +1041,17 @@ function QuranPageContent() {
     }
   };
 
-  const handleToggleMistake = (surahNumber: number, ayahNumber: number) => {
-    // Always toggle the mistake, regardless of hideMistakes mode
-    toggleMistake(surahNumber, ayahNumber);
-    refreshData();
+  const handleToggleMistake = async (surahNumber: number, ayahNumber: number) => {
+    try {
+      // Perform the actual toggle operation
+      await toggleMistake(surahNumber, ayahNumber);
+      // Refresh to ensure consistency with server
+      refreshMistakesOnly();
+    } catch (error) {
+      console.error('Error toggling mistake:', error);
+      // Refresh to ensure consistency on error
+      refreshMistakesOnly();
+    }
   };
 
   const handleRevealMistake = (surahNumber: number, ayahNumber: number) => {

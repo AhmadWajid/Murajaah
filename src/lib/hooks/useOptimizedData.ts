@@ -22,6 +22,7 @@ interface UseOptimizedDataReturn {
   // Data
   memorizationItems: any[];
   mistakes: Record<string, any>;
+  setMistakes: React.Dispatch<React.SetStateAction<Record<string, any>>>;
   
   // Loading states
   isLoadingSettings: boolean;
@@ -30,6 +31,7 @@ interface UseOptimizedDataReturn {
   // Actions
   refreshSettings: () => Promise<void>;
   refreshData: () => Promise<void>;
+  refreshMistakesOnly: () => Promise<void>;
   invalidateSettingsCache: () => void;
 }
 
@@ -120,6 +122,20 @@ export function useOptimizedData(): UseOptimizedDataReturn {
     await loadData(true);
   }, [loadData]);
 
+  const refreshMistakesOnly = useCallback(async () => {
+    try {
+      setIsLoadingData(true);
+      // Force fresh data by invalidating cache first
+      invalidateCache();
+      const mistakesData = await getMistakes();
+      setMistakes(mistakesData);
+    } catch (error) {
+      console.error('Error refreshing mistakes:', error);
+    } finally {
+      setIsLoadingData(false);
+    }
+  }, []);
+
   const invalidateSettingsCache = useCallback(() => {
     settingsCache.clear();
   }, []);
@@ -131,7 +147,22 @@ export function useOptimizedData(): UseOptimizedDataReturn {
 
   // Load data on mount
   useEffect(() => {
+    // Clear any stale cache on mount to ensure fresh data
+    invalidateCache();
     loadData();
+  }, [loadData]);
+
+  // Refresh data when page becomes visible (in case user navigated away and came back)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && isInitialized.current) {
+        // Refresh data when page becomes visible to ensure consistency
+        loadData(true);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [loadData]);
 
   return {
@@ -140,10 +171,12 @@ export function useOptimizedData(): UseOptimizedDataReturn {
     fontSettings,
     memorizationItems,
     mistakes,
+    setMistakes,
     isLoadingSettings,
     isLoadingData,
     refreshSettings,
     refreshData,
+    refreshMistakesOnly,
     invalidateSettingsCache
   };
 } 
