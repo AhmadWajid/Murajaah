@@ -134,8 +134,9 @@ function QuranPageContent() {
   const [revisionInput, setRevisionInput] = useState('');
 
   // Add this line to fix ReferenceError
+  // Disable word-by-word data by default - only fetch if explicitly enabled
   const [wordByWordData, setWordByWordData] = useState<any[]>([]);
-  const [showWordByWordTooltip, setShowWordByWordTooltip] = useState(true);
+  const [showWordByWordTooltip, setShowWordByWordTooltip] = useState(false); // Disabled by default to fix UI issue
 
   // Load from localStorage on mount
   useEffect(() => {
@@ -143,6 +144,9 @@ function QuranPageContent() {
       const saved = localStorage.getItem('showWordByWordTooltip');
       if (saved !== null) {
         setShowWordByWordTooltip(saved === 'true');
+      } else {
+        // Default to disabled
+        setShowWordByWordTooltip(false);
       }
     }
   }, []);
@@ -1192,9 +1196,16 @@ function QuranPageContent() {
   };
 
   // Fetch word-by-word translation for the current page
+  // Only fetch if the feature is explicitly enabled
   useEffect(() => {
     async function fetchWordByWord() {
       try {
+        // Skip fetching if word-by-word is disabled
+        if (!showWordByWordTooltip) {
+          setWordByWordData([]);
+          return;
+        }
+        
         const res = await fetch(`/api/wordbyword?page=${currentPage}`);
         if (res.ok) {
           const data = await res.json();
@@ -1207,7 +1218,7 @@ function QuranPageContent() {
       }
     }
     fetchWordByWord();
-  }, [currentPage]);
+  }, [currentPage, showWordByWordTooltip]);
 
   // Open Add Review modal if addReview param is present
   useEffect(() => {

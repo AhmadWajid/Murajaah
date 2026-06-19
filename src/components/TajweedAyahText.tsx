@@ -184,10 +184,9 @@ export function TajweedAyahText({
 
   // Always render with Tajweed highlighting
   const renderWordWithTajweed = (word: TajweedWord, index: number) => {
-    // Find the translation for this word if available
+    // Find the translation for this word if available and feature is enabled
     let translation = '';
-    if (wordByWordData && wordByWordData.length > 0) {
-      // Try to match by surah, ayah, and position (word.word is 1-based)
+    if (showWordByWordTooltip && wordByWordData && Array.isArray(wordByWordData) && wordByWordData.length > 0) {
       let match = wordByWordData.find(
         (w) => w.surah === word.surah && w.ayah === word.ayah && (w.position === word.word)
       );
@@ -224,7 +223,7 @@ export function TajweedAyahText({
     if (hideWords) {
       // Find the translation for this word if available
       let translation = '';
-      if (wordByWordData && wordByWordData.length > 0) {
+      if (showWordByWordTooltip && wordByWordData && Array.isArray(wordByWordData) && wordByWordData.length > 0) {
         // Try to match by surah, ayah, and position (word.word is 1-based)
         let match = wordByWordData.find(
           (w) => w.surah === word.surah && w.ayah === word.ayah && (w.position === word.word)

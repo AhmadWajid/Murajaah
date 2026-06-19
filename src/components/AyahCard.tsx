@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { MistakeData } from '@/lib/supabase/database';
 import { TajweedAyahText } from './TajweedAyahText';
+import { TafsirContent } from './TafsirContent';
 import ReactMarkdown from 'react-markdown';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -854,34 +855,67 @@ export default function AyahCard({
       )}
       {/* Tafsir Modal */}
       {showTafsir && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-2">
-          <div className="bg-white dark:bg-gray-900 rounded-xl p-4 sm:p-6 w-full max-w-md sm:max-w-lg shadow-lg relative flex flex-col">
-            <button className="absolute top-2 right-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200" onClick={() => setShowTafsir(false)}>
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-            <h2 className="text-lg font-bold mb-3 text-center">Tafsir for {tafsirData?.surahName || surahNumber}:{tafsirData?.ayahNo || ayahNumber}</h2>
-            {loadingTafsir ? (
-              <div className="py-8 text-center">Loading...</div>
-            ) : tafsirData && tafsirData.tafsirs && tafsirData.tafsirs.length > 0 ? (
-              <>
-                <select
-                  className="mb-3 w-full border rounded p-2 dark:bg-gray-800 dark:text-white"
-                  value={selectedAuthor || ''}
-                  onChange={e => setSelectedAuthor(e.target.value)}
-                >
-                  {tafsirData.tafsirs.map((t: any) => (
-                    <option key={t.author} value={t.author}>{t.author}</option>
-                  ))}
-                </select>
-                <div className="prose max-w-none dark:prose-invert overflow-y-auto max-h-[60vh] p-3 border rounded bg-gray-50 dark:bg-gray-800 text-sm sm:text-base">
-                  <ReactMarkdown>
-                    {tafsirData.tafsirs.find((t: any) => t.author === selectedAuthor)?.content || ''}
-                  </ReactMarkdown>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/50 px-2 py-4">
+          <div className="bg-white dark:bg-gray-900 rounded-xl shadow-2xl relative flex flex-col w-full max-w-4xl h-[90vh]">
+            {/* Header */}
+            <div className="flex items-center justify-between p-4 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
+              <h2 className="text-lg font-bold text-gray-900 dark:text-white">
+                Tafsir for {tafsirData?.surahName || surahNumber}:{tafsirData?.ayahNo || ayahNumber}
+              </h2>
+              <button 
+                className="p-2 text-gray-500 hover:text-gray-800 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors" 
+                onClick={() => setShowTafsir(false)}
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 overflow-hidden p-3">
+              {loadingTafsir ? (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-600 mx-auto mb-3"></div>
+                    <p className="text-gray-600 dark:text-gray-400">Loading Tafsir...</p>
+                  </div>
                 </div>
-              </>
-            ) : (
-              <div className="py-8 text-center">No tafsir found.</div>
-            )}
+              ) : tafsirData && tafsirData.tafsirs && tafsirData.tafsirs.length > 0 ? (
+                <div className="h-full flex flex-col">
+                  {/* Author Selector */}
+                  <div className="mb-3 flex-shrink-0">
+                    <select
+                      className="w-full border border-gray-300 dark:border-gray-600 rounded-lg p-2 dark:bg-gray-800 dark:text-white focus:ring-2 focus:ring-amber-500 focus:border-transparent text-sm"
+                      value={selectedAuthor || ''}
+                      onChange={e => setSelectedAuthor(e.target.value)}
+                    >
+                      {tafsirData.tafsirs.map((t: any) => (
+                        <option key={t.author} value={t.author}>{t.author}</option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Tafsir Content */}
+                  <div className="flex-1 overflow-y-auto">
+                    <div className="prose prose-sm max-w-none dark:prose-invert">
+                      <TafsirContent 
+                        content={tafsirData.tafsirs.find((t: any) => t.author === selectedAuthor)?.content || ''} 
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center justify-center h-full">
+                  <div className="text-center text-gray-600 dark:text-gray-400">
+                    <svg className="w-10 h-10 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p>No Tafsir found for this verse.</p>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

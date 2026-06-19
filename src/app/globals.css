@@ -98,27 +98,98 @@
     padding-left: 0.25rem !important;
     padding-right: 0.25rem !important;
   }
-  
-  /* Comprehensive Arabic text mobile fix */
-  .arabic-text, .uthmanic-hafs, .font-arabic {
-    /* Reset all text wrapping properties */
-    white-space: normal !important;
-    word-wrap: break-word !important;
-    overflow-wrap: break-word !important;
-    word-break: keep-all !important;
-    hyphens: none !important;
-    /* Minimal spacing for mobile */
-    word-spacing: 0.01em !important;
-    letter-spacing: 0 !important;
-    /* Ensure no horizontal overflow */
-    max-width: 100% !important;
-    overflow-x: hidden !important;
-    /* Box model */
-    box-sizing: border-box !important;
-    /* Display properties */
-    display: block !important;
-    width: 100% !important;
+}
+
+/* Tafsir Modal Styles */
+.tafsir-content {
+  line-height: 1.8;
+}
+
+.tafsir-content p {
+  margin-bottom: 1rem;
+}
+
+/* Ensure modal appears above audio player */
+.z-\[100\] {
+  z-index: 100 !important;
+}
+
+/* Tafsir content responsive design */
+@media (max-width: 1024px) {
+  .tafsir-content .flex-col.lg\:flex-row {
+    flex-direction: column;
   }
+  
+  .tafsir-content .text-right {
+    text-align: center;
+  }
+  
+  .tafsir-content .text-left {
+    text-align: center;
+  }
+}
+
+/* Tafsir modal scrollbar styling */
+.tafsir-content {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(156, 163, 175, 0.5) transparent;
+}
+
+.tafsir-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tafsir-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tafsir-content::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.5);
+  border-radius: 3px;
+}
+
+.tafsir-content::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(156, 163, 175, 0.7);
+}
+
+/* Ensure modal content is scrollable */
+.overflow-y-auto {
+  overflow-y: auto !important;
+}
+
+.min-h-0 {
+  min-height: 0 !important;
+}
+
+.max-h-full {
+  max-height: 100% !important;
+}
+
+/* Force scrolling to work in modal */
+.flex-1.overflow-y-auto {
+  height: 0 !important;
+  flex: 1 1 0% !important;
+}
+
+/* Comprehensive Arabic text mobile fix */
+.arabic-text, .uthmanic-hafs, .font-arabic {
+  /* Reset all text wrapping properties */
+  white-space: normal !important;
+  word-wrap: break-word !important;
+  overflow-wrap: break-word !important;
+  word-break: keep-all !important;
+  hyphens: none !important;
+  /* Minimal spacing for mobile */
+  word-spacing: 0.01em !important;
+  letter-spacing: 0 !important;
+  /* Ensure no horizontal overflow */
+  max-width: 100% !important;
+  overflow-x: hidden !important;
+  /* Box model */
+  box-sizing: border-box !important;
+  /* Display properties */
+  display: block !important;
+  width: 100% !important;
 }
 
 /* Override any Tailwind font size classes for Arabic */
