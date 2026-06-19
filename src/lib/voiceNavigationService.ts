@@ -287,8 +287,7 @@ const SURAH_NAME_MAPPINGS: Record<string, number> = {
   'fath': 48,
   'al-fath': 48,
   'al fath': 48,
-  'victory': 48,
-  'the victory': 48,
+  'the opening': 48,
   
   'hujurat': 49,
   'al-hujurat': 49,
