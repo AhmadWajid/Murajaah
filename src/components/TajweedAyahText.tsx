@@ -289,7 +289,7 @@ export function TajweedAyahText({
           </span>
           
           {showWordByWordTooltip && translation && isWordVisible && (
-            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded shadow-lg transition-opacity whitespace-nowrap z-20">
+            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded shadow-lg transition-opacity whitespace-nowrap z-50">
               {translation}
             </span>
           )}
@@ -320,7 +320,7 @@ export function TajweedAyahText({
           >
             <span>{word.text}</span>
             {shouldShowTooltip && (isMobile ? clickedWordId === wordId : true) && (
-              <span className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-20 ${
+              <span className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-50 ${
                 isMobile 
                   ? 'opacity-100' 
                   : 'opacity-0 group-hover:opacity-100 transition-opacity'
@@ -404,7 +404,7 @@ export function TajweedAyahText({
         >
           {segments}
           {shouldShowTooltip && (isMobile ? clickedWordId === wordId : true) && (
-            <span className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-20 ${
+            <span className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-50 ${
               isMobile 
                 ? 'opacity-100' 
                 : 'opacity-0 group-hover:opacity-100 transition-opacity'
@@ -432,7 +432,7 @@ export function TajweedAyahText({
 
   return (
     <div 
-      className={`leading-relaxed sm:leading-loose text-amber-900 dark:text-amber-100 font-arabic arabic-text uthmanic-hafs ${className}`} 
+       className={`leading-relaxed sm:leading-loose text-amber-900 dark:text-amber-100 font-arabic arabic-text uthmanic-hafs ${className}`} 
       dir="rtl"
       style={{
         fontFamily: fontLoaded ? qpcFontLoader.getFontFamily(pageNumber || 1) : "'qpc-v2-fallback', 'Amiri', serif",
@@ -450,6 +450,7 @@ export function TajweedAyahText({
         wordSpacing: '0.1em',
         whiteSpace: 'normal',
         position: 'relative',
+        overflow: 'visible',
         width: '100%',
         maxWidth: '100%',
         boxSizing: 'border-box',

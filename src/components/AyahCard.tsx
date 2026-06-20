@@ -449,7 +449,7 @@ export default function AyahCard({
           isMemorization ? `border-l-4 ${highlightClass}` : ''
         } ${isSelected ? 'bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-300 dark:border-blue-600 shadow-lg' : ''} ${
           isInHighlightedRange ? 'bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-2 border-purple-300 dark:border-purple-600 shadow-xl' : ''
-        } ${!isSelected && !isInHighlightedRange && !isMobile ? 'hover:bg-gradient-to-r hover:from-amber-50 hover:to-orange-50 dark:hover:from-amber-900/10 dark:hover:to-orange-900/10' : ''} bg-white/80 dark:bg-gray-800/80 backdrop-blur-sm`}
+        } ${!isSelected && !isInHighlightedRange && !isMobile ? 'hover:bg-gradient-to-r hover:from-amber-50 hover:to-orange-50 dark:hover:from-amber-900/10 dark:hover:to-orange-900/10' : ''} bg-white/80 dark:bg-gray-800/80 overflow-visible`}
         style={{ padding }}
         onClick={!isMobile ? () => onAyahClick(ayahNumber) : undefined}
       >
@@ -556,7 +556,7 @@ export default function AyahCard({
         </div>
 
         {/* Arabic Text */}
-        <div className="text-right mb-4 sm:mb-6 px-1 sm:px-0">
+        <div className="text-right mb-4 sm:mb-6 px-1 sm:px-0 overflow-visible">
           {shouldShowHidden ? (
             <div className="text-center py-8">
               <div className="text-gray-400 dark:text-gray-500 text-lg mb-2">
