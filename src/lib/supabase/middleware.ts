@@ -39,13 +39,6 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // if user is not signed in and the current path is not /auth then redirect the user to /auth
-  if (!user && !request.nextUrl.pathname.startsWith('/auth') && !request.nextUrl.pathname.startsWith('/api')) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/auth';
-    return NextResponse.redirect(url);
-  }
-
   // IMPORTANT: You *must* return the supabaseResponse object as it is. If you're
   // creating a new response object with NextResponse.next() make sure to:
   // 1. Pass the request in it, like so:

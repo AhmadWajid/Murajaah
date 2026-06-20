@@ -271,7 +271,30 @@ export default function AuthPage() {
               </Button>
             </div>
 
-            <div className="mt-6 text-center space-y-2">
+            <div className="mt-6">
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or</span>
+                </div>
+              </div>
+
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => router.push('/')}
+                className="w-full mt-4 text-muted-foreground hover:text-foreground"
+              >
+                Continue as Guest
+              </Button>
+              <p className="text-xs text-center text-muted-foreground mt-1">
+                Your progress will be saved locally on this device
+              </p>
+            </div>
+
+            <div className="mt-4 text-center space-y-2">
               <button
                 type="button"
                 onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
