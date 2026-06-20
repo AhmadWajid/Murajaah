@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Repeat, Repeat1, FastForward, XCircle, Info, Flag } from 'lucide-react';
+import { useEffect, useRef, useState, useCallback } from 'react';
+import { Repeat, Repeat1, FastForward, X } from 'lucide-react';
 import { saveAudioSettings, loadAudioSettings } from '@/lib/storageService';
 
 interface AudioPlayerProps {
@@ -21,9 +21,8 @@ export default function AudioPlayer({
   duration,
   currentPlayingAyah,
   onTogglePlayPause,
-  onStop
+  onStop,
 }: AudioPlayerProps) {
-  // --- New State for Loop, Custom Loop, and Speed ---
   const [loopMode, setLoopMode] = useState<'none' | 'infinite' | 'custom'>('none');
   const [customLoop, setCustomLoop] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
   const [playbackSpeed, setPlaybackSpeed] = useState(1);
@@ -31,6 +30,10 @@ export default function AudioPlayer({
   const [isStartSet, setIsStartSet] = useState(false);
   const [isEndSet, setIsEndSet] = useState(false);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+
+  // Drag state
+  const draggingMarker = useRef<'start' | 'end' | null>(null);
+  const timelineRef = useRef<HTMLDivElement>(null);
 
   // Load initial settings on mount
   useEffect(() => {
@@ -47,9 +50,7 @@ export default function AudioPlayer({
             setCustomLoop({ start, end });
             if (start !== 0 || end !== 0) {
               setIsStartSet(true);
-              if (end !== 0) {
-                setIsEndSet(true);
-              }
+              if (end !== 0) setIsEndSet(true);
             }
           }
           if (typeof settings.playbackSpeed === 'number') {
@@ -65,62 +66,92 @@ export default function AudioPlayer({
     loadSettings();
   }, []);
 
-  // Save settings when they change
   useEffect(() => {
-    if (settingsLoaded) {
-      saveAudioSettings({ loopMode });
-    }
+    if (settingsLoaded) saveAudioSettings({ loopMode });
   }, [loopMode, settingsLoaded]);
 
   useEffect(() => {
-    if (settingsLoaded) {
-      saveAudioSettings({ customLoop });
-    }
+    if (settingsLoaded) saveAudioSettings({ customLoop });
   }, [customLoop, settingsLoaded]);
 
   useEffect(() => {
-    if (settingsLoaded) {
-      saveAudioSettings({ playbackSpeed });
-    }
+    if (settingsLoaded) saveAudioSettings({ playbackSpeed });
   }, [playbackSpeed, settingsLoaded]);
 
   // Reset custom loop markers when changing Ayah
   useEffect(() => {
-    if (currentPlayingAyah) {
-      handleReset();
-    }
+    if (currentPlayingAyah) handleReset();
   }, [currentPlayingAyah]);
 
-  // --- Effect: Apply playback speed to audio ---
+  // Apply playback speed
   useEffect(() => {
-    if (currentAudio) {
-      currentAudio.playbackRate = playbackSpeed;
-    }
+    if (currentAudio) currentAudio.playbackRate = playbackSpeed;
   }, [currentAudio, playbackSpeed]);
 
-  // --- Effect: Handle loop logic ---
+  // Handle loop logic
   useEffect(() => {
     if (!currentAudio) return;
-    if (loopMode === 'infinite') {
-      currentAudio.loop = true;
-    } else {
-      currentAudio.loop = false;
-    }
+    currentAudio.loop = loopMode === 'infinite';
     if (loopMode === 'custom') {
+      // Mid-playback: if an end marker is set and we pass it, jump back
       const handleTimeUpdate = () => {
-        // If end marker is not set yet, loop to the end of duration (smooth play of entire Ayah)
-        const loopEnd = isEndSet && customLoop.end > 0 ? customLoop.end : (duration > 0 ? duration : currentAudio.duration);
-        if (loopEnd > 0 && currentAudio.currentTime > loopEnd) {
+        if (isEndSet && customLoop.end > 0 && currentAudio.currentTime > customLoop.end) {
           currentAudio.currentTime = customLoop.start;
           currentAudio.play();
         }
       };
+      // Natural end of track: always loop back to start marker
+      const handleEnded = () => {
+        currentAudio.currentTime = customLoop.start;
+        currentAudio.play();
+      };
       currentAudio.addEventListener('timeupdate', handleTimeUpdate);
+      currentAudio.addEventListener('ended', handleEnded);
       return () => {
         currentAudio.removeEventListener('timeupdate', handleTimeUpdate);
+        currentAudio.removeEventListener('ended', handleEnded);
       };
     }
   }, [currentAudio, loopMode, customLoop, duration, isEndSet]);
+
+  // Auto-show/hide custom loop editor
+  useEffect(() => {
+    if (loopMode === 'custom') setShowCustomLoopInputs(true);
+    else setShowCustomLoopInputs(false);
+  }, [loopMode]);
+
+  // Drag helpers
+  const getPosFromEvent = useCallback((e: MouseEvent | TouchEvent, rect: DOMRect): number => {
+    const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
+    const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
+    return (x / rect.width) * duration;
+  }, [duration]);
+
+  useEffect(() => {
+    const onMove = (e: MouseEvent | TouchEvent) => {
+      if (!draggingMarker.current || !timelineRef.current || duration <= 0) return;
+      if ('touches' in e) e.preventDefault();
+      const rect = timelineRef.current.getBoundingClientRect();
+      const time = getPosFromEvent(e, rect);
+      if (draggingMarker.current === 'start') {
+        handleSetStart(time);
+      } else {
+        handleSetEnd(time);
+      }
+    };
+    const onUp = () => { draggingMarker.current = null; };
+
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    window.addEventListener('touchmove', onMove, { passive: false });
+    window.addEventListener('touchend', onUp);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      window.removeEventListener('touchmove', onMove);
+      window.removeEventListener('touchend', onUp);
+    };
+  }, [duration, getPosFromEvent]);
 
   const handleSetStart = (time: number) => {
     const newStart = Math.max(0, Math.min(duration, time));
@@ -151,42 +182,32 @@ export default function AudioPlayer({
     setIsEndSet(false);
   };
 
-  // Keyboard controls for audio player
+  // Keyboard controls
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      // Only handle audio controls if there's an audio element and user is not typing
-      if (!currentAudio || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) {
-        return;
-      }
-
+      if (!currentAudio || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
       switch (event.key) {
         case ' ':
-          // Spacebar - Play/Pause
           event.preventDefault();
           onTogglePlayPause();
           break;
         case 'ArrowLeft':
-          // Left arrow - Rewind 10 seconds
           event.preventDefault();
           currentAudio.currentTime = Math.max(0, currentAudio.currentTime - 10);
           break;
         case 'ArrowRight':
-          // Right arrow - Forward 10 seconds
           event.preventDefault();
           currentAudio.currentTime = Math.min(currentAudio.duration, currentAudio.currentTime + 10);
           break;
         case 'ArrowUp':
-          // Up arrow - Volume up
           event.preventDefault();
           currentAudio.volume = Math.min(1, currentAudio.volume + 0.1);
           break;
         case 'ArrowDown':
-          // Down arrow - Volume down
           event.preventDefault();
           currentAudio.volume = Math.max(0, currentAudio.volume - 0.1);
           break;
         case 'Escape':
-          // Escape - Stop audio
           event.preventDefault();
           onStop();
           break;
@@ -196,13 +217,9 @@ export default function AudioPlayer({
           setLoopMode('custom');
           setShowCustomLoopInputs(true);
           const now = currentAudio.currentTime;
-          if (!isStartSet) {
-            handleSetStart(now);
-          } else if (isStartSet && !isEndSet) {
-            handleSetEnd(now);
-          } else {
-            handleReset();
-          }
+          if (!isStartSet) handleSetStart(now);
+          else if (!isEndSet) handleSetEnd(now);
+          else handleReset();
           break;
         }
         case '[': {
@@ -229,7 +246,6 @@ export default function AudioPlayer({
         }
       }
     };
-
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [currentAudio, onTogglePlayPause, onStop, isStartSet, isEndSet, loopMode, showCustomLoopInputs, duration, customLoop]);
@@ -242,347 +258,273 @@ export default function AudioPlayer({
 
   if (!currentAudio) return null;
 
-  // Automatically open inputs when Custom Loop mode is activated
-  useEffect(() => {
-    if (loopMode === 'custom') {
-      setShowCustomLoopInputs(true);
-    } else {
-      setShowCustomLoopInputs(false);
-    }
-  }, [loopMode]);
+  const progressPct = duration > 0 ? (currentTime / duration) * 100 : 0;
+  const startPct = duration > 0 ? (customLoop.start / duration) * 100 : 0;
+  const endPct = duration > 0 ? ((isEndSet && customLoop.end > 0 ? customLoop.end : duration) / duration) * 100 : 100;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 md:bottom-6 md:left-1/2 md:-translate-x-1/2 md:w-[760px] lg:w-[880px] bg-white/75 dark:bg-[#12161A]/80 backdrop-blur-xl border-t md:border border-amber-200/30 dark:border-border/30 p-4 md:rounded-3xl shadow-[0_15px_40px_-5px_rgba(0,0,0,0.1)] dark:shadow-[0_20px_50px_rgba(0,0,0,0.4)] z-50 pb-safe transition-all duration-300 animate-fade-in-up">
-      {/* Close button in top right */}
-      <button
-        onClick={onStop}
-        className="absolute top-3 right-4 p-1.5 rounded-full text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 hover:bg-gray-100/50 dark:hover:bg-gray-800/50 transition-colors"
-        title="Close Player"
-        aria-label="Close Audio Player"
-      >
-        <XCircle className="w-4.5 h-4.5" />
-      </button>
+    <div className="fixed bottom-0 left-0 right-0 md:bottom-5 md:left-1/2 md:-translate-x-1/2 md:w-[720px] lg:w-[820px] z-50 animate-fade-in-up">
+      {/* Main player card */}
+      <div className="bg-white dark:bg-[#0f1318] border-t md:border border-black/[0.08] dark:border-white/[0.08] md:rounded-2xl shadow-[0_-4px_24px_-4px_rgba(0,0,0,0.08),0_8px_32px_-4px_rgba(0,0,0,0.15)] dark:shadow-[0_-4px_24px_rgba(0,0,0,0.4),0_16px_48px_rgba(0,0,0,0.6)]">
 
-      <div className="w-full">
-        {/* --- Top Bar Controls --- */}
-        <div className="flex items-center gap-4 mb-3 flex-wrap justify-between border-b border-amber-200/10 dark:border-border/20 pb-2.5">
-          <div className="flex items-center gap-3.5 flex-wrap">
-            {/* Loop Mode Dropdown */}
-            <div className="flex items-center gap-1.5 relative group">
-              <button
-                aria-label={
-                  loopMode === 'infinite'
-                    ? 'Infinite Loop Enabled'
-                    : loopMode === 'custom'
-                    ? 'Custom Loop Enabled'
-                    : 'Loop Off'
-                }
-                className={`p-2 rounded-full border transition-all duration-200 ${
-                  loopMode === 'infinite' || loopMode === 'custom' 
-                    ? 'text-amber-700 dark:text-accent border-amber-300 dark:border-accent/40 bg-amber-500/10 dark:bg-accent/10 shadow-sm' 
-                    : 'text-gray-400 border-gray-200/40 dark:border-gray-800/40 bg-transparent hover:text-gray-600 dark:hover:text-gray-200'
-                }`}
-                tabIndex={0}
-                onClick={() => {
-                  setLoopMode((prev) =>
-                    prev === 'none' ? 'infinite' : prev === 'infinite' ? 'custom' : 'none'
-                  );
-                }}
-                onKeyDown={e => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    setLoopMode((prev) =>
-                      prev === 'none' ? 'infinite' : prev === 'infinite' ? 'custom' : 'none'
-                    );
-                  }
-                }}
-              >
-                {loopMode === 'infinite' ? (
-                  <Repeat1 className="w-4.5 h-4.5" />
-                ) : loopMode === 'custom' ? (
-                  <Repeat className="w-4.5 h-4.5" />
-                ) : (
-                  <Repeat className="w-4.5 h-4.5 opacity-40" />
-                )}
-              </button>
-              {loopMode === 'custom' && (
-                <button
-                  aria-label="Set Custom Loop Range"
-                  className="px-2.5 py-1 text-[11px] font-sans font-medium rounded-lg bg-amber-500/10 dark:bg-accent/15 border border-amber-400/30 dark:border-accent/30 text-amber-800 dark:text-accent hover:bg-amber-500/20 dark:hover:bg-accent/25 transition-all"
-                  onClick={() => setShowCustomLoopInputs(v => !v)}
-                >
-                  {showCustomLoopInputs ? 'Hide Editor' : 'Set Range'}
-                </button>
-              )}
-            </div>
-          </div>
-          
-          {/* Playback Speed */}
-          <div className="flex items-center gap-2 relative group mr-6 md:mr-8">
-            <FastForward className="w-4.5 h-4.5 text-amber-700/80 dark:text-accent/80" />
-            <label htmlFor="audio-speed" className="text-xs font-medium text-amber-700 dark:text-amber-200 sr-only">Speed</label>
-            <select
-              id="audio-speed"
-              className="rounded-lg px-2.5 py-1 text-xs bg-amber-50/60 dark:bg-[#181D23] border border-amber-200/40 dark:border-[#2C3440] dark:text-white focus:outline-none focus:ring-1 focus:ring-accent font-sans font-medium transition-all"
-              value={playbackSpeed}
-              aria-label="Playback Speed"
-              onChange={e => setPlaybackSpeed(Number(e.target.value))}
-            >
-              <option value={0.5}>0.5x</option>
-              <option value={0.75}>0.75x</option>
-              <option value={1}>1x (Normal)</option>
-              <option value={1.25}>1.25x</option>
-              <option value={1.5}>1.5x</option>
-              <option value={2}>2x</option>
-            </select>
-          </div>
+        {/* Progress bar — sits flush at the top */}
+        <div
+          className="relative h-1 w-full md:rounded-t-2xl overflow-hidden cursor-pointer group/progress"
+          onClick={(e) => {
+            if (!currentAudio || duration <= 0) return;
+            const rect = e.currentTarget.getBoundingClientRect();
+            currentAudio.currentTime = ((e.clientX - rect.left) / rect.width) * duration;
+          }}
+        >
+          <div className="absolute inset-0 bg-black/[0.06] dark:bg-white/[0.06]" />
+          <div
+            className="absolute inset-y-0 left-0 bg-gradient-to-r from-amber-500 to-orange-500 dark:from-amber-400 dark:to-orange-400 transition-[width] duration-100"
+            style={{ width: `${progressPct}%` }}
+          />
+          {/* Hover thumb */}
+          <div
+            className="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-amber-500 dark:bg-amber-400 shadow opacity-0 group-hover/progress:opacity-100 transition-opacity -translate-x-1/2"
+            style={{ left: `${progressPct}%` }}
+          />
         </div>
 
-        {/* --- Custom Loop Timeline Panel --- */}
-        {showCustomLoopInputs && (
-          <div className="flex flex-col gap-2.5 w-full bg-amber-500/5 dark:bg-accent/5 border border-amber-200/20 dark:border-accent/10 rounded-2xl p-3.5 mb-3.5 animate-fade-in-up">
-            {/* Header & Status */}
-            <div className="flex items-center justify-between text-xs">
-              <div className="flex items-center gap-2">
-                <span className="font-sans font-semibold text-amber-800 dark:text-accent flex items-center gap-1.5">
-                  <Repeat className="w-4 h-4" /> Custom Loop Editor
-                </span>
-                <span className="text-[10px] text-gray-500 dark:text-gray-400 font-sans">
-                  ({isStartSet ? formatTime(customLoop.start) : '0:00'} - {isEndSet ? formatTime(customLoop.end) : formatTime(duration)})
-                </span>
-              </div>
-              <div className="flex items-center gap-1 text-[10px] text-gray-500 dark:text-gray-400 font-sans">
-                <span className="bg-gray-200 dark:bg-gray-800 px-1.5 py-0.5 rounded border border-gray-300 dark:border-gray-700 font-mono font-bold mr-1">M</span> Mark Hotkey
-              </div>
+        {/* Main content */}
+        <div className="px-4 pt-3 pb-4 md:px-5 md:pt-3.5 md:pb-4">
+
+          {/* Row 1: Now playing + controls + close */}
+          <div className="flex items-center gap-3">
+
+            {/* Play / Stop */}
+            <div className="flex items-center gap-2 flex-shrink-0">
+              <button
+                onClick={onTogglePlayPause}
+                className="w-10 h-10 flex items-center justify-center bg-gradient-to-br from-amber-500 to-orange-500 dark:from-amber-400 dark:to-orange-400 text-white rounded-full shadow-md hover:shadow-lg hover:scale-105 active:scale-95 transition-all duration-200"
+                aria-label={isPlaying ? 'Pause' : 'Play'}
+              >
+                {isPlaying ? (
+                  <svg className="w-4.5 h-4.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
+                  </svg>
+                ) : (
+                  <svg className="w-4.5 h-4.5 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                )}
+              </button>
             </div>
 
-            {/* Visual Range Timeline */}
-            <div className="relative h-6 bg-amber-500/5 dark:bg-black/40 rounded-xl overflow-hidden border border-amber-200/20 dark:border-border/30 flex items-center group/timeline select-none">
-              {/* Loop Range Highlight */}
-              {duration > 0 && (
-                <div 
-                  className="absolute h-full bg-gradient-to-r from-amber-500/10 to-orange-500/10 dark:from-amber-400/10 dark:to-accent/10 border-l border-r border-amber-500/40 dark:border-accent/40"
-                  style={{ 
-                    left: `${(customLoop.start / duration) * 100}%`, 
-                    width: `${(((isEndSet && customLoop.end > 0 ? customLoop.end : duration) - customLoop.start) / duration) * 100}%` 
-                  }}
-                />
-              )}
+            {/* Ayah info */}
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-semibold uppercase tracking-widest text-amber-600/80 dark:text-amber-400/70 font-sans leading-none mb-0.5">
+                Now Playing
+              </p>
+              <p className="text-sm font-semibold text-gray-900 dark:text-white font-sans truncate leading-tight">
+                {currentPlayingAyah
+                  ? `Surah ${currentPlayingAyah.surah} · Ayah ${currentPlayingAyah.ayah}`
+                  : 'No audio playing'}
+              </p>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 font-sans tabular-nums mt-0.5">
+                {formatTime(currentTime)} / {formatTime(duration)}
+              </p>
+            </div>
 
-              {/* Playback Head (Current Time) */}
-              {duration > 0 && (
-                <div 
-                  className="absolute top-0 bottom-0 w-0.5 bg-red-500 dark:bg-red-400 shadow-sm z-10 pointer-events-none transition-all duration-100"
-                  style={{ left: `${(currentTime / duration) * 100}%` }}
-                >
-                  <div className="absolute -top-1 -left-1 w-2.5 h-2.5 bg-red-500 dark:bg-red-400 rounded-full shadow-md" />
-                </div>
-              )}
+            {/* Right controls */}
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              {/* Loop toggle */}
+              <button
+                aria-label={loopMode === 'infinite' ? 'Infinite Loop' : loopMode === 'custom' ? 'Custom Loop' : 'Loop Off'}
+                onClick={() => setLoopMode(prev => prev === 'none' ? 'infinite' : prev === 'infinite' ? 'custom' : 'none')}
+                className={`w-8 h-8 flex items-center justify-center rounded-full transition-all duration-200 ${
+                  loopMode !== 'none'
+                    ? 'bg-amber-500/15 dark:bg-amber-400/15 text-amber-600 dark:text-amber-400'
+                    : 'text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100/60 dark:hover:bg-white/5'
+                }`}
+              >
+                {loopMode === 'infinite' ? <Repeat1 className="w-4 h-4" /> : <Repeat className={`w-4 h-4 ${loopMode === 'none' ? 'opacity-50' : ''}`} />}
+              </button>
 
-              {/* Start Marker Pin */}
-              {isStartSet && duration > 0 && (
-                <div 
-                  className="absolute top-0 bottom-0 w-px bg-amber-600 dark:bg-accent z-20 pointer-events-none"
-                  style={{ left: `${(customLoop.start / duration) * 100}%` }}
+              {/* Speed */}
+              <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-gray-100/70 dark:bg-white/5 border border-black/[0.05] dark:border-white/[0.06]">
+                <FastForward className="w-3 h-3 text-amber-500 dark:text-amber-400 flex-shrink-0" />
+                <select
+                  id="audio-speed"
+                  className="text-[11px] font-semibold font-sans bg-transparent text-gray-700 dark:text-gray-300 focus:outline-none cursor-pointer appearance-none"
+                  value={playbackSpeed}
+                  aria-label="Playback Speed"
+                  onChange={e => setPlaybackSpeed(Number(e.target.value))}
                 >
-                  <div className="absolute -bottom-1.5 -translate-x-1/2 bg-amber-600 dark:bg-accent text-white dark:text-gray-950 text-[9px] font-sans font-extrabold px-1 rounded shadow-sm">
-                    S
-                  </div>
-                </div>
-              )}
+                  <option value={0.5}>0.5×</option>
+                  <option value={0.75}>0.75×</option>
+                  <option value={1}>1×</option>
+                  <option value={1.25}>1.25×</option>
+                  <option value={1.5}>1.5×</option>
+                  <option value={2}>2×</option>
+                </select>
+              </div>
 
-              {/* End Marker Pin */}
-              {isEndSet && duration > 0 && (
-                <div 
-                  className="absolute top-0 bottom-0 w-px bg-orange-650 dark:bg-amber-450 z-20 pointer-events-none"
-                  style={{ left: `${(customLoop.end / duration) * 100}%` }}
-                >
-                  <div className="absolute -bottom-1.5 -translate-x-1/2 bg-orange-600 dark:bg-amber-400 text-white dark:text-gray-950 text-[9px] font-sans font-extrabold px-1 rounded shadow-sm">
-                    E
-                  </div>
+              {/* Close */}
+              <button
+                onClick={onStop}
+                className="w-8 h-8 flex items-center justify-center rounded-full text-gray-400 dark:text-gray-600 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100/60 dark:hover:bg-white/5 transition-all"
+                aria-label="Close Player"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Custom Loop editor — only when active */}
+          {showCustomLoopInputs && (
+            <div className="mt-3 rounded-xl bg-amber-500/[0.06] dark:bg-amber-400/[0.05] border border-amber-500/[0.12] dark:border-amber-400/[0.1] p-3 space-y-2.5">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Repeat className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                  <span className="text-xs font-semibold text-amber-700 dark:text-amber-400 font-sans">Loop Range</span>
+                  <span className="text-[10px] text-gray-400 dark:text-gray-500 font-sans tabular-nums">
+                    {isStartSet ? formatTime(customLoop.start) : '0:00'} – {isEndSet ? formatTime(customLoop.end) : formatTime(duration)}
+                  </span>
                 </div>
-              )}
-              
-              {/* Click overlay to seek */}
-              <div 
-                className="absolute inset-0 cursor-pointer z-0" 
+                <div className="flex items-center gap-1.5">
+                  <kbd className="text-[9px] font-mono font-bold bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 px-1.5 py-0.5 rounded text-gray-500 dark:text-gray-400">M</kbd>
+                  <span className="text-[10px] text-gray-400 dark:text-gray-500 font-sans">mark</span>
+                </div>
+              </div>
+
+              {/* ─── Draggable Timeline ─── */}
+              <div
+                ref={timelineRef}
+                className="relative h-10 rounded-lg overflow-visible bg-black/[0.04] dark:bg-black/40 border border-black/[0.06] dark:border-white/[0.06] cursor-pointer select-none"
                 onClick={(e) => {
-                  if (!currentAudio || duration <= 0) return;
+                  // Only seek if we're not dragging
+                  if (draggingMarker.current || !currentAudio || duration <= 0) return;
                   const rect = e.currentTarget.getBoundingClientRect();
-                  const clickX = e.clientX - rect.left;
-                  const targetTime = (clickX / rect.width) * duration;
-                  currentAudio.currentTime = targetTime;
+                  currentAudio.currentTime = ((e.clientX - rect.left) / rect.width) * duration;
                 }}
-              />
-            </div>
+              >
+                {/* Loop region fill */}
+                {duration > 0 && (
+                  <div
+                    className="absolute top-0 bottom-0 bg-gradient-to-r from-amber-400/20 to-orange-400/20 dark:from-amber-400/15 dark:to-orange-400/15 border-x border-amber-500/30 dark:border-amber-400/30"
+                    style={{ left: `${startPct}%`, width: `${endPct - startPct}%` }}
+                  />
+                )}
 
-            {/* Button Controls */}
-            <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-amber-200/10 dark:border-border/10">
-              <div className="flex items-center gap-2 flex-wrap">
-                {/* Set Start Button */}
+                {/* Playhead */}
+                {duration > 0 && (
+                  <div
+                    className="absolute top-0 bottom-0 w-px bg-red-500 dark:bg-red-400 pointer-events-none z-10 transition-[left] duration-100"
+                    style={{ left: `${progressPct}%` }}
+                  >
+                    <div className="absolute -top-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-red-500 dark:bg-red-400 shadow" />
+                  </div>
+                )}
+
+                {/* Start marker — draggable */}
+                {isStartSet && duration > 0 && (
+                  <div
+                    className="absolute top-0 bottom-0 z-20 flex items-center justify-center"
+                    style={{ left: `${startPct}%` }}
+                  >
+                    {/* line */}
+                    <div className="absolute inset-y-0 w-0.5 bg-amber-500 dark:bg-amber-400" />
+                    {/* drag handle */}
+                    <div
+                      className="absolute -left-3 w-6 h-full cursor-ew-resize"
+                      onMouseDown={(e) => { e.stopPropagation(); draggingMarker.current = 'start'; }}
+                      onTouchStart={(e) => { e.stopPropagation(); draggingMarker.current = 'start'; }}
+                    />
+                    {/* label chip */}
+                    <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 bg-amber-500 dark:bg-amber-400 text-white dark:text-gray-950 text-[9px] font-extrabold font-sans px-1.5 py-0.5 rounded-full shadow-sm pointer-events-none whitespace-nowrap">
+                      S
+                    </div>
+                    {/* top time tooltip */}
+                    <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-gray-800/80 dark:bg-black/70 text-white text-[9px] font-sans px-1.5 py-0.5 rounded pointer-events-none whitespace-nowrap">
+                      {formatTime(customLoop.start)}
+                    </div>
+                  </div>
+                )}
+
+                {/* End marker — draggable */}
+                {isEndSet && duration > 0 && (
+                  <div
+                    className="absolute top-0 bottom-0 z-20 flex items-center justify-center"
+                    style={{ left: `${(customLoop.end / duration) * 100}%` }}
+                  >
+                    <div className="absolute inset-y-0 w-0.5 bg-orange-500 dark:bg-orange-400" />
+                    <div
+                      className="absolute -left-3 w-6 h-full cursor-ew-resize"
+                      onMouseDown={(e) => { e.stopPropagation(); draggingMarker.current = 'end'; }}
+                      onTouchStart={(e) => { e.stopPropagation(); draggingMarker.current = 'end'; }}
+                    />
+                    <div className="absolute -bottom-5 left-1/2 -translate-x-1/2 bg-orange-500 dark:bg-orange-400 text-white dark:text-gray-950 text-[9px] font-extrabold font-sans px-1.5 py-0.5 rounded-full shadow-sm pointer-events-none whitespace-nowrap">
+                      E
+                    </div>
+                    <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-gray-800/80 dark:bg-black/70 text-white text-[9px] font-sans px-1.5 py-0.5 rounded pointer-events-none whitespace-nowrap">
+                      {formatTime(customLoop.end)}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Action buttons */}
+              <div className="flex items-center gap-2 pt-1 flex-wrap">
                 <button
                   type="button"
-                  aria-label="Set start marker here"
                   onClick={() => handleSetStart(currentTime)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-accent border border-amber-500/20 rounded-xl text-xs font-sans font-semibold transition-all hover:scale-[1.02] active:scale-95"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/15 text-[11px] font-semibold font-sans transition-all active:scale-95"
                 >
-                  <span>Set Start</span>
-                  <kbd className="hidden sm:inline bg-white/40 dark:bg-black/30 px-1 rounded text-[9px] border border-amber-500/20 font-sans font-bold">[</kbd>
+                  Set Start
+                  <kbd className="ml-0.5 font-mono text-[9px] bg-white/50 dark:bg-black/30 px-1 rounded border border-amber-500/20">[</kbd>
                 </button>
 
-                {/* Set End Button */}
                 <button
                   type="button"
-                  aria-label="Set end marker here"
                   onClick={() => handleSetEnd(currentTime)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 bg-orange-500/10 hover:bg-orange-500/20 text-orange-700 dark:text-amber-400 border border-orange-500/20 rounded-xl text-xs font-sans font-semibold transition-all hover:scale-[1.02] active:scale-95"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-orange-500/10 hover:bg-orange-500/20 text-orange-700 dark:text-orange-400 border border-orange-500/15 text-[11px] font-semibold font-sans transition-all active:scale-95"
                 >
-                  <span>Set End</span>
-                  <kbd className="hidden sm:inline bg-white/40 dark:bg-black/30 px-1 rounded text-[9px] border border-orange-500/20 font-sans font-bold">]</kbd>
+                  Set End
+                  <kbd className="ml-0.5 font-mono text-[9px] bg-white/50 dark:bg-black/30 px-1 rounded border border-orange-500/20">]</kbd>
                 </button>
 
-                {/* Quick Toggle Button */}
                 <button
                   type="button"
                   onClick={() => {
                     const now = currentAudio.currentTime;
-                    if (!isStartSet) {
-                      handleSetStart(now);
-                    } else if (isStartSet && !isEndSet) {
-                      handleSetEnd(now);
-                    } else {
-                      handleReset();
-                    }
+                    if (!isStartSet) handleSetStart(now);
+                    else if (!isEndSet) handleSetEnd(now);
+                    else handleReset();
                   }}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 bg-gradient-to-r from-amber-500 to-orange-500 dark:from-amber-400 dark:to-accent text-white dark:text-gray-950 rounded-xl text-xs font-sans font-bold shadow-sm hover:opacity-90 hover:scale-[1.02] active:scale-95 transition-all"
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-amber-500 to-orange-500 dark:from-amber-400 dark:to-orange-400 text-white dark:text-gray-950 text-[11px] font-bold font-sans shadow-sm hover:opacity-90 active:scale-95 transition-all"
                 >
-                  <Flag className="w-3.5 h-3.5" />
-                  {!isStartSet ? (
-                    <>
-                      <span>Mark Start</span>
-                      <kbd className="bg-black/10 dark:bg-white/20 px-1 rounded text-[9px] font-bold">M</kbd>
-                    </>
-                  ) : !isEndSet ? (
-                    <>
-                      <span>Mark End</span>
-                      <kbd className="bg-black/10 dark:bg-white/20 px-1 rounded text-[9px] font-bold">M</kbd>
-                    </>
-                  ) : (
-                    <>
-                      <span>Reset Markers</span>
-                      <kbd className="bg-black/10 dark:bg-white/20 px-1 rounded text-[9px] font-bold">M</kbd>
-                    </>
-                  )}
+                  {!isStartSet ? 'Mark Start' : !isEndSet ? 'Mark End' : 'Reset'}
+                  <kbd className="ml-0.5 font-mono text-[9px] bg-black/10 dark:bg-white/20 px-1 rounded">M</kbd>
                 </button>
-              </div>
 
-              {/* Numeric Inputs & Reset */}
-              <div className="flex items-center gap-2 ml-auto flex-wrap">
-                {/* Start Input */}
-                <div className="flex items-center gap-1 bg-white/40 dark:bg-[#181D23]/40 px-2 py-0.5 rounded-lg border border-amber-250/20 dark:border-border/30">
-                  <span className="text-[10px] text-gray-500 dark:text-gray-400 font-sans font-bold uppercase">Start:</span>
-                  <input
-                    type="number"
-                    min={0}
-                    max={Math.floor(duration)}
-                    value={Number(customLoop.start.toFixed(1))}
-                    step={0.1}
-                    aria-label="Custom Loop Start (seconds)"
-                    onChange={e => handleSetStart(Number(e.target.value))}
-                    className="w-12 rounded px-1.5 py-0.5 border border-amber-200/40 dark:border-[#2C3440] bg-white dark:bg-[#181D23] dark:text-white text-center font-sans text-xs focus:ring-1 focus:ring-accent"
-                  />
+                <div className="ml-auto flex items-center gap-1.5">
+                  <span className="text-[10px] text-gray-400 font-sans">
+                    Start: <input
+                      type="number" min={0} max={Math.floor(duration)} step={0.1}
+                      value={Number(customLoop.start.toFixed(1))}
+                      aria-label="Loop start seconds"
+                      onChange={e => handleSetStart(Number(e.target.value))}
+                      className="w-11 text-center text-[10px] font-sans bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 rounded px-1 py-0.5 text-gray-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+                    />
+                  </span>
+                  <span className="text-[10px] text-gray-400 font-sans">
+                    End: <input
+                      type="number" min={customLoop.start} max={Math.floor(duration)} step={0.1}
+                      value={isEndSet && customLoop.end > 0 ? Number(customLoop.end.toFixed(1)) : ''}
+                      placeholder={duration > 0 ? Math.floor(duration).toString() : '—'}
+                      aria-label="Loop end seconds"
+                      onChange={e => handleSetEnd(Number(e.target.value))}
+                      className="w-11 text-center text-[10px] font-sans bg-white dark:bg-white/10 border border-black/10 dark:border-white/10 rounded px-1 py-0.5 text-gray-800 dark:text-white focus:outline-none focus:ring-1 focus:ring-amber-500/50"
+                    />
+                  </span>
                 </div>
-
-                {/* End Input */}
-                <div className="flex items-center gap-1 bg-white/40 dark:bg-[#181D23]/40 px-2 py-0.5 rounded-lg border border-amber-250/20 dark:border-border/30">
-                  <span className="text-[10px] text-gray-500 dark:text-gray-400 font-sans font-bold uppercase">End:</span>
-                  <input
-                    type="number"
-                    min={customLoop.start}
-                    max={Math.floor(duration)}
-                    value={isEndSet && customLoop.end > 0 ? Number(customLoop.end.toFixed(1)) : ''}
-                    placeholder={duration > 0 ? Math.floor(duration).toString() : 'End'}
-                    step={0.1}
-                    aria-label="Custom Loop End (seconds)"
-                    onChange={e => handleSetEnd(Number(e.target.value))}
-                    className="w-12 rounded px-1.5 py-0.5 border border-amber-200/40 dark:border-[#2C3440] bg-white dark:bg-[#181D23] dark:text-white text-center font-sans text-xs focus:ring-1 focus:ring-accent"
-                  />
-                </div>
-
-                {/* Reset Button */}
-                <button
-                  type="button"
-                  aria-label="Clear Markers"
-                  className="p-2 rounded-xl bg-red-500/10 dark:bg-red-500/15 hover:bg-red-500/20 text-red-600 dark:text-red-400 transition-all hover:scale-[1.02] active:scale-95"
-                  onClick={handleReset}
-                  title="Clear Markers (C)"
-                >
-                  <XCircle className="w-4 h-4" />
-                </button>
-
-                {/* Done Button */}
-                <button
-                  type="button"
-                  aria-label="Done Setting Custom Loop"
-                  className="px-3.5 py-1.5 rounded-xl bg-amber-500/15 dark:bg-accent/20 text-xs font-sans font-bold hover:bg-amber-500/25 dark:hover:bg-accent/30 text-amber-800 dark:text-accent transition-colors"
-                  onClick={() => setShowCustomLoopInputs(false)}
-                >
-                  Done
-                </button>
               </div>
             </div>
-          </div>
-        )}
-        
-        {/* --- Playback Control Row --- */}
-        <div className="flex items-center gap-4 md:gap-5 flex-wrap md:flex-nowrap">
-          <div className="flex items-center gap-3">
-            {/* Play/Pause Button */}
-            <button
-              onClick={onTogglePlayPause}
-              className="p-3 bg-gradient-to-r from-amber-500 to-orange-500 dark:from-amber-400 dark:to-accent text-white dark:text-gray-950 rounded-full transition-all duration-300 shadow-md hover:shadow-lg hover:scale-105"
-            >
-              {isPlaying ? (
-                <svg className="w-5.5 h-5.5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z" />
-                </svg>
-              ) : (
-                <svg className="w-5.5 h-5.5" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M8 5v14l11-7z" />
-                </svg>
-              )}
-            </button>
-
-            {/* Stop Button */}
-            <button
-              onClick={onStop}
-              className="p-3 bg-gray-50 dark:bg-[#181D23] hover:bg-gray-100 dark:hover:bg-[#20262E] text-gray-600 dark:text-gray-300 border border-gray-200/40 dark:border-gray-800/40 rounded-full transition-all duration-300 hover:scale-105"
-            >
-              <svg className="w-5.5 h-5.5" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M6 6h12v12H6z" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Current Ayah Info */}
-          <div className="min-w-[130px] flex-shrink-0">
-            <div className="text-xs font-bold text-gray-500 dark:text-gray-400 font-sans uppercase tracking-wider">Now Playing</div>
-            <div className="text-sm font-semibold text-gray-900 dark:text-white font-sans mt-0.5 truncate max-w-[180px]">
-              {currentPlayingAyah ? `Surah ${currentPlayingAyah.surah}, Ayah ${currentPlayingAyah.ayah}` : 'No audio playing'}
-            </div>
-            <div className="text-xs text-amber-700/80 dark:text-accent/80 font-sans mt-0.5">
-              {formatTime(currentTime)} / {formatTime(duration)}
-            </div>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="flex-1 min-w-[200px]">
-            <div className="w-full bg-amber-200/30 dark:bg-[#20252C] rounded-full h-2 relative">
-              <div 
-                className="bg-gradient-to-r from-amber-500 to-orange-500 dark:from-amber-400 dark:to-accent h-2 rounded-full transition-all duration-100 shadow-sm"
-                style={{ width: `${duration > 0 ? (currentTime / duration) * 100 : 0}%` }}
-              ></div>
-            </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

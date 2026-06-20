@@ -870,40 +870,44 @@ export default function QuranContent({
           )
         )}
 
-        {/* Selected Ayahs Info - Floating Action Bubble */}
+        {/* Selected Ayahs — slim pill toolbar, non-intrusive */}
         {selectedAyahs.size > 0 && (
-          <div className="fixed bottom-28 right-6 md:right-8 z-40 glassmorphic px-5 py-4 rounded-2xl shadow-[0_10px_30px_-5px_rgba(0,0,0,0.15)] dark:shadow-[0_15px_35px_rgba(0,0,0,0.4)] border border-amber-200/40 dark:border-amber-900/30 max-w-sm w-[280px] animate-fade-in-up">
-            <div className="flex items-center justify-between mb-3 pb-2 border-b border-amber-200/10 dark:border-border/20">
-              <span className="text-xs font-bold text-amber-700/80 dark:text-accent/80 uppercase font-sans tracking-wide">Selection Active</span>
-              <span className="text-xs font-semibold px-2 py-0.5 bg-amber-500/10 dark:bg-accent/10 border border-amber-500/20 dark:border-accent/20 text-amber-700 dark:text-accent rounded-full font-sans">
-                {selectedAyahs.size} {selectedAyahs.size === 1 ? 'verse' : 'verses'}
+          <div className="fixed bottom-6 right-4 md:right-6 z-40 flex items-center gap-1.5 bg-white dark:bg-[#1a1f28] border border-amber-200/50 dark:border-amber-800/30 rounded-full shadow-lg dark:shadow-[0_8px_24px_rgba(0,0,0,0.5)] px-1 py-1 animate-fade-in-up">
+            {/* Count badge — click to see details */}
+            <button
+              onClick={() => setShowSelectedAyahsModal(true)}
+              className="flex items-center gap-1.5 pl-3 pr-2 h-8 rounded-full hover:bg-amber-500/8 dark:hover:bg-amber-400/8 transition-colors group"
+              title="View selected verses"
+            >
+              <span className="w-5 h-5 rounded-full bg-amber-500 dark:bg-amber-400 text-white dark:text-gray-950 text-[10px] font-extrabold flex items-center justify-center flex-shrink-0">
+                {selectedAyahs.size}
               </span>
-            </div>
-            <div className="space-y-2">
-              <Button
-                onClick={() => setShowSelectedAyahsModal(true)}
-                variant="outline"
-                className="w-full h-9 rounded-xl border-amber-200/60 dark:border-amber-900/40 hover:bg-amber-500/5 hover:text-amber-900 dark:hover:text-accent font-sans text-xs"
-              >
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
-                View Selected
-              </Button>
-              <Button
-                onClick={onAddRevision}
-                className="w-full h-9 rounded-xl btn-primary font-sans text-xs"
-              >
-                <Plus className="h-3.5 w-3.5 mr-1.5" />
-                Add for Review
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onClearSelectedAyahs?.()}
-                className="w-full h-7 text-[10px] text-gray-500 hover:text-red-500 dark:text-gray-400 dark:hover:text-red-400 font-sans mt-1"
-              >
-                Clear Selection
-              </Button>
-            </div>
+              <span className="text-[11px] font-semibold text-amber-800 dark:text-amber-300 font-sans whitespace-nowrap group-hover:text-amber-600 dark:group-hover:text-accent transition-colors">
+                {selectedAyahs.size === 1 ? 'verse' : 'verses'}
+              </span>
+            </button>
+
+            <div className="w-px h-5 bg-amber-200/50 dark:bg-amber-800/40" />
+
+            {/* Add for Review */}
+            <button
+              onClick={onAddRevision}
+              className="h-8 px-3 rounded-full text-[11px] font-bold font-sans bg-gradient-to-r from-amber-500 to-orange-500 dark:from-amber-400 dark:to-orange-400 text-white dark:text-gray-950 hover:opacity-90 transition-opacity whitespace-nowrap"
+              title="Add selected verses for review"
+            >
+              Add Review
+            </button>
+
+            {/* Clear */}
+            <button
+              onClick={() => onClearSelectedAyahs?.()}
+              className="w-8 h-8 rounded-full flex items-center justify-center text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all"
+              title="Clear selection"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
           </div>
         )}
 

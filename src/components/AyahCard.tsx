@@ -756,11 +756,9 @@ export default function AyahCard({
         style={borderless ? {} : { paddingLeft: `${padding}px`, paddingRight: `${padding}px`, paddingTop: '1.5rem', paddingBottom: '1.5rem' }}
         onClick={!isMobile ? () => onAyahClick(ayahNumber) : undefined}
       >
-        {/* Borderless Hover Elements (sliding left border and ambient glow) */}
         {borderless && (
           <>
             <div className="absolute inset-0 pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-amber-500/[0.03] via-amber-500/[0.005] to-transparent dark:from-accent/[0.05] dark:via-accent/[0.01] to-transparent z-0" />
-            <div className="absolute left-0 top-3 bottom-3 w-1 pointer-events-none bg-amber-500/80 dark:bg-accent rounded-r transform -translate-x-1 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition-all duration-350 z-10" />
           </>
         )}
 
@@ -811,7 +809,7 @@ export default function AyahCard({
             </div>
             
             {/* Actions toolbar */}
-            <div className={`flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0 ${borderless ? 'lg:opacity-0 lg:translate-y-1 lg:group-hover:opacity-100 lg:group-hover:translate-y-0 transition-all duration-300 lg:bg-white/80 lg:dark:bg-[#12161A]/80 lg:backdrop-blur-md lg:border lg:border-amber-500/15 lg:dark:border-accent/15 lg:px-3 lg:py-1 lg:rounded-full lg:shadow-sm' : ''}`}>
+            <div className={`flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0 ${borderless ? 'lg:opacity-0 lg:translate-y-1 lg:group-hover:opacity-100 lg:group-hover:translate-y-0 transition-all duration-300' : ''}`}>
               {actionButtons}
             </div>
           </div>

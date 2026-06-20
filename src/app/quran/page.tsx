@@ -1193,9 +1193,17 @@ function QuranPageContent() {
     });
 
     audio.addEventListener('ended', () => {
-      setIsPlaying(false);
-      setCurrentTime(0);
-      setCurrentPlayingAyah(null);
+      // Only clear state if the audio wasn't immediately restarted by the custom loop.
+      // The AudioPlayer loop seeks back to start and calls play(), so currentTime will
+      // be non-zero shortly after ended fires. Use a short timeout to let the loop
+      // handler act first before we decide whether to clear.
+      setTimeout(() => {
+        if (audio.paused) {
+          setIsPlaying(false);
+          setCurrentTime(0);
+          setCurrentPlayingAyah(null);
+        }
+      }, 80);
     });
     
     audio.addEventListener('error', (e) => {
@@ -1281,7 +1289,7 @@ function QuranPageContent() {
   if (!isInitialized) return null;
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-32 px-0 sm:px-4">
+    <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 px-0 sm:px-4 transition-[padding] duration-300 ${currentAudio ? 'pb-80' : 'pb-32'}`}>
       {/* Header */}
       <AppHeader 
         pageType="quran"

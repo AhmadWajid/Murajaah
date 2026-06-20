@@ -1,10 +1,5 @@
 'use client';
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { X, Plus, Trash2 } from 'lucide-react';
-
 interface SelectedAyahsModalProps {
   isOpen: boolean;
   selectedAyahs: Set<{surah: number, ayah: number}>;
@@ -22,173 +17,111 @@ export default function SelectedAyahsModal({
   onClose,
   onAddForReview,
   onRemoveAyah,
-  onClearAll
+  onClearAll,
 }: SelectedAyahsModalProps) {
   if (!isOpen) return null;
 
-  // Group selected ayahs by surah and create ranges
-  const getSelectedAyahsInfo = () => {
-    const selectedAyahsArray = Array.from(selectedAyahs);
-    // Group by surah
-    const groupedBySurah: { [key: number]: { surah: number, ayah: number }[] } = {};
-    selectedAyahsArray.forEach(sel => {
-      if (!groupedBySurah[sel.surah]) groupedBySurah[sel.surah] = [];
-      groupedBySurah[sel.surah].push(sel);
-    });
-    return Object.entries(groupedBySurah).map(([surahNumber, ayahs]) => {
-      const sortedAyahs = ayahs.sort((a, b) => a.ayah - b.ayah);
-      const start = sortedAyahs[0].ayah;
-      const end = sortedAyahs[sortedAyahs.length - 1].ayah;
-      // Try to get surah name from pageData or fallback
-      let surahName = 'Unknown';
+  // Group by surah → sorted ranges
+  const groups = (() => {
+    const map: Record<number, { surah: number; ayah: number }[]> = {};
+    for (const s of Array.from(selectedAyahs)) {
+      if (!map[s.surah]) map[s.surah] = [];
+      map[s.surah].push(s);
+    }
+    return Object.entries(map).map(([surahNum, ayahs]) => {
+      const sorted = ayahs.sort((a, b) => a.ayah - b.ayah);
+      const num = Number(surahNum);
+      let name = `Surah ${num}`;
       if (pageData?.ayahs) {
-        const found = pageData.ayahs.find((a: any) => a.surah?.number === Number(surahNumber));
-        if (found) surahName = found.surah?.englishName || found.surah?.name || 'Unknown';
+        const found = pageData.ayahs.find((a: any) => a.surah?.number === num);
+        if (found) name = found.surah?.englishName || name;
       }
-      return {
-        surahNumber: Number(surahNumber),
-        surahName,
-        start,
-        end,
-        ayahs: sortedAyahs,
-        range: start === end ? `${start}` : `${start}-${end}`
-      };
+      return { surahNumber: num, name, ayahs: sorted };
     });
-  };
+  })();
 
-  const selectedAyahsInfo = getSelectedAyahsInfo();
+  const total = selectedAyahs.size;
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="max-w-2xl w-full max-h-[80vh] overflow-hidden">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+    >
+      <div className="w-full max-w-sm bg-white dark:bg-[#12161A] rounded-2xl shadow-2xl dark:shadow-[0_24px_64px_rgba(0,0,0,0.7)] border border-black/[0.07] dark:border-white/[0.07] overflow-hidden animate-fade-in-up font-sans">
+
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 pt-5 pb-4 border-b border-black/[0.06] dark:border-white/[0.06]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center text-white text-[11px] font-extrabold flex-shrink-0">
+              {total}
+            </div>
             <div>
-              <CardTitle className="flex items-center space-x-2">
-                <Plus className="h-5 w-5 text-blue-600" />
-                <span>Selected Ayahs for Review</span>
-              </CardTitle>
-              <CardDescription>
-                {selectedAyahs.size} ayah{selectedAyahs.size !== 1 ? 's' : ''} selected
-              </CardDescription>
+              <p className="text-sm font-bold text-gray-900 dark:text-white leading-none">
+                {total === 1 ? '1 verse selected' : `${total} verses selected`}
+              </p>
+              <p className="text-[11px] text-gray-400 dark:text-gray-500 mt-0.5">
+                {groups.length} {groups.length === 1 ? 'surah' : 'surahs'}
+              </p>
             </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-8 w-8 p-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
           </div>
-        </CardHeader>
+          <button
+            onClick={onClose}
+            className="w-7 h-7 rounded-full flex items-center justify-center text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/[0.06] transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
 
-        <CardContent className="space-y-4 max-h-[60vh] overflow-y-auto">
-          {selectedAyahsInfo.length > 0 ? (
-            <>
-              {/* Summary */}
-              <div className="bg-blue-50 dark:bg-blue-900/20 rounded-lg p-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="font-medium text-blue-900 dark:text-blue-100">
-                      Summary
-                    </h4>
-                    <p className="text-sm text-blue-700 dark:text-blue-300">
-                      {selectedAyahsInfo.length} range{selectedAyahsInfo.length !== 1 ? 's' : ''} across {selectedAyahsInfo.length} surah{selectedAyahsInfo.length !== 1 ? 's' : ''}
-                    </p>
+        {/* Verse list */}
+        <div className="max-h-64 overflow-y-auto divide-y divide-black/[0.04] dark:divide-white/[0.04]">
+          {groups.map((group) =>
+            group.ayahs.map((ayah) => (
+              <div
+                key={`${ayah.surah}-${ayah.ayah}`}
+                className="flex items-center justify-between px-5 py-3 hover:bg-amber-50/50 dark:hover:bg-white/[0.02] transition-colors"
+              >
+                <div className="flex items-center gap-3 min-w-0">
+                  {/* Surah number dot */}
+                  <span className="w-6 h-6 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                    {ayah.surah}
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-xs font-semibold text-gray-800 dark:text-gray-200 truncate">{group.name}</p>
+                    <p className="text-[10px] text-gray-400 dark:text-gray-500">{ayah.surah}:{ayah.ayah}</p>
                   </div>
-                  <Badge variant="secondary" className="text-blue-700 dark:text-blue-300">
-                    {selectedAyahs.size} total
-                  </Badge>
                 </div>
+                <button
+                  onClick={() => onRemoveAyah(ayah.surah, ayah.ayah)}
+                  className="w-6 h-6 rounded-full flex items-center justify-center text-gray-300 dark:text-gray-600 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all flex-shrink-0 ml-2"
+                  title="Remove"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-
-              {/* Selected Ranges */}
-              <div className="space-y-3">
-                <h4 className="font-medium text-gray-900 dark:text-gray-100">
-                  Selected Ranges
-                </h4>
-                {selectedAyahsInfo.map((range, index) => (
-                  <div
-                    key={`${range.surahNumber}-${range.start}-${range.end}`}
-                    className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div className="flex items-center space-x-2">
-                        <Badge variant="outline" className="bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-300">
-                          {range.surahNumber}
-                        </Badge>
-                        <span className="font-medium text-gray-900 dark:text-gray-100">
-                          {range.surahName}
-                        </span>
-                        <span className="text-sm text-gray-500 dark:text-gray-400">
-                          Ayah {range.range}
-                        </span>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          // Remove all ayahs in this range
-                          range.ayahs.forEach(ayah => onRemoveAyah(ayah.surah, ayah.ayah));
-                        }}
-                        className="h-6 w-6 p-0 text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                      >
-                        <Trash2 className="h-3 w-3" />
-                      </Button>
-                    </div>
-                    
-                    {/* Individual ayahs in this range */}
-                    <div className="space-y-2">
-                      {range.ayahs.map(ayah => (
-                        <div
-                          key={ayah.ayah}
-                          className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-700 rounded"
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2">
-                              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                                {ayah.surah}:{ayah.ayah}
-                              </span>
-                            </div>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => onRemoveAyah(ayah.surah, ayah.ayah)}
-                            className="h-5 w-5 p-0 text-gray-400 hover:text-red-500"
-                          >
-                            <X className="h-3 w-3" />
-                          </Button>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          ) : (
-            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-              <div className="text-lg mb-2">No ayahs selected</div>
-              <p className="text-sm">Click on ayahs to select them for review</p>
-            </div>
+            ))
           )}
-        </CardContent>
+        </div>
 
-        {/* Action Buttons */}
-        {selectedAyahs.size > 0 && (
-          <div className="border-t border-gray-200 dark:border-gray-700 p-4 bg-gray-50 dark:bg-gray-800/50">
-            <div className="flex items-center justify-between">
-              <Button variant="outline" onClick={onClearAll}>
-                Clear All
-              </Button>
-              <Button onClick={onAddForReview}>
-                <Plus className="h-4 w-4 mr-2" /> Add for Review
-              </Button>
-            </div>
-          </div>
-        )}
-      </Card>
+        {/* Footer actions */}
+        <div className="flex items-center gap-2 px-5 py-4 border-t border-black/[0.06] dark:border-white/[0.06] bg-gray-50/50 dark:bg-white/[0.02]">
+          <button
+            onClick={onClearAll}
+            className="flex-1 h-9 rounded-xl text-xs font-semibold text-gray-500 dark:text-gray-400 hover:text-red-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 border border-black/[0.08] dark:border-white/[0.08] transition-all"
+          >
+            Clear all
+          </button>
+          <button
+            onClick={onAddForReview}
+            className="flex-1 h-9 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-amber-500 to-orange-500 hover:opacity-90 transition-opacity shadow-sm shadow-amber-500/20"
+          >
+            Add for Review
+          </button>
+        </div>
+      </div>
     </div>
   );
-} 
+}
