@@ -70,6 +70,8 @@ function QuranPageContent() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [currentSurah, setCurrentSurah] = useState(1);
   const [currentAyah, setCurrentAyah] = useState(1);
+  const [readingLayout, setReadingLayout] = useState<'mushaf' | 'verse'>('verse');
+  const [activeAyah, setActiveAyah] = useState<{ surah: number; ayah: number } | null>(null);
   const [pageData, setPageData] = useState<PageData | null>(null);
   const [previousPageData, setPreviousPageData] = useState<PageData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -114,6 +116,43 @@ function QuranPageContent() {
       setSelectedTranslation(fontSettings.selectedTranslation || 'en.hilali');
     }
   }, [fontSettings]);
+
+  // Load reading layout from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('quran-reading-layout');
+      if (saved === 'mushaf' || saved === 'verse') {
+        setReadingLayout(saved as 'mushaf' | 'verse');
+      }
+    }
+  }, []);
+
+  // Save reading layout to localStorage whenever it changes
+  useEffect(() => {
+    if (isInitialized) {
+      localStorage.setItem('quran-reading-layout', readingLayout);
+    }
+  }, [readingLayout, isInitialized]);
+
+  // Set initial active verse when pageData or previousPageData loads
+  useEffect(() => {
+    if (pageData?.ayahs && pageData.ayahs.length > 0) {
+      const isCurrentOnCurrentPage = activeAyah && pageData.ayahs.some(
+        (a: any) => a.surah?.number === activeAyah.surah && a.numberInSurah === activeAyah.ayah
+      );
+      const isCurrentOnPreviousPage = activeAyah && previousPageData?.ayahs?.some(
+        (a: any) => a.surah?.number === activeAyah.surah && a.numberInSurah === activeAyah.ayah
+      );
+      
+      if (!isCurrentOnCurrentPage && !isCurrentOnPreviousPage) {
+        const firstAyah = pageData.ayahs[0];
+        setActiveAyah({
+          surah: firstAyah.surah?.number || currentSurah,
+          ayah: firstAyah.numberInSurah
+        });
+      }
+    }
+  }, [pageData, previousPageData]);
   
   // Update selected reciter from optimized hook
   useEffect(() => {
@@ -1192,6 +1231,7 @@ function QuranPageContent() {
       setIsPlaying(false);
       setCurrentTime(0);
       setCurrentPlayingAyah(null);
+      setCurrentAudio(null);
     }
   };
 
@@ -1300,6 +1340,8 @@ function QuranPageContent() {
             currentAyah={currentAyah}
             onNavigateToNextMistake={handleNavigateToAyah}
             pageData={pageData}
+            readingLayout={readingLayout}
+            onReadingLayoutChange={setReadingLayout}
           />
         }
       />
@@ -1369,6 +1411,9 @@ function QuranPageContent() {
         wordByWordData={wordByWordData}
         showWordByWordTooltip={showWordByWordTooltip}
         padding={padding}
+        readingLayout={readingLayout}
+        activeAyah={activeAyah}
+        onActiveAyahChange={setActiveAyah}
       />
 
       {/* Audio Player */}

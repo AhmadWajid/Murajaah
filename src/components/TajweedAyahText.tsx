@@ -23,6 +23,7 @@ interface TajweedAyahTextProps {
   showWordByWordTooltip?: boolean;
   disableTajweedColors?: boolean; // NEW PROP
   isMobile?: boolean; // Add mobile detection prop
+  displayMode?: 'block' | 'inline'; // NEW PROP
 }
 
 export function TajweedAyahText({ 
@@ -42,7 +43,9 @@ export function TajweedAyahText({
   showWordByWordTooltip = true,
   disableTajweedColors = false, // NEW DEFAULT
   isMobile = false, // NEW DEFAULT
+  displayMode = 'block',
 }: TajweedAyahTextProps) {
+  const Tag = displayMode === 'inline' ? 'span' : 'div';
   const { getTajweedWords, isTajweedLoading } = useTajweedCache();
   const [tajweedWords, setTajweedWords] = useState<TajweedWord[]>([]);
   const [fontLoaded, setFontLoaded] = useState(false);
@@ -429,14 +432,14 @@ export function TajweedAyahText({
   // const tooltipBgColor = hoveredRuleClass && ruleColorMap[hoveredRuleClass] ? ruleColorMap[hoveredRuleClass] : undefined;
 
   return (
-    <div 
+    <Tag 
        className={`leading-relaxed sm:leading-loose text-amber-900 dark:text-amber-100 font-arabic arabic-text uthmanic-hafs ${className}`} 
       dir="rtl"
       style={{
         fontFamily: fontLoaded ? qpcFontLoader.getFontFamily(pageNumber || 1) : "'qpc-v2-fallback', 'Amiri', serif",
         fontSize: `${currentFontSize}px`,
-        lineHeight: '1.8',
-        textAlign: 'right',
+        lineHeight: displayMode === 'inline' ? 'inherit' : '1.8',
+        textAlign: displayMode === 'inline' ? 'inherit' : 'right',
         '--custom-font-size': `${currentFontSize}px`,
         fontFeatureSettings: fontLoaded ? "'liga' 1, 'kern' 1, 'calt' 1, 'rlig' 1, 'ccmp' 1, 'locl' 1, 'mark' 1, 'mkmk' 1" : "'liga' 0, 'kern' 0, 'calt' 0, 'rlig' 0, 'ccmp' 0, 'locl' 0, 'mark' 0, 'mkmk' 0",
         textRendering: 'optimizeLegibility',
@@ -445,12 +448,13 @@ export function TajweedAyahText({
         wordBreak: 'keep-all',
         overflowWrap: 'break-word',
         hyphens: 'none',
-        wordSpacing: '0.1em',
+        wordSpacing: '0.12em',
         whiteSpace: 'normal',
         position: 'relative',
         overflow: 'visible',
-        width: '100%',
-        maxWidth: '100%',
+        display: displayMode === 'inline' ? 'inline' : 'block',
+        width: displayMode === 'inline' ? 'auto' : '100%',
+        maxWidth: displayMode === 'inline' ? 'none' : '100%',
         boxSizing: 'border-box',
       } as React.CSSProperties}
     >
@@ -507,7 +511,7 @@ export function TajweedAyahText({
           </Tooltip>
         );
       })}
-    </div>
+    </Tag>
   );
 }
 
