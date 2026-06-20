@@ -10,6 +10,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatAyahRange, formatAyahRangeArabic } from '@/lib/quran';
 
+/** Strip tajweed <rule class="...">text</rule> tags from a string, keeping only the inner text. */
+function stripRuleTags(text: string): string {
+  if (!text) return text;
+  return text.replace(/<rule[^>]*>([^<]*)<\/rule>/g, '$1');
+}
+
 interface AyahCardProps {
   ayah: any;
   index: number;
@@ -654,11 +660,11 @@ export default function AyahCard({
               {(() => {
                 // For first ayah with Bismillah, show only the translation of the rest
                 if (isFirstAyah && finalHasBismillah) {
-                  const translationText = ayah.translation || ayah.text || '';
+                  const translationText = stripRuleTags(ayah.translation || ayah.text || '');
                   const restOfTranslation = translationText.replace(/In the name of Allah, the Most Gracious, the Most Merciful/gi, '').trim();
                   return restOfTranslation || '';
                 }
-                return ayah.translation || ayah.text;
+                return stripRuleTags(ayah.translation || ayah.text || '');
               })()}
             </div>
           </div>
