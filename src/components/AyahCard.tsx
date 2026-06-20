@@ -10,10 +10,17 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatAyahRange, formatAyahRangeArabic } from '@/lib/quran';
 
-/** Strip tajweed <rule class="...">text</rule> tags from a string, keeping only the inner text. */
+/** Strip tajweed <rule class="...">text</rule> tags from a string, keeping only the inner text. Handles nested tags. */
 function stripRuleTags(text: string): string {
   if (!text) return text;
-  return text.replace(/<rule[^>]*>([^<]*)<\/rule>/g, '$1');
+  const innermostRegex = /<rule[^>]*>([^<]*)<\/rule>/g;
+  let result = text;
+  let safetyCounter = 0;
+  while (innermostRegex.test(result) && safetyCounter < 50) {
+    safetyCounter++;
+    result = result.replace(innermostRegex, '$1');
+  }
+  return result;
 }
 
 interface AyahCardProps {

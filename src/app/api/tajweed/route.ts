@@ -83,36 +83,74 @@ function getPagesDatabase(): Database.Database {
   return pagesDb;
 }
 
-// Parse tajweed rules from XML-like tags in the text
+// Parse tajweed rules from XML-like tags in the text (handles nested tags)
 function parseTajweedRules(text: string): TajweedRule[] {
   const rules: TajweedRule[] = [];
-  const ruleRegex = /<rule class=([^>]+)>([^<]+)<\/rule>/g;
+  // First, flatten nested rules by collecting all rule spans
+  const ruleRegex = /<rule class=([^>]+)>([^<]*(?:(?!<\/rule>)<[^<]*)*)<\/rule>/g;
   let match;
-  let offset = 0;
+  
+  // We need to work with the cleaned text to compute correct indices.
+  // Strategy: find all rules (including nested), compute their positions in the final clean text.
+  const flattenAndParse = (rawText: string): TajweedRule[] => {
+    const foundRules: TajweedRule[] = [];
+    // Use a simple iterative approach: find innermost rules first
+    let working = rawText;
+    // Innermost rule regex: matches <rule> tags with no nested <rule> inside
+    const innermostRegex = /<rule class=([^>]+)>([^<]*)<\/rule>/g;
+    
+    // Collect all rules with their positions in the original text
+    const allMatches: { class: string; text: string; origStart: number; origEnd: number }[] = [];
+    
+    // Repeatedly extract innermost rules
+    let safetyCounter = 0;
+    while (innermostRegex.test(working) && safetyCounter < 50) {
+      safetyCounter++;
+      innermostRegex.lastIndex = 0;
+      let innerMatch;
+      while ((innerMatch = innermostRegex.exec(working)) !== null) {
+        allMatches.push({
+          class: innerMatch[1].replace(/['"]/g, ''),
+          text: innerMatch[2],
+          origStart: innerMatch.index,
+          origEnd: innerMatch.index + innerMatch[0].length,
+        });
+      }
+      // Strip innermost tags for next iteration
+      working = working.replace(innermostRegex, '$2');
+    }
+    
+    // Now compute positions relative to the fully cleaned text
+    const cleanedText = cleanText(rawText);
+    for (const m of allMatches) {
+      const startIndex = cleanedText.indexOf(m.text);
+      if (startIndex !== -1) {
+        foundRules.push({
+          class: m.class,
+          text: m.text,
+          startIndex,
+          endIndex: startIndex + m.text.length,
+        });
+      }
+    }
+    
+    return foundRules;
+  };
 
-  while ((match = ruleRegex.exec(text)) !== null) {
-    const ruleClass = match[1].replace(/['"]/g, ''); // Remove quotes
-    const ruleText = match[2];
-    const startIndex = match.index - offset;
-    const endIndex = startIndex + ruleText.length;
-
-    rules.push({
-      class: ruleClass,
-      text: ruleText,
-      startIndex,
-      endIndex,
-    });
-
-    // Adjust offset for next matches
-    offset += match[0].length - ruleText.length;
-  }
-
-  return rules;
+  return flattenAndParse(text);
 }
 
-// Clean text by removing tajweed rule tags
+// Clean text by removing tajweed rule tags (handles nested tags)
 function cleanText(text: string): string {
-  return text.replace(/<rule class=[^>]+>([^<]+)<\/rule>/g, '$1');
+  // Repeatedly strip innermost <rule> tags until none remain
+  const innermostRegex = /<rule class=[^>]+>([^<]*)<\/rule>/g;
+  let result = text;
+  let safetyCounter = 0;
+  while (innermostRegex.test(result) && safetyCounter < 50) {
+    safetyCounter++;
+    result = result.replace(innermostRegex, '$1');
+  }
+  return result;
 }
 
 export async function GET(request: NextRequest) {
