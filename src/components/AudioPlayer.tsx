@@ -185,7 +185,7 @@ export default function AudioPlayer({
   // Keyboard controls
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (!currentAudio || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return;
+      if (!currentAudio || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement || event.metaKey || event.ctrlKey || event.altKey) return;
       switch (event.key) {
         case ' ':
           event.preventDefault();
