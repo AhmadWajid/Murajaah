@@ -314,8 +314,8 @@ function QuranPageContent() {
       return;
     }
 
-    // If audio is playing, let the audio player handle spacebar and left/right arrows for seeking
-    if (currentAudio && isPlaying && (event.key === ' ' || event.key === 'ArrowLeft' || event.key === 'ArrowRight')) {
+    // If audio player is active, let the audio player handle spacebar and arrow keys for controls
+    if (currentAudio && (event.key === ' ' || event.key === 'ArrowLeft' || event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'ArrowDown')) {
       return;
     }
 
@@ -346,19 +346,7 @@ function QuranPageContent() {
           }
         }
         break;
-      case ' ':
-        // Spacebar = Next page (forward in RTL reading) - only when no audio is playing
-        event.preventDefault();
-        if (layoutMode === 'spread') {
-          if (currentPage < TOTAL_QURAN_PAGES - 1) {
-            setCurrentPage(currentPage + 2);
-          }
-        } else {
-          if (currentPage < TOTAL_QURAN_PAGES) {
-            setCurrentPage(currentPage + 1);
-          }
-        }
-        break;
+
       case 'ArrowUp':
         // Up arrow = Next page (forward in RTL reading) - only when no audio is playing
         event.preventDefault();
