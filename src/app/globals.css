@@ -51,7 +51,7 @@
     letter-spacing: 0.002em !important;
     /* Tighter spacing on mobile */
     max-width: 100% !important;
-    overflow-x: hidden !important;
+    overflow: visible !important;
     word-break: normal !important;
     overflow-wrap: anywhere !important;
     text-wrap: pretty !important;
@@ -89,7 +89,7 @@
   /* Ensure all containers respect mobile boundaries */
   div[dir="rtl"] {
     max-width: 100% !important;
-    overflow-x: hidden !important;
+    overflow: visible !important;
     box-sizing: border-box !important;
   }
   
@@ -184,7 +184,7 @@
   letter-spacing: 0 !important;
   /* Ensure no horizontal overflow */
   max-width: 100% !important;
-  overflow-x: hidden !important;
+  overflow: visible !important;
   /* Box model */
   box-sizing: border-box !important;
   /* Display properties */

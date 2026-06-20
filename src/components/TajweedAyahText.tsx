@@ -181,6 +181,7 @@ export function TajweedAyahText({
 
   // Store tooltip data for rendering outside the text flow
   const tooltipData: Array<{ id: string; content: string; bgColor: string }> = [];
+  const translationTooltipData: Array<{ id: string; content: string; wordId: string }> = [];
 
   // Always render with Tajweed highlighting
   const renderWordWithTajweed = (word: TajweedWord, index: number) => {
@@ -242,6 +243,11 @@ export function TajweedAyahText({
       
       const wordId = String(word.id);
       const isWordVisible = visibleWordIds.has(wordId);
+      const translationTooltipId = `translation-tooltip-${word.id}`;
+      
+      if (showWordByWordTooltip && translation && isWordVisible) {
+        translationTooltipData.push({ id: translationTooltipId, content: translation, wordId });
+      }
       
       return (
         <span
@@ -253,6 +259,8 @@ export function TajweedAyahText({
           }}
           onMouseEnter={() => handleWordMouseEnter(wordId, index)}
           onMouseLeave={() => handleWordMouseLeave(wordId)}
+          data-tooltip-id={showWordByWordTooltip && translation && isWordVisible ? translationTooltipId : undefined}
+          data-word-tooltip
         >
           {/* Invisible text that takes up natural space */}
           <span 
@@ -287,12 +295,6 @@ export function TajweedAyahText({
           >
             {word.text}
           </span>
-          
-          {showWordByWordTooltip && translation && isWordVisible && (
-            <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded shadow-lg transition-opacity whitespace-nowrap z-50">
-              {translation}
-            </span>
-          )}
         </span>
       );
     }
@@ -310,24 +312,22 @@ export function TajweedAyahText({
       if (showWordByWordTooltip && translation) {
         const wordId = String(word.id);
         const shouldShowTooltip = isMobile ? clickedWordId === wordId : hoveredTajweedWordId !== wordId;
+        const translationTooltipId = `translation-tooltip-${word.id}`;
+        
+        if (shouldShowTooltip) {
+          translationTooltipData.push({ id: translationTooltipId, content: translation, wordId });
+        }
+        
         return (
           <span
             key={word.id}
-            className={`inline ${isMobile ? 'cursor-pointer' : 'group'} relative`}
+            className={`inline ${isMobile ? 'cursor-pointer' : ''}`}
             style={{ fontSize: `${currentFontSize}px` }}
             onClick={handleWordClick}
+            data-tooltip-id={shouldShowTooltip ? translationTooltipId : undefined}
             data-word-tooltip
           >
             <span>{word.text}</span>
-            {shouldShowTooltip && (isMobile ? clickedWordId === wordId : true) && (
-              <span className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-50 ${
-                isMobile 
-                  ? 'opacity-100' 
-                  : 'opacity-0 group-hover:opacity-100 transition-opacity'
-              }`}>
-                {translation}
-              </span>
-            )}
           </span>
         );
       }
@@ -394,24 +394,22 @@ export function TajweedAyahText({
     if (showWordByWordTooltip && translation) {
       const wordId = String(word.id);
       const shouldShowTooltip = isMobile ? clickedWordId === wordId : hoveredTajweedWordId !== wordId;
+      const translationTooltipId = `translation-tooltip-${word.id}`;
+      
+      if (shouldShowTooltip) {
+        translationTooltipData.push({ id: translationTooltipId, content: translation, wordId });
+      }
+      
       return (
         <span
           key={word.id}
-          className={`inline ${isMobile ? 'cursor-pointer' : 'group'} relative`}
+          className={`inline ${isMobile ? 'cursor-pointer' : ''}`}
           style={{ fontSize: `${currentFontSize}px` }}
           onClick={handleWordClick}
+          data-tooltip-id={shouldShowTooltip ? translationTooltipId : undefined}
           data-word-tooltip
         >
           {segments}
-          {shouldShowTooltip && (isMobile ? clickedWordId === wordId : true) && (
-            <span className={`absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 bg-gray-900 text-white text-xs rounded shadow-lg whitespace-nowrap z-50 ${
-              isMobile 
-                ? 'opacity-100' 
-                : 'opacity-0 group-hover:opacity-100 transition-opacity'
-            }`}>
-              {translation}
-            </span>
-          )}
         </span>
       );
     }
@@ -487,6 +485,28 @@ export function TajweedAyahText({
           {content}
         </Tooltip>
       ))}
+      {/* Render all translation tooltips at the end, outside the text flow */}
+      {translationTooltipData.map(({ id, content, wordId }) => {
+        const tooltipProps = isMobile ? { isOpen: clickedWordId === wordId } : {};
+        return (
+          <Tooltip
+            key={id}
+            id={id}
+            {...tooltipProps}
+            style={{
+              backgroundColor: '#111827', // bg-gray-900
+              color: '#fff',
+              borderRadius: '0.375rem',
+              padding: '0.25rem 0.5rem',
+              fontSize: '0.75rem', // text-xs
+              zIndex: 9999,
+              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+            }}
+          >
+            {content}
+          </Tooltip>
+        );
+      })}
     </div>
   );
 }
