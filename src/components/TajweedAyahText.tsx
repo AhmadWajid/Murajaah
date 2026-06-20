@@ -245,7 +245,7 @@ export function TajweedAyahText({
       const isWordVisible = visibleWordIds.has(wordId);
       const translationTooltipId = `translation-tooltip-${word.id}`;
       
-      if (showWordByWordTooltip && translation && isWordVisible) {
+      if (showWordByWordTooltip && translation) {
         translationTooltipData.push({ id: translationTooltipId, content: translation, wordId });
       }
       
@@ -259,7 +259,7 @@ export function TajweedAyahText({
           }}
           onMouseEnter={() => handleWordMouseEnter(wordId, index)}
           onMouseLeave={() => handleWordMouseLeave(wordId)}
-          data-tooltip-id={showWordByWordTooltip && translation && isWordVisible ? translationTooltipId : undefined}
+          data-tooltip-id={showWordByWordTooltip && translation ? translationTooltipId : undefined}
           data-word-tooltip
         >
           {/* Invisible text that takes up natural space */}
