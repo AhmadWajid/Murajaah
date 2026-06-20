@@ -83,61 +83,63 @@ function getPagesDatabase(): Database.Database {
   return pagesDb;
 }
 
-// Parse tajweed rules from XML-like tags in the text (handles nested tags)
+// Parse tajweed rules from XML-like tags in the text (handles nested tags).
+// Uses a stack-based approach to produce NON-OVERLAPPING rule segments,
+// where inner (more specific) rules take priority over outer ones.
 function parseTajweedRules(text: string): TajweedRule[] {
-  const rules: TajweedRule[] = [];
-  // First, flatten nested rules by collecting all rule spans
-  const ruleRegex = /<rule class=([^>]+)>([^<]*(?:(?!<\/rule>)<[^<]*)*)<\/rule>/g;
-  let match;
-  
-  // We need to work with the cleaned text to compute correct indices.
-  // Strategy: find all rules (including nested), compute their positions in the final clean text.
-  const flattenAndParse = (rawText: string): TajweedRule[] => {
-    const foundRules: TajweedRule[] = [];
-    // Use a simple iterative approach: find innermost rules first
-    let working = rawText;
-    // Innermost rule regex: matches <rule> tags with no nested <rule> inside
-    const innermostRegex = /<rule class=([^>]+)>([^<]*)<\/rule>/g;
-    
-    // Collect all rules with their positions in the original text
-    const allMatches: { class: string; text: string; origStart: number; origEnd: number }[] = [];
-    
-    // Repeatedly extract innermost rules
-    let safetyCounter = 0;
-    while (innermostRegex.test(working) && safetyCounter < 50) {
-      safetyCounter++;
-      innermostRegex.lastIndex = 0;
-      let innerMatch;
-      while ((innerMatch = innermostRegex.exec(working)) !== null) {
-        allMatches.push({
-          class: innerMatch[1].replace(/['"]/g, ''),
-          text: innerMatch[2],
-          origStart: innerMatch.index,
-          origEnd: innerMatch.index + innerMatch[0].length,
-        });
-      }
-      // Strip innermost tags for next iteration
-      working = working.replace(innermostRegex, '$2');
-    }
-    
-    // Now compute positions relative to the fully cleaned text
-    const cleanedText = cleanText(rawText);
-    for (const m of allMatches) {
-      const startIndex = cleanedText.indexOf(m.text);
-      if (startIndex !== -1) {
-        foundRules.push({
-          class: m.class,
-          text: m.text,
-          startIndex,
-          endIndex: startIndex + m.text.length,
-        });
-      }
-    }
-    
-    return foundRules;
-  };
+  const cleaned = cleanText(text);
+  if (cleaned.length === 0) return [];
 
-  return flattenAndParse(text);
+  // Build a per-character rule assignment by walking the raw text
+  // and tracking the rule stack (innermost rule = top of stack).
+  const charRuleClass: (string | null)[] = new Array(cleaned.length).fill(null);
+  const ruleStack: string[] = [];
+  let cleanIdx = 0;
+  let rawIdx = 0;
+
+  while (rawIdx < text.length) {
+    // Check for opening tag: <rule class=...>
+    const openMatch = text.substring(rawIdx).match(/^<rule class=([^>]+)>/);
+    if (openMatch) {
+      ruleStack.push(openMatch[1].replace(/['"]/g, ''));
+      rawIdx += openMatch[0].length;
+      continue;
+    }
+
+    // Check for closing tag: </rule>
+    if (text.substring(rawIdx, rawIdx + 7) === '</rule>') {
+      ruleStack.pop();
+      rawIdx += 7;
+      continue;
+    }
+
+    // Regular character — assign the innermost (top-of-stack) rule
+    if (cleanIdx < cleaned.length) {
+      charRuleClass[cleanIdx] = ruleStack.length > 0 ? ruleStack[ruleStack.length - 1] : null;
+      cleanIdx++;
+    }
+    rawIdx++;
+  }
+
+  // Collapse adjacent characters with the same rule class into segments
+  const rules: TajweedRule[] = [];
+  let segStart = 0;
+
+  for (let i = 1; i <= cleaned.length; i++) {
+    if (i === cleaned.length || charRuleClass[i] !== charRuleClass[segStart]) {
+      if (charRuleClass[segStart] !== null) {
+        rules.push({
+          class: charRuleClass[segStart]!,
+          text: cleaned.substring(segStart, i),
+          startIndex: segStart,
+          endIndex: i,
+        });
+      }
+      segStart = i;
+    }
+  }
+
+  return rules;
 }
 
 // Clean text by removing tajweed rule tags (handles nested tags)
