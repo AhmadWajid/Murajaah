@@ -12,6 +12,7 @@ interface AudioPlayerProps {
   currentPlayingAyah: { surah: number; ayah: number } | null;
   onTogglePlayPause: () => void;
   onStop: () => void;
+  onPlayNext?: () => void;
 }
 
 export default function AudioPlayer({
@@ -22,6 +23,7 @@ export default function AudioPlayer({
   currentPlayingAyah,
   onTogglePlayPause,
   onStop,
+  onPlayNext,
 }: AudioPlayerProps) {
   const [loopMode, setLoopMode] = useState<'none' | 'custom'>('none');
   const [customLoop, setCustomLoop] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
@@ -120,8 +122,17 @@ export default function AudioPlayer({
         currentAudio.removeEventListener('timeupdate', handleTimeUpdate);
         currentAudio.removeEventListener('ended', handleEnded);
       };
+    } else if (loopMode === 'none' && onPlayNext) {
+      // No loop — auto-advance to next verse when audio ends
+      const handleEnded = () => {
+        onPlayNext();
+      };
+      currentAudio.addEventListener('ended', handleEnded);
+      return () => {
+        currentAudio.removeEventListener('ended', handleEnded);
+      };
     }
-  }, [currentAudio, loopMode, customLoop, duration, isEndSet]);
+  }, [currentAudio, loopMode, customLoop, duration, isEndSet, onPlayNext]);
 
   // Auto-show/hide custom loop inputs
   useEffect(() => {
@@ -143,6 +154,7 @@ export default function AudioPlayer({
       const clientX = 'touches' in e ? e.touches[0].clientX : (e as MouseEvent).clientX;
       const x = Math.max(0, Math.min(clientX - rect.left, rect.width));
       const time = (x / rect.width) * duration;
+      if (!isFinite(time)) return;
 
       if (draggingMarker.current === 'start') {
         handleSetStart(time);
