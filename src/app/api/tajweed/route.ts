@@ -238,6 +238,59 @@ export async function GET(request: NextRequest) {
         
         return NextResponse.json({ ruleClasses });
         
+      case 'pageFullDetails': {
+        const fullPageNum = parseInt(searchParams.get('page') || '1');
+        
+        const linesStmt = pagesDatabase.prepare(`
+          SELECT page_number, line_number, line_type, is_centered, first_word_id, last_word_id, surah_number
+          FROM pages 
+          WHERE page_number = ? 
+          ORDER BY line_number
+        `);
+        const lineRows = linesStmt.all(fullPageNum) as PageRow[];
+        
+        if (lineRows.length === 0) {
+          return NextResponse.json({ pageLayout: [], wordsByLine: {} });
+        }
+        
+        const ayahLines = lineRows.filter(r => r.line_type === 'ayah');
+        if (ayahLines.length === 0) {
+          return NextResponse.json({ pageLayout: lineRows, wordsByLine: {} });
+        }
+        
+        const firstWordId = Math.min(...ayahLines.map(l => l.first_word_id));
+        const lastWordId = Math.max(...ayahLines.map(l => l.last_word_id));
+        
+        const allWordsStmt = tajweedDatabase.prepare(`
+          SELECT id, location, surah, ayah, word, text 
+          FROM words 
+          WHERE id BETWEEN ? AND ? 
+          ORDER BY id
+        `);
+        const allWordsRows = allWordsStmt.all(firstWordId, lastWordId) as WordRow[];
+        
+        const processedWords: ProcessedWord[] = allWordsRows.map(row => ({
+          id: row.id,
+          location: row.location,
+          surah: row.surah,
+          ayah: row.ayah,
+          word: row.word,
+          text: cleanText(row.text),
+          tajweedRules: parseTajweedRules(row.text),
+        }));
+        
+        const wordsByLine: Record<number, ProcessedWord[]> = {};
+        for (const line of lineRows) {
+          if (line.line_type === 'ayah') {
+            wordsByLine[line.line_number] = processedWords.filter(
+              w => w.id >= line.first_word_id && w.id <= line.last_word_id
+            );
+          }
+        }
+        
+        return NextResponse.json({ pageLayout: lineRows, wordsByLine });
+      }
+
       case 'pageLayout':
         const pageNumber = parseInt(searchParams.get('page') || '1');
         const pageStmt = pagesDatabase.prepare(`

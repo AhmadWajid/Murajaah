@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { TajweedWord } from '@/lib/tajweedService';
 import { qpcFontLoader } from '@/lib/qpcFontLoader';
 import { Tooltip } from 'react-tooltip';
@@ -59,13 +60,15 @@ export function TajweedAyahText({
   // State for mobile click-to-show tooltips
   const [clickedWordId, setClickedWordId] = useState<string | null>(null);
 
-  // Detect Safari (Mac or iOS)
+  // Detect Safari (Mac or iOS) and track mounted state
   const [isSafari, setIsSafari] = useState(false);
+  const [mounted, setMounted] = useState(false);
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const ua = window.navigator.userAgent;
       const isSafariBrowser = /Safari/.test(ua) && !/Chrome/.test(ua);
       setIsSafari(isSafariBrowser);
+      setMounted(true);
     }
   }, []);
 
@@ -176,8 +179,26 @@ export function TajweedAyahText({
   }, [surahNumber, ayahNumber, ayahText, getTajweedWords]);
 
   useEffect(() => {
-    loadTajweedData();
-  }, [loadTajweedData]);
+    if (hideWords) {
+      if (!ayahText) {
+        setTajweedWords([]);
+        return;
+      }
+      // Construct plain words without tajweed rules synchronously
+      const plainWords = ayahText.split(/\s+/).map((wordText, idx) => ({
+        id: surahNumber * 1000000 + ayahNumber * 1000 + idx,
+        location: `${surahNumber}:${ayahNumber}:${idx + 1}`,
+        surah: surahNumber,
+        ayah: ayahNumber,
+        word: idx + 1,
+        text: wordText,
+        tajweedRules: []
+      })) as unknown as TajweedWord[];
+      setTajweedWords(plainWords);
+    } else {
+      loadTajweedData();
+    }
+  }, [hideWords, ayahText, loadTajweedData, surahNumber, ayahNumber]);
 
   // Always use arabicFontSize for Arabic text
   const currentFontSize = arabicFontSize;
@@ -432,86 +453,99 @@ export function TajweedAyahText({
   // const tooltipBgColor = hoveredRuleClass && ruleColorMap[hoveredRuleClass] ? ruleColorMap[hoveredRuleClass] : undefined;
 
   return (
-    <Tag 
-       className={`leading-relaxed sm:leading-loose text-amber-900 dark:text-amber-100 font-arabic arabic-text uthmanic-hafs ${className}`} 
-      dir="rtl"
-      style={{
-        fontFamily: fontLoaded ? qpcFontLoader.getFontFamily(pageNumber || 1) : "'qpc-v2-fallback', 'Amiri', serif",
-        fontSize: `${currentFontSize}px`,
-        lineHeight: displayMode === 'inline' ? 'inherit' : '1.8',
-        textAlign: displayMode === 'inline' ? 'inherit' : 'right',
-        '--custom-font-size': `${currentFontSize}px`,
-        fontFeatureSettings: fontLoaded ? "'liga' 1, 'kern' 1, 'calt' 1, 'rlig' 1, 'ccmp' 1, 'locl' 1, 'mark' 1, 'mkmk' 1" : "'liga' 0, 'kern' 0, 'calt' 0, 'rlig' 0, 'ccmp' 0, 'locl' 0, 'mark' 0, 'mkmk' 0",
-        textRendering: 'optimizeLegibility',
-        WebkitFontSmoothing: 'antialiased',
-        MozOsxFontSmoothing: 'grayscale',
-        wordBreak: 'keep-all',
-        overflowWrap: 'break-word',
-        hyphens: 'none',
-        wordSpacing: '0.12em',
-        whiteSpace: 'normal',
-        position: 'relative',
-        overflow: 'visible',
-        display: displayMode === 'inline' ? 'inline' : 'block',
-        width: displayMode === 'inline' ? 'auto' : '100%',
-        maxWidth: displayMode === 'inline' ? 'none' : '100%',
-        boxSizing: 'border-box',
-      } as React.CSSProperties}
-    >
-              {isTajweedLoading(surahNumber, ayahNumber) ? (
-        <div className="text-center py-4">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-600 mx-auto"></div>
-          <p className="mt-2 text-sm text-amber-600">Loading tajweed...</p>
-        </div>
-      ) : (
-        tajweedWords.map((word, index) => (
-          <React.Fragment key={word.id}>
-            {renderWordWithTajweed(word, index)}
-            {index < tajweedWords.length - 1 && <span className="mx-1"> </span>}
-          </React.Fragment>
-        ))
+    <>
+      <Tag 
+         className={`leading-relaxed sm:leading-loose text-amber-900 dark:text-amber-100 font-arabic arabic-text uthmanic-hafs ${className}`} 
+        dir="rtl"
+        style={{
+          fontFamily: fontLoaded ? qpcFontLoader.getFontFamily(pageNumber || 1) : "'qpc-v2-fallback', 'Amiri', serif",
+          fontSize: `${currentFontSize}px`,
+          lineHeight: displayMode === 'inline' ? 'inherit' : '1.8',
+          textAlign: displayMode === 'inline' ? 'inherit' : 'right',
+          '--custom-font-size': `${currentFontSize}px`,
+          fontFeatureSettings: fontLoaded ? "'liga' 1, 'kern' 1, 'calt' 1, 'rlig' 1, 'ccmp' 1, 'locl' 1, 'mark' 1, 'mkmk' 1" : "'liga' 0, 'kern' 0, 'calt' 0, 'rlig' 0, 'ccmp' 0, 'locl' 0, 'mark' 0, 'mkmk' 0",
+          textRendering: 'optimizeLegibility',
+          WebkitFontSmoothing: 'antialiased',
+          MozOsxFontSmoothing: 'grayscale',
+          wordBreak: 'keep-all',
+          overflowWrap: 'break-word',
+          hyphens: 'none',
+          wordSpacing: '0.12em',
+          whiteSpace: 'normal',
+          position: 'relative',
+          overflow: 'visible',
+          display: displayMode === 'inline' ? 'inline' : 'block',
+          width: displayMode === 'inline' ? 'auto' : '100%',
+          maxWidth: displayMode === 'inline' ? 'none' : '100%',
+          boxSizing: 'border-box',
+        } as React.CSSProperties}
+      >
+        {isTajweedLoading(surahNumber, ayahNumber) ? (
+          displayMode === 'inline' ? (
+            <span className="inline-flex items-center mx-1 text-xs text-amber-600/40 animate-pulse font-sans">
+              ...
+            </span>
+          ) : (
+            <div className="text-center py-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-600 mx-auto"></div>
+              <p className="mt-2 text-sm text-amber-600">Loading tajweed...</p>
+            </div>
+          )
+        ) : (
+          tajweedWords.map((word, index) => (
+            <React.Fragment key={word.id}>
+              {renderWordWithTajweed(word, index)}
+              {index < tajweedWords.length - 1 && ' '}
+            </React.Fragment>
+          ))
+        )}
+      </Tag>
+      
+      {/* Render all tooltips outside the inline text flow at document.body using createPortal */}
+      {mounted && typeof document !== 'undefined' && createPortal(
+        <>
+          {tooltipData.map(({ id, content, bgColor }) => (
+            <Tooltip
+              key={id}
+              id={id}
+              style={{
+                backgroundColor: bgColor,
+                color: isColorLight(bgColor) ? '#222' : '#fff',
+                borderRadius: '0.375rem',
+                padding: '0.25rem 0.5rem',
+                fontSize: '0.875rem',
+                zIndex: 9999,
+                position: 'absolute',
+              }}
+            >
+              {content}
+            </Tooltip>
+          ))}
+          {translationTooltipData.map(({ id, content, wordId }) => {
+            const tooltipProps = isMobile ? { isOpen: clickedWordId === wordId } : {};
+            return (
+              <Tooltip
+                key={id}
+                id={id}
+                {...tooltipProps}
+                style={{
+                  backgroundColor: '#111827', // bg-gray-900
+                  color: '#fff',
+                  borderRadius: '0.375rem',
+                  padding: '0.25rem 0.5rem',
+                  fontSize: '0.75rem', // text-xs
+                  zIndex: 9999,
+                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+                }}
+              >
+                {content}
+              </Tooltip>
+            );
+          })}
+        </>,
+        document.body
       )}
-      {/* Render all tooltips at the end, outside the text flow */}
-      {tooltipData.map(({ id, content, bgColor }) => (
-        <Tooltip
-          key={id}
-          id={id}
-          style={{
-            backgroundColor: bgColor,
-            color: isColorLight(bgColor) ? '#222' : '#fff',
-            borderRadius: '0.375rem',
-            padding: '0.25rem 0.5rem',
-            fontSize: '0.875rem',
-            zIndex: 9999,
-            position: 'absolute',
-          }}
-        >
-          {content}
-        </Tooltip>
-      ))}
-      {/* Render all translation tooltips at the end, outside the text flow */}
-      {translationTooltipData.map(({ id, content, wordId }) => {
-        const tooltipProps = isMobile ? { isOpen: clickedWordId === wordId } : {};
-        return (
-          <Tooltip
-            key={id}
-            id={id}
-            {...tooltipProps}
-            style={{
-              backgroundColor: '#111827', // bg-gray-900
-              color: '#fff',
-              borderRadius: '0.375rem',
-              padding: '0.25rem 0.5rem',
-              fontSize: '0.75rem', // text-xs
-              zIndex: 9999,
-              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
-            }}
-          >
-            {content}
-          </Tooltip>
-        );
-      })}
-    </Tag>
+    </>
   );
 }
 

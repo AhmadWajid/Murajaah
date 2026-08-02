@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment, useRef } from 'react';
 import AyahCard from './AyahCard';
 import { MistakeData } from '@/lib/supabase/database';
 import { Card } from '@/components/ui/card';
@@ -9,6 +9,21 @@ import { Button } from '@/components/ui/button';
 import { Plus, X } from 'lucide-react';
 import SelectedAyahsModal from './SelectedAyahsModal';
 import { TajweedAyahText } from './TajweedAyahText';
+import { TajweedWord, TAJWEED_COLORS, TAJWEED_DESCRIPTIONS } from '@/lib/tajweedService';
+import { qpcFontLoader } from '@/lib/qpcFontLoader';
+import { createPortal } from 'react-dom';
+import { Tooltip } from 'react-tooltip';
+import AyahDetailDrawer from './AyahDetailDrawer';
+
+interface PageLine {
+  page_number: number;
+  line_number: number;
+  line_type: string;
+  is_centered: number;
+  first_word_id: number;
+  last_word_id: number;
+  surah_number: number;
+}
 
 const CornerOrnament = ({ className }: { className?: string }) => (
   <svg
@@ -145,7 +160,7 @@ interface QuranContentProps {
   wordByWordData: any[];
   showWordByWordTooltip: boolean;
   padding?: number;
-  readingLayout?: 'mushaf' | 'verse';
+  readingLayout?: 'mushaf' | 'mushaf_15lines' | 'verse';
   activeAyah?: { surah: number; ayah: number } | null;
   onActiveAyahChange?: (ayah: { surah: number; ayah: number } | null) => void;
 }
@@ -193,6 +208,85 @@ export default function QuranContent({
 }: QuranContentProps) {
   const [showSelectedAyahsModal, setShowSelectedAyahsModal] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const [hoveredTajweedWordId15, setHoveredTajweedWordId15] = useState<string | null>(null);
+  const hoverTimeoutRef15 = useRef<NodeJS.Timeout | null>(null);
+
+  const [visibleWordIds15, setVisibleWordIds15] = useState<Set<string>>(new Set());
+  const wordTimeoutsRef15 = useRef<Map<string, NodeJS.Timeout>>(new Map());
+
+  const pageTooltips15Map = new Map<string, string>();
+
+  const [layout15Data, setLayout15Data] = useState<{
+    pageLayout: PageLine[];
+    wordsByLine: Record<number, TajweedWord[]>;
+  } | null>(null);
+  const [loading15, setLoading15] = useState(false);
+  const [fontLoaded15, setFontLoaded15] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+    return () => {
+      wordTimeoutsRef15.current.forEach(timeout => clearTimeout(timeout));
+      wordTimeoutsRef15.current.clear();
+    };
+  }, []);
+
+  const handleWordMouseEnter15 = (wordId: string, wordSurah: number, wordAyah: number, currentWordObj: any) => {
+    if (wordTimeoutsRef15.current.has(wordId)) {
+      clearTimeout(wordTimeoutsRef15.current.get(wordId)!);
+      wordTimeoutsRef15.current.delete(wordId);
+    }
+    
+    setVisibleWordIds15(prev => new Set(prev).add(wordId));
+    
+    const pageWords = layout15Data ? Object.values(layout15Data.wordsByLine).flat() : [];
+    const ayahWords = pageWords
+      .filter((w: any) => w.surah === wordSurah && w.ayah === wordAyah)
+      .sort((a: any, b: any) => a.id - b.id);
+    
+    const currentWordIndexInAyah = ayahWords.findIndex((w: any) => String(w.id) === wordId);
+    
+    if (currentWordIndexInAyah !== -1) {
+      ayahWords.forEach((word: any, index) => {
+        if (index > currentWordIndexInAyah) {
+          const laterWordId = String(word.id);
+          if (wordTimeoutsRef15.current.has(laterWordId)) {
+            clearTimeout(wordTimeoutsRef15.current.get(laterWordId)!);
+            wordTimeoutsRef15.current.delete(laterWordId);
+          }
+          setVisibleWordIds15(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(laterWordId);
+            return newSet;
+          });
+        }
+      });
+    }
+  };
+
+  const handleWordMouseLeave15 = (wordId: string) => {
+    if (hideWordsDelay > 0) {
+      const timeoutId = setTimeout(() => {
+        setVisibleWordIds15(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(wordId);
+          return newSet;
+        });
+        wordTimeoutsRef15.current.delete(wordId);
+      }, hideWordsDelay);
+      wordTimeoutsRef15.current.set(wordId, timeoutId);
+    } else {
+      setVisibleWordIds15(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(wordId);
+        return newSet;
+      });
+    }
+  };
+
+  // Diagnostic log for tooltips
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       setIsMobile(window.innerWidth <= 640);
@@ -205,6 +299,52 @@ export default function QuranContent({
       return () => window.removeEventListener('resize', handleResize);
     }
   }, []);
+
+  // Diagnostic log for tooltips
+  useEffect(() => {
+    if (readingLayout === 'mushaf_15lines') {
+      console.log('[15-Line Mushaf Diagnostics]', {
+        showWordByWordTooltip,
+        wordByWordDataLength: wordByWordData?.length,
+        layout15DataWordsCount: layout15Data ? Object.values(layout15Data.wordsByLine).flat().length : 0
+      });
+    }
+  }, [readingLayout, showWordByWordTooltip, wordByWordData, layout15Data]);
+
+  useEffect(() => {
+    if (readingLayout !== 'mushaf_15lines') return;
+    const pageNum = pageData?.number;
+    if (!pageNum) return;
+    
+    let active = true;
+    const loadFullDetails = async () => {
+      setLoading15(true);
+      try {
+        const fontSuccess = await qpcFontLoader.loadPageFont(pageNum);
+        if (active) {
+          setFontLoaded15(fontSuccess);
+        }
+        
+        const response = await fetch(`/api/tajweed?action=pageFullDetails&page=${pageNum}`);
+        if (!response.ok) throw new Error('Failed to load 15-line details');
+        const data = await response.json();
+        if (active) {
+          setLayout15Data(data);
+        }
+      } catch (error) {
+        console.error('Error loading 15-line details:', error);
+      } finally {
+        if (active) {
+          setLoading15(false);
+        }
+      }
+    };
+    
+    loadFullDetails();
+    return () => {
+      active = false;
+    };
+  }, [pageData?.number, readingLayout]);
 
   const isAyahInMemorization = (surah: number, ayahNumber: number) => {
     return memorizationItems.some(item => 
@@ -350,8 +490,6 @@ export default function QuranContent({
                     dir="rtl"
                     style={{
                       textAlign: 'justify',
-                      textAlignLast: surahAyahsList.length < 3 ? 'right' : 'center',
-                      textJustify: 'inter-word',
                     }}
                   >
                     {surahAyahsList.map((ayah: any, index: number) => {
@@ -359,7 +497,7 @@ export default function QuranContent({
                       const ayahKey = `${surahNo}:${ayahNo}`;
                       const isActive = activeAyah && activeAyah.surah === surahNo && activeAyah.ayah === ayahNo;
                       
-                      let arText = ayah.text || '';
+                      let arText = (ayah.text || '').replace(/\r?\n|\r/g, ' ').trim();
                       if (ayahNo === 1 && surahNo !== 1 && surahNo !== 9) {
                         const unicodeBismillahPattern = /^.*?بِسْمِ\s*[ٱا]للَّهِ\s*[ٱا]لرَّحْمَٰنِ\s*[ٱا]لرَّحِيمِ\s*/;
                         arText = arText.replace(unicodeBismillahPattern, '').trim();
@@ -370,53 +508,47 @@ export default function QuranContent({
                       
                       const status = getMemorizationStatus(surahNo, ayahNo);
                       const isMemorized = isAyahInMemorization(surahNo, ayahNo);
-                      const reviewGlowClass = status === 'overdue' ? 'shadow-[0_0_8px_rgba(239,68,68,0.25)] border-b-2 border-red-500' :
-                                              status === 'due-today' ? 'shadow-[0_0_8px_rgba(249,115,22,0.25)] border-b-2 border-orange-500' :
-                                              status === 'due-soon' ? 'shadow-[0_0_8px_rgba(245,158,11,0.25)] border-b-2 border-amber-500' :
-                                              status === 'upcoming' ? 'shadow-[0_0_8px_rgba(16,185,129,0.25)] border-b-2 border-emerald-500' : '';
+                      const reviewGlowClass = status === 'overdue' ? 'decoration-red-500 underline decoration-2 underline-offset-4' :
+                                              status === 'due-today' ? 'decoration-orange-500 underline decoration-2 underline-offset-4' :
+                                              status === 'due-soon' ? 'decoration-amber-500 underline decoration-2 underline-offset-4' :
+                                              status === 'upcoming' ? 'decoration-emerald-500 underline decoration-2 underline-offset-4' : '';
 
                       const isSelected = Array.from(selectedAyahs).some(sel => sel.surah === surahNo && sel.ayah === ayahNo);
                       
                       return (
-                        <span
-                          key={ayah.number}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onActiveAyahChange?.({ surah: surahNo, ayah: ayahNo });
-                          }}
-                          className={`inline transition-all duration-200 cursor-pointer rounded px-1.5 py-1 select-text ${
-                            isActive 
-                              ? 'bg-amber-500/10 dark:bg-accent/20 ring-1 ring-amber-500/30 dark:ring-accent/40 shadow-[0_0_12px_rgba(212,175,55,0.2)]' 
-                              : isSelected
-                                ? 'bg-amber-500/5 dark:bg-accent/10 border-b border-amber-500'
-                                : 'hover:bg-amber-500/5 dark:hover:bg-accent/10'
-                          } ${isMemorized ? reviewGlowClass : ''}`}
-                        >
-                          <TajweedAyahText
-                            ayahText={arText}
-                            surahNumber={surahNo}
-                            ayahNumber={ayahNo}
-                            fontSize={fontSize}
-                            arabicFontSize={arabicFontSize}
-                            translationFontSize={translationFontSize}
-                            fontTargetArabic={fontTargetArabic}
-                            pageNumber={pageNum}
-                            hideWords={hideWords}
-                            hideWordsDelay={hideWordsDelay}
-                            wordByWordData={wordByWordData}
-                            showWordByWordTooltip={showWordByWordTooltip}
-                            disableTajweedColors={isMobile}
-                            isMobile={isMobile}
-                            displayMode="inline"
-                          />
-                          
-                          <span 
-                            className="inline-flex items-center justify-center mx-2 w-7 h-7 rounded-full border-2 border-amber-500/40 dark:border-accent/40 bg-amber-50/5 dark:bg-accent/5 text-[10px] font-bold text-amber-800 dark:text-accent select-none align-middle font-sans" 
-                            dir="ltr"
-                          >
-                            {ayahNo}
+                        <Fragment key={ayah.number}>
+                          <span
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onActiveAyahChange?.({ surah: surahNo, ayah: ayahNo });
+                            }}
+                            className={`inline cursor-pointer select-text transition-colors duration-200 ${
+                              isActive 
+                                ? 'bg-amber-500/15 dark:bg-accent/20 rounded-sm' 
+                                : isSelected
+                                  ? 'bg-amber-500/8 dark:bg-accent/10'
+                                  : 'hover:bg-amber-500/5 dark:hover:bg-accent/10'
+                            } ${isMemorized ? reviewGlowClass : ''}`}>
+                            <TajweedAyahText
+                              ayahText={arText}
+                              surahNumber={surahNo}
+                              ayahNumber={ayahNo}
+                              fontSize={fontSize}
+                              arabicFontSize={arabicFontSize}
+                              translationFontSize={translationFontSize}
+                              fontTargetArabic={fontTargetArabic}
+                              pageNumber={pageNum}
+                              hideWords={hideWords}
+                              hideWordsDelay={hideWordsDelay}
+                              wordByWordData={wordByWordData}
+                              showWordByWordTooltip={showWordByWordTooltip}
+                              disableTajweedColors={isMobile}
+                              isMobile={isMobile}
+                              displayMode="inline"
+                            />
                           </span>
-                        </span>
+                          {index < surahAyahsList.length - 1 && ' '}
+                        </Fragment>
                       );
                     })}
                   </div>
@@ -447,6 +579,314 @@ export default function QuranContent({
         <div className="absolute bottom-4 left-6 right-6 border-t border-amber-500/10 dark:border-accent/10 pt-2 flex justify-center text-[10px] font-bold text-amber-700/60 dark:text-accent/50 tracking-widest uppercase">
           Juz' {ayahs[0]?.juz} • Page {pageNum}
         </div>
+      </Card>
+    );
+  };
+
+  const render15LinesMushafPage = (pageObj: any, pageSide: 'left' | 'right' | 'single' = 'single') => {
+    if (!pageObj) return null;
+    const pageNum = pageObj.number;
+    
+    const layout = layout15Data?.pageLayout || [];
+    const wordsByLine = layout15Data?.wordsByLine || {};
+    
+    const roundedClass = pageSide === 'left' 
+      ? 'rounded-3xl lg:rounded-r-none' 
+      : pageSide === 'right' 
+        ? 'rounded-3xl lg:rounded-l-none' 
+        : 'rounded-3xl';
+
+    return (
+      <Card className={`flex-1 min-h-[75vh] shadow-[0_10px_35px_-5px_rgba(0,0,0,0.05)] dark:shadow-[0_15px_40px_rgba(0,0,0,0.35)] border-4 border-double border-amber-500/40 dark:border-accent/30 bg-[#FAF8F5]/90 dark:bg-[#12161A]/95 backdrop-blur-md overflow-hidden relative p-6 sm:p-8 md:p-10 font-sans transition-all duration-300 ${roundedClass}`}>
+        
+        {/* Double Gold nested borders framing the page */}
+        <div className="absolute inset-4 pointer-events-none border border-amber-500/25 dark:border-accent/20 rounded-2xl z-20" />
+        <div className="absolute inset-5 pointer-events-none border border-amber-500/10 dark:border-accent/10 rounded-2xl z-20" />
+        
+        {/* Beautiful Custom SVG corner ornaments */}
+        <CornerOrnament className="absolute top-4 left-4 w-10 h-10 text-amber-500/40 dark:text-accent/30 select-none pointer-events-none z-20" />
+        <CornerOrnament className="absolute top-4 right-4 w-10 h-10 text-amber-500/40 dark:text-accent/30 select-none pointer-events-none z-20 rotate-90" />
+        <CornerOrnament className="absolute bottom-4 right-4 w-10 h-10 text-amber-500/40 dark:text-accent/30 select-none pointer-events-none z-20 rotate-180" />
+        <CornerOrnament className="absolute bottom-4 left-4 w-10 h-10 text-amber-500/40 dark:text-accent/30 select-none pointer-events-none z-20 -rotate-90" />
+
+        {/* Page fold shading */}
+        {pageSide === 'left' && (
+          <div className="hidden lg:block absolute top-0 bottom-0 right-0 w-16 pointer-events-none z-25 bg-gradient-to-l from-black/8 via-black/2 to-transparent dark:from-black/25 dark:via-black/8" />
+        )}
+        {pageSide === 'right' && (
+          <div className="hidden lg:block absolute top-0 bottom-0 left-0 w-16 pointer-events-none z-25 bg-gradient-to-r from-black/8 via-black/2 to-transparent dark:from-black/25 dark:via-black/8" />
+        )}
+        
+        {/* Page Top Header */}
+        <div className="flex justify-between items-center pb-3 mb-6 border-b border-amber-500/20 dark:border-accent/10 text-xs font-bold text-amber-700/70 dark:text-accent/60 tracking-wider">
+          <span>Juz' {pageObj.ayahs?.[0]?.juz || ''}</span>
+          <span className="font-serif-header text-sm">
+            {Array.from(new Set(pageObj.ayahs?.map((a: any) => a?.surah?.englishName).filter(Boolean))).join(' • ')}
+          </span>
+          <span>Page {pageNum}</span>
+        </div>
+
+        {/* 15 Lines Layout Container */}
+        {loading15 ? (
+          <div className="flex-1 flex flex-col items-center justify-center min-h-[50vh]">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-600 mx-auto"></div>
+            <p className="mt-4 text-sm text-amber-700/70 dark:text-accent/70 font-semibold font-sans">Formatting 15-line Quran page...</p>
+          </div>
+        ) : (
+          <div className="flex flex-col justify-between h-[calc(100%-4rem)] min-h-[60vh] space-y-4">
+            {layout.map((line) => {
+              if (line.line_type === 'surah_name') {
+                const surahName = pageObj.ayahs?.find((a: any) => a.surah?.number === line.surah_number)?.surah?.englishName || `Surah ${line.surah_number}`;
+                return (
+                  <div key={`line-${line.line_number}`} className="relative my-2 w-full flex items-center justify-center py-1 select-none">
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#FAF3E3]/40 via-[#FAF3E3]/95 to-[#FAF3E3]/40 dark:from-[#1A1F26]/40 dark:via-[#1A1F26]/95 dark:to-[#1A1F26]/40 rounded-xl border border-amber-500/20 dark:border-accent/15" />
+                    <div className="relative z-10 px-6 py-2 border border-amber-500/25 dark:border-accent/20 rounded-xl bg-[#FAF8F4]/90 dark:bg-[#151A20]/90 flex flex-col items-center justify-center min-w-[180px]">
+                      <span className="text-[8px] font-bold text-amber-700/80 dark:text-accent/80 tracking-widest uppercase mb-0.5 font-sans">Surah</span>
+                      <h3 className="text-sm sm:text-base font-bold font-serif-header text-gray-900 dark:text-white leading-tight">
+                        {surahName}
+                      </h3>
+                    </div>
+                  </div>
+                );
+              }
+              
+              if (line.line_type === 'basmallah') {
+                return (
+                  <div key={`line-${line.line_number}`} className="text-center py-2 select-none">
+                    <div className="inline-block px-6 py-1 border-b border-amber-500/10 dark:border-accent/10 text-xl sm:text-2xl text-amber-950 dark:text-amber-100 font-arabic text-center" style={{ fontFamily: 'Amiri, serif', direction: 'rtl' }}>
+                      بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ
+                    </div>
+                  </div>
+                );
+              }
+
+              if (line.line_type === 'ayah') {
+                const words = wordsByLine[line.line_number] || [];
+                return (
+                  <div 
+                    key={`line-${line.line_number}`} 
+                    className="flex flex-row items-center w-full leading-[2.5] sm:leading-[3.0] overflow-visible font-arabic arabic-text uthmanic-hafs text-amber-900 dark:text-amber-100"
+                    dir="rtl"
+                    style={{
+                      justifyContent: line.is_centered === 1 ? 'center' : 'space-between',
+                      flexWrap: 'nowrap',
+                    }}
+                  >
+                    {words.map((word) => {
+                      const wordId = word.id;
+                      const wordSurah = word.surah;
+                      const wordAyah = word.ayah;
+                      
+                      const isActive = activeAyah && activeAyah.surah === wordSurah && activeAyah.ayah === wordAyah;
+                      const isSelected = Array.from(selectedAyahs).some(sel => sel.surah === wordSurah && sel.ayah === wordAyah);
+                      
+                      const status = getMemorizationStatus(wordSurah, wordAyah);
+                      const isMemorized = isAyahInMemorization(wordSurah, wordAyah);
+                      const reviewGlowClass = status === 'overdue' ? 'decoration-red-500 underline decoration-2 underline-offset-4' :
+                                               status === 'due-today' ? 'decoration-orange-500 underline decoration-2 underline-offset-4' :
+                                               status === 'due-soon' ? 'decoration-amber-500 underline decoration-2 underline-offset-4' :
+                                               status === 'upcoming' ? 'decoration-emerald-500 underline decoration-2 underline-offset-4' : '';
+
+                      // Find the translation for this word if available and feature is enabled
+                      let translation = '';
+                      if (showWordByWordTooltip && wordByWordData && Array.isArray(wordByWordData) && wordByWordData.length > 0) {
+                        let match = wordByWordData.find(
+                          (w) => w.surah === wordSurah && w.ayah === wordAyah && w.position === word.word
+                        );
+                        // Fallback matching by relative index in ayah
+                        if (!match) {
+                          const ayahWords = wordByWordData.filter(w => w.surah === wordSurah && w.ayah === wordAyah);
+                          const allPageWordsForAyah = Object.values(wordsByLine)
+                            .flat()
+                            .filter((w: any) => w.surah === wordSurah && w.ayah === wordAyah)
+                            .sort((a: any, b: any) => a.id - b.id);
+                          const wordIndexInAyah = allPageWordsForAyah.findIndex((w: any) => w.id === wordId);
+                          if (wordIndexInAyah !== -1 && ayahWords.length > wordIndexInAyah) {
+                            match = ayahWords[wordIndexInAyah];
+                          }
+                        }
+                        if (match && match.translation) {
+                          translation = match.translation;
+                        }
+                      }
+
+                      const translationTooltipId = `translation-tooltip-15line-${wordId}`;
+                      const shouldShowTranslationTooltip = hoveredTajweedWordId15 !== String(wordId);
+
+                      const isWordVisible = visibleWordIds15.has(String(wordId));
+
+                      // Function to render the inner word content (with or without Tajweed rules)
+                      const renderWordContent = () => {
+                        if (word.tajweedRules && word.tajweedRules.length > 0) {
+                          const text = word.text;
+                          const rules = word.tajweedRules;
+                          const segments: React.ReactNode[] = [];
+                          let lastIndex = 0;
+                          const sortedRules = [...rules].sort((a, b) => a.startIndex - b.startIndex);
+                          
+                          sortedRules.forEach((rule, ruleIndex) => {
+                            if (rule.startIndex > lastIndex) {
+                              segments.push(
+                                <span 
+                                  key={`text-${wordId}-${ruleIndex}`}
+                                  style={{ fontSize: `${arabicFontSize}px` }}
+                                >
+                                  {text.slice(lastIndex, rule.startIndex)}
+                                </span>
+                              );
+                            }
+                            const ruleColor = TAJWEED_COLORS[rule.class] || 'text-gray-600';
+                            const ruleDescription = TAJWEED_DESCRIPTIONS[rule.class] || rule.class;
+                            const tooltipId = 'tajweed-tooltip-15line';
+
+                            const handleTajweedMouseEnter = () => {
+                              if (hoverTimeoutRef15.current) clearTimeout(hoverTimeoutRef15.current);
+                              setHoveredTajweedWordId15(String(wordId));
+                            };
+                            const handleTajweedMouseLeave = () => {
+                              hoverTimeoutRef15.current = setTimeout(() => setHoveredTajweedWordId15(null), 80);
+                            };
+
+                            segments.push(
+                              <span 
+                                key={`rule-${wordId}-${ruleIndex}`} 
+                                className={ruleColor}
+                                data-tooltip-id={tooltipId}
+                                data-tooltip-content={ruleDescription}
+                                style={{ fontSize: `${arabicFontSize}px` }}
+                                onMouseEnter={handleTajweedMouseEnter}
+                                onMouseLeave={handleTajweedMouseLeave}
+                              >
+                                {rule.text}
+                              </span>
+                            );
+                            lastIndex = rule.endIndex;
+                          });
+                          
+                          if (lastIndex < text.length) {
+                            segments.push(
+                              <span 
+                                key={`text-${wordId}-end`}
+                                style={{ fontSize: `${arabicFontSize}px` }}
+                              >
+                                {text.slice(lastIndex)}
+                              </span>
+                            );
+                          }
+                          return segments;
+                        }
+                        return word.text;
+                      };
+
+                      if (hideWords) {
+                        if (showWordByWordTooltip && translation && shouldShowTranslationTooltip) {
+                          pageTooltips15Map.set(translationTooltipId, translation);
+                        }
+                        return (
+                          <span
+                            key={`word-${wordId}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onActiveAyahChange?.({ surah: wordSurah, ayah: wordAyah });
+                            }}
+                            onMouseEnter={() => handleWordMouseEnter15(String(wordId), wordSurah, wordAyah, word)}
+                            onMouseLeave={() => handleWordMouseLeave15(String(wordId))}
+                            data-tooltip-id={showWordByWordTooltip && translation && shouldShowTranslationTooltip ? translationTooltipId : undefined}
+                            className={`inline cursor-pointer select-none transition-all duration-200 px-0.5 rounded-sm relative font-arabic arabic-text uthmanic-hafs ${
+                              isActive 
+                                ? 'bg-amber-500/15 dark:bg-accent/20' 
+                                : isSelected
+                                  ? 'bg-amber-500/8 dark:bg-accent/10'
+                                  : 'hover:bg-amber-500/5 dark:hover:bg-accent/10'
+                            } ${isMemorized ? reviewGlowClass : ''}`}
+                            style={{
+                              fontFamily: fontLoaded15 ? qpcFontLoader.getFontFamily(pageNum) : "'qpc-v2-fallback', 'Amiri', serif",
+                              fontSize: `${arabicFontSize}px`,
+                              direction: 'rtl',
+                              whiteSpace: 'nowrap',
+                              fontFeatureSettings: fontLoaded15 ? "'liga' 1, 'kern' 1, 'calt' 1, 'rlig' 1, 'ccmp' 1, 'locl' 1, 'mark' 1, 'mkmk' 1" : "'liga' 0, 'kern' 0, 'calt' 0, 'rlig' 0, 'ccmp' 0, 'locl' 0, 'mark' 0, 'mkmk' 0",
+                              textRendering: 'optimizeLegibility',
+                              WebkitFontSmoothing: 'antialiased',
+                              MozOsxFontSmoothing: 'grayscale',
+                            }}
+                          >
+                            {/* Invisible text that takes up natural space */}
+                            <span className="opacity-0" style={{ fontSize: `${arabicFontSize}px` }}>
+                              {word.text}
+                            </span>
+                            
+                            {/* Overlay for hiding/showing */}
+                            <span
+                              className={`transition-opacity duration-200 absolute inset-0 flex items-center justify-center ${
+                                isWordVisible ? 'opacity-0' : 'opacity-100'
+                              }`}
+                              style={{
+                                backgroundColor: 'rgba(249, 250, 251, 0.9)',
+                                border: '1px dashed rgba(156, 163, 175, 0.6)',
+                                borderRadius: '3px',
+                                zIndex: 10
+                              }}
+                            />
+                            
+                            {/* Visible text when revealed */}
+                            <span
+                              className={`transition-opacity duration-200 absolute inset-0 flex items-center justify-center ${
+                                isWordVisible ? 'opacity-100' : 'opacity-0'
+                              }`}
+                              style={{
+                                fontSize: `${arabicFontSize}px`,
+                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                borderRadius: '3px',
+                                zIndex: 20
+                              }}
+                            >
+                              {word.text}
+                            </span>
+                          </span>
+                        );
+                      }
+
+                      if (showWordByWordTooltip && translation && shouldShowTranslationTooltip) {
+                        pageTooltips15Map.set(translationTooltipId, translation);
+                      }
+                      return (
+                        <span
+                          key={`word-${wordId}`}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onActiveAyahChange?.({ surah: wordSurah, ayah: wordAyah });
+                          }}
+                          data-tooltip-id={showWordByWordTooltip && translation && shouldShowTranslationTooltip ? translationTooltipId : undefined}
+                          className={`inline cursor-pointer select-none transition-all duration-200 px-0.5 rounded-sm font-arabic arabic-text uthmanic-hafs ${
+                            isActive 
+                              ? 'bg-amber-500/15 dark:bg-accent/20' 
+                              : isSelected
+                                ? 'bg-amber-500/8 dark:bg-accent/10'
+                                : 'hover:bg-amber-500/5 dark:hover:bg-accent/10'
+                          } ${isMemorized ? reviewGlowClass : ''}`}
+                          style={{
+                            fontFamily: fontLoaded15 ? qpcFontLoader.getFontFamily(pageNum) : "'qpc-v2-fallback', 'Amiri', serif",
+                            fontSize: `${arabicFontSize}px`,
+                            direction: 'rtl',
+                            whiteSpace: 'nowrap',
+                            fontFeatureSettings: fontLoaded15 ? "'liga' 1, 'kern' 1, 'calt' 1, 'rlig' 1, 'ccmp' 1, 'locl' 1, 'mark' 1, 'mkmk' 1" : "'liga' 0, 'kern' 0, 'calt' 0, 'rlig' 0, 'ccmp' 0, 'locl' 0, 'mark' 0, 'mkmk' 0",
+                            textRendering: 'optimizeLegibility',
+                            WebkitFontSmoothing: 'antialiased',
+                            MozOsxFontSmoothing: 'grayscale',
+                          }}
+                        >
+                          {renderWordContent()}
+                        </span>
+                      );
+                    })}
+                  </div>
+                );
+              }
+              
+              return null;
+            })}
+          </div>
+        )}
       </Card>
     );
   };
@@ -504,57 +944,36 @@ export default function QuranContent({
               </div>
             )}
 
-            {/* Active Verse Commentary Panel with Parchment and Left Gold Divider */}
-            {activeAyah && activeAyahData && (
-              <div 
-                key={`active-ayah-${activeAyah.surah}-${activeAyah.ayah}`}
-                className="mt-8 max-w-3xl mx-auto px-4 md:px-0 animate-fade-in-up"
-              >
-                <div className="text-xs font-bold text-amber-700/80 dark:text-accent/80 uppercase tracking-widest mb-3 pl-1 font-sans flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-accent animate-pulse" />
-                  Selected Verse Details & Translation
+            {/* Active Verse Commentary Panel removed - now renders in sliding drawer */}
+          </div>
+        ) : readingLayout === 'mushaf_15lines' ? (
+          /* 15-Line Mushaf Layout */
+          <div className="space-y-8 p-2 sm:p-4 animate-fade-in">
+            {layoutMode === 'spread' ? (
+              /* Two-Page Spread Layout with 3D Book features */
+              <div className="relative flex flex-col lg:flex-row gap-0 rounded-3xl overflow-hidden border border-amber-500/20 dark:border-accent/15 shadow-2xl bg-[#FAF8F5]/30 dark:bg-[#12161A]/30 p-1">
+                {/* Left Page (Current Page) */}
+                <div className="flex-1 relative flex">
+                  {render15LinesMushafPage(pageData, 'left')}
                 </div>
-                <div className="relative overflow-hidden rounded-2xl border-l-4 border-l-amber-500/80 border border-amber-500/20 dark:border-accent/15 bg-gradient-to-br from-[#FCFAF2] to-[#F5EEDC] dark:from-[#1D222B] dark:to-[#171B22] p-5 sm:p-7 shadow-[0_8px_30px_rgba(0,0,0,0.06)] dark:shadow-[0_12px_35px_rgba(0,0,0,0.3)] transition-all duration-350 hover:scale-[1.005]">
-                  {/* Subtle parchment paper texture overlay */}
-                  <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none" style={{ backgroundImage: 'radial-gradient(var(--accent) 1px, transparent 1px)', backgroundSize: '12px 12px' }}></div>
-                  
-                  <AyahCard
-                    ayah={activeAyahData}
-                    index={pageData.ayahs.indexOf(activeAyahData) >= 0 ? pageData.ayahs.indexOf(activeAyahData) : 0}
-                    pageData={pageData.ayahs.includes(activeAyahData) ? pageData : previousPageData}
-                    isMemorization={isAyahInMemorization(activeAyahData.surah?.number || pageData?.surah || activeAyah.surah, activeAyah.ayah)}
-                    status={getMemorizationStatus(activeAyahData.surah?.number || pageData?.surah || activeAyah.surah, activeAyah.ayah)}
-                    isSelected={false}
-                    isInHighlightedRange={false}
-                    showTranslation={true}
-                    memorizationItems={memorizationItems}
-                    onAyahClick={() => {}}
-                    onPlayAudio={onPlayAudio}
-                    onQuickReview={onQuickReview}
-                    onToggleReviewDropdown={onToggleReviewDropdown}
-                    openReviewDropdown={openReviewDropdown}
-                    onReviewComplete={onReviewComplete}
-                    reviewsOnPage={reviewsOnPage}
-                    fontSize={fontSize}
-                    arabicFontSize={arabicFontSize}
-                    translationFontSize={translationFontSize}
-                    fontTargetArabic={fontTargetArabic}
-                    mistakes={mistakes}
-                    onToggleMistake={onToggleMistake}
-                    hideMistakes={hideMistakes}
-                    onRevealMistake={onRevealMistake}
-                    revealedMistakes={revealedMistakes}
-                    hideWords={hideWords}
-                    hideWordsDelay={hideWordsDelay}
-                    wordByWordData={wordByWordData}
-                    showWordByWordTooltip={showWordByWordTooltip}
-                    padding={0}
-                    borderless={true}
-                    layoutMode={layoutMode}
-                  />
+                
+                {/* Central Crease / Spine (only visible when side-by-side on lg screens) */}
+                <div className="hidden lg:block absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-16 z-30 pointer-events-none bg-gradient-to-r from-transparent via-black/10 to-transparent dark:via-black/30" />
+                <div className="hidden lg:block absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-0.5 z-30 pointer-events-none bg-amber-500/20 dark:bg-accent/20" />
+                
+                {/* Right Page (Previous Page) */}
+                <div className="flex-1 relative flex">
+                  {render15LinesMushafPage(previousPageData, 'right')}
                 </div>
               </div>
+            ) : (
+              /* Single Page Layout */
+              <div className="max-w-3xl mx-auto">
+                {render15LinesMushafPage(pageData, 'single')}
+              </div>
             )}
+
+            {/* Active Verse Commentary Panel removed - now renders in sliding drawer */}
           </div>
         ) : (
           /* Borderless Editorial List Layout */
@@ -924,7 +1343,112 @@ export default function QuranContent({
           onRemoveAyah={onRemoveAyah || (() => {})}
           onClearAll={onClearSelectedAyahs || (() => {})}
         />
+
+        {/* Sliding detail drawer for active verse in Mushaf modes */}
+        <AyahDetailDrawer
+          isOpen={!!activeAyah && (readingLayout === 'mushaf' || readingLayout === 'mushaf_15lines')}
+          onClose={() => onActiveAyahChange?.(null)}
+          ayah={activeAyahData}
+          pageData={pageData?.ayahs?.includes(activeAyahData) ? pageData : previousPageData}
+          isMemorization={activeAyahData ? isAyahInMemorization(activeAyahData.surah?.number || pageData?.surah || activeAyah?.surah || 1, activeAyah?.ayah || 1) : false}
+          status={activeAyahData ? getMemorizationStatus(activeAyahData.surah?.number || pageData?.surah || activeAyah?.surah || 1, activeAyah?.ayah || 1) : null}
+          showTranslation={true}
+          memorizationItems={memorizationItems}
+          onPlayAudio={onPlayAudio}
+          onQuickReview={onQuickReview}
+          onToggleReviewDropdown={onToggleReviewDropdown}
+          openReviewDropdown={openReviewDropdown}
+          onReviewComplete={onReviewComplete}
+          reviewsOnPage={reviewsOnPage}
+          fontSize={fontSize}
+          arabicFontSize={arabicFontSize}
+          translationFontSize={translationFontSize}
+          fontTargetArabic={fontTargetArabic}
+          mistakes={mistakes}
+          onToggleMistake={onToggleMistake}
+          hideMistakes={hideMistakes}
+          onRevealMistake={onRevealMistake}
+          revealedMistakes={revealedMistakes}
+          hideWords={hideWords}
+          hideWordsDelay={hideWordsDelay}
+          wordByWordData={wordByWordData}
+          showWordByWordTooltip={showWordByWordTooltip}
+          layoutMode={layoutMode}
+        />
+
+        {/* 15-line Mushaf Tooltips Portal */}
+        {mounted && typeof document !== 'undefined' && createPortal(
+          <>
+            <Tooltip
+              id="tajweed-tooltip-15line"
+              style={{
+                backgroundColor: '#1f2937', // bg-gray-800
+                color: '#fff',
+                borderRadius: '0.375rem',
+                padding: '0.25rem 0.5rem',
+                fontSize: '0.875rem', // text-sm
+                zIndex: 9999,
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+              }}
+            />
+            {Array.from(pageTooltips15Map.entries()).map(([id, content]) => (
+              <Tooltip
+                key={id}
+                id={id}
+                style={{
+                  backgroundColor: '#111827', // bg-gray-900
+                  color: '#fff',
+                  borderRadius: '0.375rem',
+                  padding: '0.25rem 0.5rem',
+                  fontSize: '0.75rem', // text-xs
+                  zIndex: 9999,
+                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+                }}
+              >
+                {content}
+              </Tooltip>
+            ))}
+          </>,
+          document.body
+        )}
       </div>
     </main>
   );
-} 
+}
+
+// Helper functions for 15-line layout tooltips
+function isColorLight(hex: string): boolean {
+  hex = hex.replace('#', '');
+  if (hex.length === 3) {
+    hex = hex.split('').map(x => x + x).join('');
+  }
+  const r = parseInt(hex.substring(0, 2), 16);
+  const g = parseInt(hex.substring(2, 4), 16);
+  const b = parseInt(hex.substring(4, 6), 16);
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness > 180;
+}
+
+const ruleColorMap: Record<string, string> = {
+  ham_wasl: '#ef4444',
+  laam_shamsiyah: '#f59e42',
+  madda_normal: '#22c55e',
+  madda_permissible: '#22c55e',
+  madda_necessary: '#16a34a',
+  slnt: '#6b7280',
+  ghunnah: '#6366f1',
+  qalaqah: '#f97316',
+  ikhafa: '#a78bfa',
+  madda_obligatory_mottasel: '#16a34a',
+  madda_obligatory_monfasel: '#16a34a',
+  iqlab: '#14b8a6',
+  izhar: '#3b82f6',
+  idgham_ghunnah: '#2563eb',
+  idgham_wo_ghunnah: '#3b82f6',
+  ikhafa_shafawi: '#a78bfa',
+  idgham_shafawi: '#2563eb',
+  izhar_shafawi: '#3b82f6',
+  madd_al_tamkeen: '#22c55e',
+  tafkheem: '#ef4444',
+  tarqeeq: '#60a5fa',
+}; 

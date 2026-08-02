@@ -148,7 +148,8 @@ export const ALQURAN_API_BASE = 'https://api.alquran.cloud/v1';
 export const DEFAULT_EDITIONS = {
   arabic: 'quran-uthmani',
   english: 'en.hilali',
-  audio: 'ar.alafasy',
+  /** EveryAyah subfolder id — see src/lib/recitations.ts */
+  audio: 'Ayman_Sowaid_64kbps',
 } as const;
 
 export function getSurahName(surahNumber: number): string {

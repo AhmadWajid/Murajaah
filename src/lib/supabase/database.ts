@@ -683,7 +683,7 @@ export async function loadSelectedReciter(): Promise<string> {
     const settings = await getUserSettings();
     return settings.selected_reciter;
   } catch {
-    return 'ar.alafasy';
+    return 'Ayman_Sowaid_64kbps';
   }
 }
 

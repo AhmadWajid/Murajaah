@@ -247,9 +247,6 @@
   overflow: visible !important;
   /* Box model */
   box-sizing: border-box !important;
-  /* Display properties */
-  display: block !important;
-  width: 100% !important;
 }
 
 /* Override any Tailwind font size classes for Arabic */

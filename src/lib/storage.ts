@@ -301,9 +301,9 @@ export const saveSelectedReciter = (reciter: string) => {
 
 export const loadSelectedReciter = (): string => {
   if (typeof window !== 'undefined') {
-    return localStorage.getItem(RECITER_STORAGE_KEY) || 'ar.alafasy';
+    return localStorage.getItem(RECITER_STORAGE_KEY) || 'Ayman_Sowaid_64kbps';
   }
-  return 'ar.alafasy';
+  return 'Ayman_Sowaid_64kbps';
 };
 
 export const removeMistake = (surahNumber: number, ayahNumber: number) => {

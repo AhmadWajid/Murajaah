@@ -7,6 +7,7 @@ import {
   getMistakes,
   invalidateCache
 } from '@/lib/storageService';
+import { DEFAULT_RECITER_ID, resolveReciterId } from '@/lib/recitations';
 
 // Cache for user settings to prevent redundant API calls
 const settingsCache = new Map<string, { data: any; timestamp: number; ttl: number }>();
@@ -37,7 +38,7 @@ interface UseOptimizedDataReturn {
 
 export function useOptimizedData(): UseOptimizedDataReturn {
   const [hideMistakes, setHideMistakes] = useState(false);
-  const [selectedReciter, setSelectedReciter] = useState('Ayman Sowaid');
+  const [selectedReciter, setSelectedReciter] = useState(DEFAULT_RECITER_ID);
   const [fontSettings, setFontSettings] = useState<any>(null);
   const [memorizationItems, setMemorizationItems] = useState<any[]>([]);
   const [mistakes, setMistakes] = useState<Record<string, any>>({});
@@ -62,7 +63,7 @@ export function useOptimizedData(): UseOptimizedDataReturn {
       ]);
       
       setHideMistakes(hideMistakesResult);
-      setSelectedReciter(reciterResult);
+      setSelectedReciter(resolveReciterId(reciterResult));
       setFontSettings(fontSettingsResult);
       
       isInitialized.current = true;

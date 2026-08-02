@@ -12,6 +12,7 @@ import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
+import { RECITERS } from '@/lib/recitations';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -798,23 +799,11 @@ export default function QuranHeader({
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="ar.alafasy">Mishary Alafasy</SelectItem>
-                        <SelectItem value="ar.abdurrahmaansudais">Abdur-Rahman As-Sudais</SelectItem>
-                        <SelectItem value="ar.abdullahbasfar">Abdullah Basfar</SelectItem>
-                        <SelectItem value="ar.abdulsamad">Abdul Samad</SelectItem>
-                        <SelectItem value="ar.ahmedajamy">Ahmed ibn Ali al-Ajamy</SelectItem>
-                        <SelectItem value="ar.aymanswoaid">Ayman Sowaid</SelectItem>
-                        <SelectItem value="ar.hanirifai">Hani Rifai</SelectItem>
-                        <SelectItem value="ar.hudhaify">Ali bin Abdur-Rahman Al-Hudhaify</SelectItem>
-                        <SelectItem value="ar.husary">Mahmoud Khalil Al-Husary</SelectItem>
-                        <SelectItem value="ar.husarymujawwad">Husary (Mujawwad)</SelectItem>
-                        <SelectItem value="ar.ibrahimakhbar">Ibrahim Akhdar</SelectItem>
-                        <SelectItem value="ar.mahermuaiqly">Maher Al Muaiqly</SelectItem>
-                        <SelectItem value="ar.muhammadayyoub">Muhammad Ayyoub</SelectItem>
-                        <SelectItem value="ar.muhammadjibreel">Muhammad Jibreel</SelectItem>
-                        <SelectItem value="ar.parhizgar">Parhizgar</SelectItem>
-                        <SelectItem value="ar.saoodshuraym">Saood bin Ibraaheem Ash-Shuraym</SelectItem>
-                        <SelectItem value="ar.shaatree">Abu Bakr Ash-Shaatree</SelectItem>
+                        {RECITERS.map((reciter) => (
+                          <SelectItem key={reciter.id} value={reciter.id}>
+                            {reciter.name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     {/* --- New Audio Features --- */}

@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { RECITERS } from '@/lib/recitations';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -22,6 +23,7 @@ import {
   Target,
   Menu,
   X,
+  Layers,
   Book,
   Info,
   Keyboard
@@ -67,8 +69,8 @@ interface QuranHeaderContentProps {
   onToggleHideWords: () => void;
   hideWordsDelay: number;
   onHideWordsDelayChange: (delay: number) => void;
-  readingLayout: 'mushaf' | 'verse';
-  onReadingLayoutChange: (layout: 'mushaf' | 'verse') => void;
+  readingLayout: 'mushaf' | 'mushaf_15lines' | 'verse';
+  onReadingLayoutChange: (layout: 'mushaf' | 'mushaf_15lines' | 'verse') => void;
 }
 
 export default function QuranHeaderContent(props: QuranHeaderContentProps) {
@@ -190,27 +192,8 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
     loadTranslations();
   }, []);
 
-  // Reciter options
-  const reciters = [
-    { id: 'ar.alafasy', name: 'Mishary Alafasy' },
-    { id: 'ar.abdurrahmaansudais', name: 'Abdur-Rahman As-Sudais' },
-    { id: 'ar.abdullahbasfar', name: 'Abdullah Basfar' },
-    { id: 'ar.abdulsamad', name: 'Abdul Samad' },
-    { id: 'ar.ahmedajamy', name: 'Ahmed ibn Ali al-Ajamy' },
-    { id: 'ar.aymanswoaid', name: 'Ayman Sowaid' },
-    { id: 'ar.hanirifai', name: 'Hani Rifai' },
-    { id: 'ar.hudhaify', name: 'Ali bin Abdur-Rahman Al-Hudhaify' },
-    { id: 'ar.husary', name: 'Mahmoud Khalil Al-Husary' },
-    { id: 'ar.husarymujawwad', name: 'Husary (Mujawwad)' },
-    { id: 'ar.ibrahimakhbar', name: 'Ibrahim Akhdar' },
-    { id: 'ar.mahermuaiqly', name: 'Maher Al Muaiqly' },
-    { id: 'ar.minshawi', name: 'Muhammad Siddiq Al-Minshawi' },
-    { id: 'ar.muhammadayyoub', name: 'Muhammad Ayyub' },
-    { id: 'ar.muhammadjibreel', name: 'Muhammad Jibreel' },
-    { id: 'ar.parhizgar', name: 'Parhizgar' },
-    { id: 'ar.saoodshuraym', name: 'Saood bin Ibraaheem Ash-Shuraym' },
-    { id: 'ar.shaatree', name: 'Abu Bakr Ash-Shaatree' },
-  ];
+  // Reciter options (EveryAyah.com)
+  const reciters = RECITERS;
 
   const currentSurahData = surahList.find(s => s.number === currentSurah);
   const surahName = currentSurahData ? currentSurahData.name : 'Unknown Surah';
@@ -368,10 +351,23 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                   ? 'bg-white dark:bg-[#12161A] text-amber-855 dark:text-accent shadow-sm border border-amber-200/20 dark:border-border/20'
                   : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-305 border border-transparent'
               }`}
-              title="Continuous Mushaf Mode"
+              title="Continuous Page Flow Mode"
             >
               <Book className="h-3.5 w-3.5 text-amber-600 dark:text-accent opacity-80" />
-              <span className="hidden xl:inline">Mushaf</span>
+              <span className="hidden xl:inline">Continuous</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => onReadingLayoutChange('mushaf_15lines')}
+              className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                readingLayout === 'mushaf_15lines'
+                  ? 'bg-white dark:bg-[#12161A] text-amber-855 dark:text-accent shadow-sm border border-amber-200/20 dark:border-border/20'
+                  : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-305 border border-transparent'
+              }`}
+              title="Standard 15-Line Page Mode"
+            >
+              <Layers className="h-3.5 w-3.5 text-amber-600 dark:text-accent opacity-80" />
+              <span className="hidden xl:inline">15-Line</span>
             </button>
             <button
               type="button"
@@ -525,18 +521,29 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                 <button
                   type="button"
                   onClick={() => onReadingLayoutChange('mushaf')}
-                  className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all ${
+                  className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${
                     readingLayout === 'mushaf'
                       ? 'bg-white dark:bg-gray-700 text-amber-850 dark:text-accent shadow-sm'
                       : 'text-gray-500'
                   }`}
                 >
-                  Mushaf
+                  Continuous
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onReadingLayoutChange('mushaf_15lines')}
+                  className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${
+                    readingLayout === 'mushaf_15lines'
+                      ? 'bg-white dark:bg-gray-700 text-amber-850 dark:text-accent shadow-sm'
+                      : 'text-gray-500'
+                  }`}
+                >
+                  15-Line
                 </button>
                 <button
                   type="button"
                   onClick={() => onReadingLayoutChange('verse')}
-                  className={`px-2.5 py-1 text-[11px] font-bold rounded-md transition-all ${
+                  className={`px-2 py-1 text-[10px] font-bold rounded-md transition-all ${
                     readingLayout === 'verse'
                       ? 'bg-white dark:bg-gray-700 text-amber-850 dark:text-accent shadow-sm'
                       : 'text-gray-500'
@@ -934,24 +941,35 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                     <button
                       type="button"
                       onClick={() => onReadingLayoutChange('verse')}
-                      className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all ${
+                      className={`px-2.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
                         readingLayout === 'verse'
                           ? 'bg-white dark:bg-gray-700 text-amber-850 dark:text-accent shadow-sm'
                           : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                       }`}
                     >
-                      Editorial List
+                      List
                     </button>
                     <button
                       type="button"
                       onClick={() => onReadingLayoutChange('mushaf')}
-                      className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all ${
+                      className={`px-2.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
                         readingLayout === 'mushaf'
                           ? 'bg-white dark:bg-gray-700 text-amber-850 dark:text-accent shadow-sm'
                           : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
                       }`}
                     >
-                      Continuous Mushaf
+                      Continuous
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => onReadingLayoutChange('mushaf_15lines')}
+                      className={`px-2.5 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
+                        readingLayout === 'mushaf_15lines'
+                          ? 'bg-white dark:bg-gray-700 text-amber-850 dark:text-accent shadow-sm'
+                          : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                      }`}
+                    >
+                      15-Line
                     </button>
                   </div>
                 </div>

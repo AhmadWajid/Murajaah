@@ -7,7 +7,8 @@ import { addMemorizationItem, updateMemorizationItem, getMemorizationItem, toggl
 import { useOptimizedData } from '@/lib/hooks/useOptimizedData';
 import { MistakeData } from '@/lib/supabase/database';
 import { MemorizationItem, updateInterval, createMemorizationItem } from '@/lib/spacedRepetition';
-import { getSurah, getQuranMeta, getPage, getAyah, fetchPageWithTranslation, SurahListItem } from '@/lib/quranService';
+import { getSurah, getQuranMeta, getPage, getAyah, fetchPageWithTranslation, SurahListItem, getAyahAudioUrl } from '@/lib/quranService';
+import { DEFAULT_RECITER_ID, resolveReciterId } from '@/lib/recitations';
 import { generateMemorizationId } from '@/lib/utils';
 import AppHeader from '@/components/AppHeader';
 import QuranHeaderContent from '@/components/QuranHeaderContent';
@@ -70,7 +71,7 @@ function QuranPageContent() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [currentSurah, setCurrentSurah] = useState(1);
   const [currentAyah, setCurrentAyah] = useState(1);
-  const [readingLayout, setReadingLayout] = useState<'mushaf' | 'verse'>('verse');
+  const [readingLayout, setReadingLayout] = useState<'mushaf' | 'mushaf_15lines' | 'verse'>('verse');
   const [activeAyah, setActiveAyah] = useState<{ surah: number; ayah: number } | null>(null);
   const [pageData, setPageData] = useState<PageData | null>(null);
   const [previousPageData, setPreviousPageData] = useState<PageData | null>(null);
@@ -91,7 +92,7 @@ function QuranPageContent() {
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
   const [currentPlayingAyah, setCurrentPlayingAyah] = useState<{surah: number, ayah: number} | null>(null);
-  const [selectedReciter, setSelectedReciter] = useState('Ayman Sowaid');
+  const [selectedReciter, setSelectedReciter] = useState(DEFAULT_RECITER_ID);
   const [showTranslation, setShowTranslation] = useState(true);
   
   // Font settings state (will be loaded asynchronously)
@@ -121,8 +122,8 @@ function QuranPageContent() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('quran-reading-layout');
-      if (saved === 'mushaf' || saved === 'verse') {
-        setReadingLayout(saved as 'mushaf' | 'verse');
+      if (saved === 'mushaf' || saved === 'mushaf_15lines' || saved === 'verse') {
+        setReadingLayout(saved as any);
       }
     }
   }, []);
@@ -157,7 +158,7 @@ function QuranPageContent() {
   // Update selected reciter from optimized hook
   useEffect(() => {
     if (optimizedSelectedReciter) {
-      setSelectedReciter(optimizedSelectedReciter);
+      setSelectedReciter(resolveReciterId(optimizedSelectedReciter));
     }
   }, [optimizedSelectedReciter]);
   
@@ -1136,21 +1137,8 @@ function QuranPageContent() {
         currentAudio.pause();
         currentAudio.currentTime = 0;
       }
-      
-      const response = await fetch(`https://api.alquran.cloud/v1/ayah/${surahNumber}:${ayahNumber}/${selectedReciter}`);
-      
-      if (!response.ok) {
-        throw new Error(`Failed to fetch ayah data: ${response.status} ${response.statusText}`);
-      }
-      
-      const data = await response.json();
-      
-      if (!data.data || !data.data.audio) {
-        throw new Error('No audio URL found for this ayah');
-      }
-      
-      const audioUrl = data.data.audio;
-      
+
+      const audioUrl = getAyahAudioUrl(surahNumber, ayahNumber, selectedReciter);
       const audio = new Audio(audioUrl);
       audio.preload = 'metadata';
       
@@ -1307,19 +1295,28 @@ function QuranPageContent() {
           return;
         }
         
-        const res = await fetch(`/api/wordbyword?page=${currentPage}`);
-        if (res.ok) {
-          const data = await res.json();
-          setWordByWordData(data.words || []);
-        } else {
-          setWordByWordData([]);
+        const pagesToFetch = [currentPage];
+        if (layoutMode === 'spread' && previousPageData?.number) {
+          pagesToFetch.push(previousPageData.number);
         }
+        
+        const allWords: any[] = [];
+        for (const p of pagesToFetch) {
+          const res = await fetch(`/api/wordbyword?page=${p}`);
+          if (res.ok) {
+            const data = await res.json();
+            if (data.words) {
+              allWords.push(...data.words);
+            }
+          }
+        }
+        setWordByWordData(allWords);
       } catch {
         setWordByWordData([]);
       }
     }
     fetchWordByWord();
-  }, [currentPage, showWordByWordTooltip]);
+  }, [currentPage, layoutMode, previousPageData?.number, showWordByWordTooltip]);
 
   // Open Add Review modal if addReview param is present
   useEffect(() => {

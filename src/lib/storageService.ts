@@ -396,7 +396,7 @@ export async function loadSelectedReciter(): Promise<string> {
   const result = await withFallback(
     () => databaseService.loadSelectedReciter(),
     () => localStorageService.loadSelectedReciter(),
-    'mishary_rashid_alafasy'
+    'Ayman_Sowaid_64kbps'
   );
 
   cache.set(cacheKey, result, 5 * 60 * 1000);

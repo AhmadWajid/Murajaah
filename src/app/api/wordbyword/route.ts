@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
       for (const word of verse.words) {
         words.push({
           id: word.id,
-          surah: verse.surah_number,
+          surah: verse.surah_number || parseInt(verse.verse_key.split(':')[0]),
           ayah: verse.verse_number,
           position: word.position,
           arabic: word.text_uthmani,
