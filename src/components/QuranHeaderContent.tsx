@@ -130,6 +130,9 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
   // Refs for auto-scrolling to selected reciter in the audio modal
   const reciterListRef = useRef<HTMLDivElement>(null);
   const selectedReciterRef = useRef<HTMLDivElement>(null);
+  // Keyboard navigation for surah index
+  const [keyboardIndex, setKeyboardIndex] = useState(-1);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Audio Settings Modal Tab: 'reciters' or 'info'
   const [audioTab, setAudioTab] = useState<'reciters' | 'info'>('reciters');
@@ -167,6 +170,19 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
       return () => clearTimeout(t);
     }
   }, [showReciterSelector, audioTab]);
+
+  // Reset keyboard index when modal opens/closes or search changes
+  useEffect(() => {
+    setKeyboardIndex(-1);
+  }, [showSurahSelector, surahSearchTerm, modalViewState]);
+
+  // Focus search input when modal opens
+  useEffect(() => {
+    if (showSurahSelector && modalViewState === 'chapters') {
+      const t = setTimeout(() => searchInputRef.current?.focus(), 100);
+      return () => clearTimeout(t);
+    }
+  }, [showSurahSelector, modalViewState]);
 
   // Get the next mistake in verse order
   const [nextMistake, setNextMistake] = useState<MistakeData | null>(null);
@@ -606,24 +622,60 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
             <X className="h-6 w-6 transition-transform duration-300" />
           )}
         </Button>
-      </div>      {/* Navigation Modal */}
+      </div>      {/* ─── Quran Index Modal — full-screen centered (inspired by Apple Music / Spotify) ─── */}
       {showSurahSelector && (
-        /* Right-side drawer overlay */
         <div
-          className="fixed inset-0 z-50 flex"
+          className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-6 index-overlay"
           onClick={(e) => { if (e.target === e.currentTarget) { setShowSurahSelector(false); setSurahSearchTerm(''); } }}
-          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)' }}
+          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
         >
-          {/* Drawer panel — slides in from right */}
-          <div className="ml-auto h-full w-full max-w-[400px] flex flex-col bg-white dark:bg-[#0f1318] shadow-[−24px_0_80px_rgba(0,0,0,0.35)] animate-fade-in-up font-sans overflow-hidden">
+          <div
+            className="index-modal relative w-full h-full md:max-w-2xl md:max-h-[85vh] flex flex-col bg-white dark:bg-[#0f1318] md:rounded-2xl overflow-hidden shadow-2xl font-sans"
+            onKeyDown={(e) => {
+              if (modalViewState !== 'chapters') return;
+              const filtered = surahSearchTerm
+                ? surahList.filter(s =>
+                    s.name.toLowerCase().includes(surahSearchTerm.toLowerCase()) ||
+                    (s.englishName && s.englishName.toLowerCase().includes(surahSearchTerm.toLowerCase())) ||
+                    s.number.toString().includes(surahSearchTerm)
+                  )
+                : surahList;
+              if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setKeyboardIndex(prev => {
+                  const next = Math.min(prev + 1, filtered.length - 1);
+                  const el = surahListRef.current?.querySelector(`[data-surah-idx="${next}"]`) as HTMLElement | null;
+                  el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                  return next;
+                });
+              } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setKeyboardIndex(prev => {
+                  const next = Math.max(prev - 1, 0);
+                  const el = surahListRef.current?.querySelector(`[data-surah-idx="${next}"]`) as HTMLElement | null;
+                  el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+                  return next;
+                });
+              } else if (e.key === 'Enter' && keyboardIndex >= 0 && keyboardIndex < filtered.length) {
+                e.preventDefault();
+                const surah = filtered[keyboardIndex];
+                setSelectedSurahForAyah(surah.number);
+                setModalViewState('verses');
+              } else if (e.key === 'Escape') {
+                e.preventDefault();
+                setShowSurahSelector(false);
+                setSurahSearchTerm('');
+              }
+            }}
+          >
 
             {modalViewState === 'chapters' ? (
               <>
-                {/* ── Header ── */}
-                <div className="relative bg-gradient-to-br from-[#1a1206] via-[#241808] to-[#1c1507] dark:from-[#0c0e13] dark:via-[#111520] dark:to-[#0c0e13] px-5 pt-6 pb-5 flex-shrink-0">
+                {/* ── Premium header with Quran calligraphy watermark ── */}
+                <div className="relative index-header-gradient px-6 pt-6 pb-5 flex-shrink-0">
                   {/* Decorative Arabic text watermark */}
                   <div
-                    className="absolute right-4 top-1 text-[64px] text-amber-400/[0.07] select-none pointer-events-none leading-none"
+                    className="absolute right-6 top-2 text-[72px] text-amber-400/[0.08] select-none pointer-events-none leading-none"
                     style={{ fontFamily: 'Amiri, serif' }}
                   >
                     القرآن
@@ -631,28 +683,28 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                   <div className="relative z-10">
                     <div className="flex items-start justify-between mb-4">
                       <div>
-                        <p className="text-[10px] font-bold text-amber-400/70 tracking-[0.2em] uppercase mb-1">Navigation</p>
-                        <h2 className="text-2xl font-bold text-white font-serif-header leading-tight">Quran Index</h2>
-                        <p className="text-xs text-amber-400/60 mt-1">{surahList.length} chapters · 6,236 verses</p>
+                        <p className="text-[10px] font-bold text-amber-400/70 tracking-[0.2em] uppercase mb-1.5">Navigation</p>
+                        <h2 className="text-2xl md:text-3xl font-bold text-white font-serif-header leading-tight">Quran Index</h2>
+                        <p className="text-xs text-amber-400/50 mt-1.5">{surahList.length} chapters · 6,236 verses</p>
                       </div>
                       <button
                         onClick={() => { setShowSurahSelector(false); setSurahSearchTerm(''); }}
-                        className="w-8 h-8 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all flex-shrink-0 mt-0.5"
+                        className="w-9 h-9 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all flex-shrink-0"
                       >
-                        <X className="w-4 h-4" />
+                        <X className="w-5 h-5" />
                       </button>
                     </div>
 
-                    {/* Search */}
+                    {/* Search — large, prominent */}
                     <div className="relative">
-                      <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400/50 pointer-events-none" />
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400/50 pointer-events-none" />
                       <input
+                        ref={searchInputRef}
                         type="text"
-                        placeholder="Search surah or jump to verse (2:255)…"
+                        placeholder="Search surah or jump to verse (e.g. 2:255)…"
                         value={surahSearchTerm}
                         onChange={(e) => setSurahSearchTerm(e.target.value)}
-                        autoFocus
-                        className="w-full h-10 pl-10 pr-4 rounded-xl bg-white/[0.08] border border-white/[0.1] text-white placeholder-white/30 text-sm outline-none focus:border-amber-400/40 focus:bg-white/[0.12] transition-all"
+                        className="w-full h-11 pl-11 pr-4 rounded-xl drawer-search text-white placeholder-white/30 text-sm outline-none transition-all"
                       />
                     </div>
                   </div>
@@ -660,30 +712,31 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
 
                 {/* Direct verse jump result */}
                 {directSearchResult && (
-                  <div className="px-4 pt-3 pb-1 flex-shrink-0">
+                  <div className="px-5 pt-3 pb-1 flex-shrink-0">
                     <button
                       onClick={() => {
                         onNavigateToAyah(directSearchResult.surah.number, directSearchResult.ayah);
                         setShowSurahSelector(false);
                         setSurahSearchTerm('');
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/10 dark:bg-amber-400/8 border border-amber-500/20 dark:border-amber-400/15 hover:bg-amber-500/15 transition-colors text-left"
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/8 dark:bg-amber-400/6 border border-amber-500/15 dark:border-amber-400/12 hover:bg-amber-500/12 transition-colors text-left"
                     >
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-amber-500 to-orange-500 flex items-center justify-center flex-shrink-0">
-                        <Search className="w-3.5 h-3.5 text-white" />
+                      <div className="w-9 h-9 rounded-lg badge-gold flex items-center justify-center flex-shrink-0">
+                        <Search className="w-4 h-4 text-white" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Jump to</p>
+                        <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Jump to verse</p>
                         <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                           {directSearchResult.surah.englishName} · Verse {directSearchResult.ayah}
                         </p>
                       </div>
+                      <ChevronRight className="w-4 h-4 text-amber-500 ml-auto flex-shrink-0" />
                     </button>
                     <div className="h-px bg-black/[0.06] dark:bg-white/[0.05] mt-3" />
                   </div>
                 )}
 
-                {/* ── Surah list ── */}
+                {/* ── Surah list — rich, spacious ── */}
                 <div ref={surahListRef} className="flex-1 overflow-y-auto">
                   {(() => {
                     const surahsToShow = surahSearchTerm
@@ -696,55 +749,56 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
 
                     if (surahsToShow.length === 0) {
                       return (
-                        <div className="text-center py-16 text-gray-400 dark:text-gray-600 text-sm">
+                        <div className="text-center py-20 text-gray-400 dark:text-gray-600 text-sm">
+                          <Search className="w-8 h-8 mx-auto mb-3 opacity-30" />
                           No chapters found
                         </div>
                       );
                     }
 
-                    return surahsToShow.map((surah) => {
+                    return surahsToShow.map((surah, idx) => {
                       const isActive = surah.number === currentSurah && !surahSearchTerm;
+                      const isKeyboardSelected = idx === keyboardIndex;
                       const revType = surah.revelationType || '';
                       const isMeccan = revType === 'Meccan' || revType === 'Makkah';
                       return (
                         <button
                           key={surah.number}
+                          data-surah-idx={idx}
                           onClick={() => {
                             setSelectedSurahForAyah(surah.number);
                             setModalViewState('verses');
                           }}
-                          className={`w-full flex items-center gap-3.5 px-5 py-3.5 group transition-colors text-left border-b border-black/[0.04] dark:border-white/[0.03] last:border-0 ${
-                            isActive
-                              ? 'bg-amber-50 dark:bg-amber-400/[0.07]'
-                              : 'hover:bg-gray-50 dark:hover:bg-white/[0.03]'
-                          }`}
+                          className={`surah-item w-full flex items-center gap-4 px-6 py-3.5 group text-left border-b border-black/[0.04] dark:border-white/[0.03] last:border-0 ${
+                            isActive ? 'surah-item-active' : ''
+                          } ${isKeyboardSelected ? 'surah-item-keyboard' : ''}`}
                           data-current-surah={isActive ? 'true' : undefined}
                         >
-                          {/* Number */}
-                          <div className={`w-9 h-9 rounded-xl flex items-center justify-center text-xs font-extrabold flex-shrink-0 transition-colors ${
+                          {/* Number badge */}
+                          <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-xs font-extrabold flex-shrink-0 transition-all ${
                             isActive
-                              ? 'bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-sm'
-                              : 'bg-gray-100 dark:bg-white/[0.06] text-gray-500 dark:text-gray-400 group-hover:bg-amber-100 dark:group-hover:bg-amber-400/10 group-hover:text-amber-700 dark:group-hover:text-amber-300'
+                              ? 'badge-gold text-white'
+                              : 'badge-subtle'
                           }`}>
                             {surah.number}
                           </div>
 
                           {/* Name block */}
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2 mb-0.5">
+                            <div className="flex items-center justify-between gap-3 mb-0.5">
                               <span className={`font-semibold text-sm truncate ${
                                 isActive ? 'text-amber-800 dark:text-amber-300' : 'text-gray-900 dark:text-gray-100'
                               }`}>
                                 {surah.englishName}
                               </span>
                               <span
-                                className={`text-base flex-shrink-0 ${isActive ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-gray-400'}`}
+                                className={`text-lg flex-shrink-0 transition-colors ${isActive ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-gray-400'}`}
                                 style={{ fontFamily: 'Amiri, serif' }}
                               >
                                 {surah.name}
                               </span>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-2.5">
                               {revType && (
                                 <span className={`inline-flex items-center gap-1 text-[10px] font-semibold`}>
                                   <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isMeccan ? 'bg-emerald-500' : 'bg-blue-500'}`} />
@@ -760,12 +814,28 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                           <ChevronRight className={`w-4 h-4 flex-shrink-0 transition-all ${
                             isActive
                               ? 'text-amber-500'
-                              : 'text-gray-300 dark:text-gray-700 group-hover:text-amber-400 group-hover:translate-x-0.5'
+                              : 'text-gray-300 dark:text-gray-700 group-hover:text-amber-500 group-hover:translate-x-0.5'
                           }`} />
                         </button>
                       );
                     });
                   })()}
+                </div>
+
+                {/* ── Footer hint ── */}
+                <div className="hidden md:flex items-center justify-center gap-4 px-6 py-2.5 border-t border-black/[0.04] dark:border-white/[0.04] text-[10px] text-gray-400 dark:text-gray-600 font-medium flex-shrink-0">
+                  <span className="flex items-center gap-1.5">
+                    <kbd className="px-1.5 py-0.5 rounded bg-black/[0.05] dark:bg-white/[0.06] font-mono text-[9px]">↑↓</kbd>
+                    Navigate
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <kbd className="px-1.5 py-0.5 rounded bg-black/[0.05] dark:bg-white/[0.06] font-mono text-[9px]">↵</kbd>
+                    Select
+                  </span>
+                  <span className="flex items-center gap-1.5">
+                    <kbd className="px-1.5 py-0.5 rounded bg-black/[0.05] dark:bg-white/[0.06] font-mono text-[9px]">Esc</kbd>
+                    Close
+                  </span>
                 </div>
               </>
             ) : (
@@ -776,33 +846,33 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                   const revType = activeSurah?.revelationType || '';
                   const isMeccan = revType === 'Meccan' || revType === 'Makkah';
                   return (
-                    <div className="relative bg-gradient-to-br from-[#1a1206] via-[#241808] to-[#1c1507] dark:from-[#0c0e13] dark:via-[#111520] dark:to-[#0c0e13] px-5 pt-5 pb-5 flex-shrink-0">
+                    <div className="relative index-header-gradient px-6 pt-5 pb-5 flex-shrink-0">
                       <div
-                        className="absolute right-4 top-0 text-[80px] text-amber-400/[0.06] select-none pointer-events-none leading-none"
+                        className="absolute right-6 top-0 text-[88px] text-amber-400/[0.08] select-none pointer-events-none leading-none"
                         style={{ fontFamily: 'Amiri, serif' }}
                       >
                         {activeSurah?.name}
                       </div>
                       <div className="relative z-10">
-                        <div className="flex items-center gap-2.5 mb-4">
+                        <div className="flex items-center gap-3 mb-4">
                           <button
                             onClick={() => setModalViewState('chapters')}
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all flex-shrink-0"
+                            className="w-9 h-9 rounded-full flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all flex-shrink-0"
                           >
-                            <ChevronLeft className="w-4 h-4" />
+                            <ChevronLeft className="w-5 h-5" />
                           </button>
                           <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center justify-between gap-3">
                               <div className="min-w-0">
-                                <p className="text-[10px] font-bold text-amber-400/70 tracking-[0.15em] uppercase mb-0.5">Surah {selectedSurahForAyah}</p>
-                                <h2 className="text-xl font-bold text-white font-serif-header truncate leading-tight">
+                                <p className="text-[10px] font-bold text-amber-400/70 tracking-[0.15em] uppercase mb-1">Surah {selectedSurahForAyah}</p>
+                                <h2 className="text-xl md:text-2xl font-bold text-white font-serif-header truncate leading-tight">
                                   {activeSurah?.englishName}
                                 </h2>
                               </div>
                               <div className="text-right flex-shrink-0">
-                                <p className="text-xl text-amber-300" style={{ fontFamily: 'Amiri, serif' }}>{activeSurah?.name}</p>
+                                <p className="text-xl md:text-2xl text-amber-300" style={{ fontFamily: 'Amiri, serif' }}>{activeSurah?.name}</p>
                                 {revType && (
-                                  <span className="flex items-center gap-1 justify-end mt-0.5">
+                                  <span className="flex items-center gap-1 justify-end mt-1">
                                     <span className={`w-1.5 h-1.5 rounded-full ${isMeccan ? 'bg-emerald-400' : 'bg-blue-400'}`} />
                                     <span className={`text-[10px] font-semibold ${isMeccan ? 'text-emerald-400' : 'text-blue-400'}`}>
                                       {revType === 'Makkah' ? 'Meccan' : revType === 'Madinah' ? 'Medinan' : revType}
@@ -814,18 +884,18 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                           </div>
                           <button
                             onClick={() => { setShowSurahSelector(false); setSurahSearchTerm(''); }}
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all flex-shrink-0"
+                            className="w-9 h-9 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all flex-shrink-0"
                           >
-                            <X className="w-4 h-4" />
+                            <X className="w-5 h-5" />
                           </button>
                         </div>
 
                         {/* Read from start CTA */}
                         <button
                           onClick={() => { onSurahSelect(selectedSurahForAyah); setShowSurahSelector(false); }}
-                          className="w-full h-10 rounded-xl bg-white/[0.08] border border-white/[0.12] text-white/80 hover:bg-white/[0.14] hover:text-white transition-all text-xs font-semibold flex items-center justify-center gap-2"
+                          className="w-full h-11 rounded-xl bg-white/[0.06] border border-white/[0.1] text-white/80 hover:bg-amber-400/10 hover:border-amber-400/25 hover:text-amber-200 transition-all text-xs font-semibold flex items-center justify-center gap-2"
                         >
-                          <BookOpen className="w-3.5 h-3.5 text-amber-400" />
+                          <BookOpen className="w-4 h-4 text-amber-400" />
                           Read from beginning · Verse 1
                         </button>
                       </div>
@@ -834,11 +904,11 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                 })()}
 
                 {/* ── Verse picker ── */}
-                <div className="flex-1 overflow-y-auto p-4">
+                <div className="flex-1 overflow-y-auto p-5">
                   {/* Direct jump input */}
-                  <div className="flex items-center gap-2 mb-4">
+                  <div className="flex items-center gap-2.5 mb-5">
                     <div className="relative flex-1">
-                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-xs font-bold select-none">#</span>
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-xs font-bold select-none">#</span>
                       <input
                         type="number"
                         min="1"
@@ -857,7 +927,7 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                             }
                           }
                         }}
-                        className="w-full h-9 pl-7 pr-3 rounded-lg bg-gray-100 dark:bg-white/[0.06] border border-transparent focus:border-amber-400/50 dark:focus:border-amber-400/30 text-sm font-semibold text-gray-700 dark:text-gray-200 outline-none transition-all placeholder-gray-400 dark:placeholder-gray-600"
+                        className="w-full h-10 pl-8 pr-3 rounded-lg bg-gray-100 dark:bg-white/[0.06] border border-transparent focus:border-amber-400/40 focus:ring-2 focus:ring-amber-400/10 text-sm font-semibold text-gray-700 dark:text-gray-200 outline-none transition-all placeholder-gray-400 dark:placeholder-gray-600"
                       />
                     </div>
                     <button
@@ -870,15 +940,15 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                           setVerseJumpInput('');
                         }
                       }}
-                      className="h-9 px-3.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-colors flex-shrink-0"
+                      className="h-10 px-5 rounded-lg btn-primary text-white text-xs font-bold transition-all flex-shrink-0"
                     >
                       Go
                     </button>
                   </div>
 
                   {/* Compact grid */}
-                  <p className="text-[10px] font-bold text-gray-400 dark:text-gray-600 uppercase tracking-[0.15em] mb-2">All verses</p>
-                  <div className="grid grid-cols-8 gap-1">
+                  <p className="text-[10px] font-bold text-gray-400 dark:text-gray-600 uppercase tracking-[0.15em] mb-2.5">All verses</p>
+                  <div className="grid grid-cols-8 md:grid-cols-10 gap-1.5">
                     {Array.from(
                       { length: surahList.find(s => s.number === selectedSurahForAyah)?.numberOfAyahs || 1 },
                       (_, i) => i + 1
@@ -888,10 +958,10 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                         <button
                           key={verseNum}
                           onClick={() => { onNavigateToAyah(selectedSurahForAyah, verseNum); setShowSurahSelector(false); setVerseJumpInput(''); }}
-                          className={`h-7 w-full rounded-md text-[11px] font-bold transition-all ${
+                          className={`h-8 w-full rounded-lg text-[11px] font-bold transition-all ${
                             isCurrent
-                              ? 'bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-sm shadow-amber-500/30'
-                              : 'bg-gray-100 dark:bg-white/[0.05] text-gray-600 dark:text-gray-400 hover:bg-amber-100 dark:hover:bg-amber-400/15 hover:text-amber-800 dark:hover:text-amber-300'
+                              ? 'verse-grid-active'
+                              : 'bg-gray-100 dark:bg-white/[0.05] text-gray-600 dark:text-gray-400 hover:bg-amber-100 dark:hover:bg-amber-400/10 hover:text-amber-700 dark:hover:text-amber-300'
                           }`}
                         >
                           {verseNum}
