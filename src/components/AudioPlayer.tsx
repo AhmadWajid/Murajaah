@@ -116,15 +116,24 @@ export default function AudioPlayer({
     currentAudio.loop = false;
 
     if (loopMode === 'custom') {
+      // Determine the effective loop boundaries:
+      // - If the user set custom markers, use those (segment-relative + seekOffset)
+      // - If no end marker is set, loop the whole verse:
+      //     verse mode → handleEnded catches the file end
+      //     surah mode → use segmentEnd as the loop point (file keeps playing)
+      const loopEndAbsolute = isEndSet && customLoop.end > 0
+        ? seekOffset + customLoop.end
+        : (segmentEnd > 0 ? segmentEnd : 0); // 0 = defer to handleEnded
+      const loopStartAbsolute = seekOffset + customLoop.start;
+
       const handleTimeUpdate = () => {
-        // Loop markers are segment-relative; add seekOffset for absolute position.
-        if (isEndSet && customLoop.end > 0 && currentAudio.currentTime > seekOffset + customLoop.end) {
-          currentAudio.currentTime = seekOffset + customLoop.start;
+        if (loopEndAbsolute > 0 && currentAudio.currentTime >= loopEndAbsolute) {
+          currentAudio.currentTime = loopStartAbsolute;
           currentAudio.play();
         }
       };
       const handleEnded = () => {
-        currentAudio.currentTime = seekOffset + customLoop.start;
+        currentAudio.currentTime = loopStartAbsolute;
         currentAudio.play();
       };
       currentAudio.addEventListener('timeupdate', handleTimeUpdate);
