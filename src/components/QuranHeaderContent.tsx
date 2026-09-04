@@ -127,7 +127,10 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
   const [verseJumpInput, setVerseJumpInput] = useState('');
   // Ref for the surah list scroll container
   const surahListRef = useRef<HTMLDivElement>(null);
-  
+  // Refs for auto-scrolling to selected reciter in the audio modal
+  const reciterListRef = useRef<HTMLDivElement>(null);
+  const selectedReciterRef = useRef<HTMLDivElement>(null);
+
   // Audio Settings Modal Tab: 'reciters' or 'info'
   const [audioTab, setAudioTab] = useState<'reciters' | 'info'>('reciters');
 
@@ -154,6 +157,16 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
       return () => clearTimeout(t);
     }
   }, [showSurahSelector, modalViewState, currentSurah]);
+
+  // Auto-scroll to the selected reciter when the audio modal opens on the reciters tab
+  useEffect(() => {
+    if (showReciterSelector && audioTab === 'reciters') {
+      const t = setTimeout(() => {
+        selectedReciterRef.current?.scrollIntoView({ block: 'center', behavior: 'instant' });
+      }, 80);
+      return () => clearTimeout(t);
+    }
+  }, [showReciterSelector, audioTab]);
 
   // Get the next mistake in verse order
   const [nextMistake, setNextMistake] = useState<MistakeData | null>(null);
@@ -243,91 +256,80 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
 
   return (
     <>
-      {/* Main content container */}
-      <div className="flex items-center justify-between flex-1 min-w-0 overflow-hidden relative font-sans">
-        
-        {/* Center Section - Unified breadcrumb-style navigation bar */}
-        <div className="hidden md:flex items-center space-x-1.5 flex-shrink min-w-0 flex-1 justify-center mx-2">
-          <div className="flex items-center bg-white/70 dark:bg-[#12161A]/80 backdrop-blur-md rounded-xl border border-amber-200/30 dark:border-border/30 p-1 shadow-sm transition-all">
-            
-            {/* Unified Navigation Dropdown Button */}
+      {/* ─── Desktop Top Bar (md+) — spacious two-section layout ─── */}
+      <div className="hidden md:flex items-center justify-between flex-1 min-w-0 gap-3 font-sans py-1">
+
+        {/* ── Left: Surah navigation + page navigator ── */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Surah selector pill */}
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              setModalViewState('chapters');
+              setSurahSearchTerm('');
+              setSelectedSurahForAyah(currentSurah);
+              setShowSurahSelector(true);
+            }}
+            className="h-10 px-4 rounded-xl bg-white/80 dark:bg-[#12161A]/80 backdrop-blur-md border border-amber-200/30 dark:border-border/30 hover:border-amber-300/50 dark:hover:border-accent/30 hover:bg-amber-50/50 dark:hover:bg-[#181D23] text-amber-850 dark:text-accent font-semibold text-sm transition-all flex items-center gap-2 shadow-sm"
+            title="Select Surah and Verse"
+          >
+            <BookOpen className="h-4 w-4 text-amber-600 dark:text-accent opacity-80" />
+            <span className="truncate max-w-[160px] xl:max-w-[220px] font-bold">
+              {currentSurah}. {surahName}
+            </span>
+            {currentAyah ? <span className="text-amber-600 dark:text-accent/80 font-bold">:{currentAyah}</span> : null}
+            <ChevronLeft className="h-3.5 w-3.5 opacity-40 rotate-90" />
+          </Button>
+
+          {/* Page navigator pill */}
+          <div className="flex items-center gap-1 bg-white/80 dark:bg-[#12161A]/80 backdrop-blur-md rounded-xl border border-amber-200/30 dark:border-border/30 px-1.5 py-1 shadow-sm">
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => {
-                setModalViewState('chapters');
-                setSurahSearchTerm('');
-                setSelectedSurahForAyah(currentSurah);
-                setShowSurahSelector(true);
-              }}
-              className="h-8 px-3.5 rounded-lg hover:bg-amber-500/5 dark:hover:bg-[#181D23] text-amber-850 dark:text-accent font-semibold text-xs transition-colors flex items-center space-x-1.5"
-              title="Select Surah and Verse"
+              onClick={() => onPageChange(layoutMode === 'spread' ? currentPage - 2 : currentPage - 1)}
+              disabled={layoutMode === 'spread' ? currentPage <= 2 : currentPage <= 1}
+              className="h-8 w-8 p-0 rounded-lg hover:bg-amber-500/5 dark:hover:bg-[#181D23] transition-colors"
+              title="Previous Page"
             >
-              <BookOpen className="h-3.5 w-3.5 text-amber-600 dark:text-accent opacity-80" />
-              <span className="truncate max-w-[130px] xl:max-w-[180px] font-sans font-bold">
-                {currentSurah}. {surahName} {currentAyah ? `: ${currentAyah}` : ''}
-              </span>
-              <span className="text-[10px] opacity-60 ml-0.5">▼</span>
+              <ChevronRight className="h-4 w-4" />
             </Button>
-
-            <div className="h-4 w-px bg-amber-200/25 dark:bg-border/25 mx-1" />
-
-            {/* Page Navigator */}
-            <div className="flex items-center">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onPageChange(layoutMode === 'spread' ? currentPage + 2 : currentPage + 1)}
-                disabled={layoutMode === 'spread' ? currentPage >= totalPages - 1 : currentPage >= totalPages}
-                className="h-8 w-8 p-0 flex-shrink-0 rounded-lg hover:bg-amber-500/5 dark:hover:bg-[#181D23] transition-colors group"
-                title="Next Page (Forward in Reading)"
-              >
-                <ChevronLeft className="h-4 w-4 group-hover:text-amber-500 transition-colors" />
-              </Button>
-              
-              <div className="flex items-center space-x-1 px-2 flex-shrink-0">
-                <span className="text-xs text-gray-400 dark:text-gray-500 select-none font-medium hidden lg:inline">Page</span>
-                <Input
-                  type="number"
-                  value={currentPage}
-                  onChange={(e) => {
-                    const value = parseInt(e.target.value);
-                    if (!isNaN(value)) {
-                      onPageChange(value);
-                    }
-                  }}
-                  onFocus={(e: React.FocusEvent<HTMLInputElement>) => e.target.select()}
-                  min="1"
-                  max={totalPages}
-                  className="w-12 h-7 text-center text-xs font-bold rounded-lg border-amber-200/20 dark:border-border/25 bg-white dark:bg-[#12161A] focus:ring-1 focus:ring-accent p-0"
-                />
-                <span className="text-xs text-gray-400 dark:text-gray-500 select-none font-medium">/ {totalPages}</span>
-              </div>
-              
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => onPageChange(layoutMode === 'spread' ? currentPage - 2 : currentPage - 1)}
-                disabled={layoutMode === 'spread' ? currentPage <= 2 : currentPage <= 1}
-                className="h-8 w-8 p-0 flex-shrink-0 rounded-lg hover:bg-amber-500/5 dark:hover:bg-[#181D23] transition-colors group"
-                title="Previous Page (Backward in Reading)"
-              >
-                <ChevronRight className="h-4 w-4 group-hover:text-amber-500 transition-colors" />
-              </Button>
+            <div className="flex items-center gap-1.5 px-1">
+              <Input
+                type="number"
+                value={currentPage}
+                onChange={(e) => {
+                  const value = parseInt(e.target.value);
+                  if (!isNaN(value)) onPageChange(value);
+                }}
+                onFocus={(e: React.FocusEvent<HTMLInputElement>) => e.target.select()}
+                min="1"
+                max={totalPages}
+                className="w-14 h-7 text-center text-xs font-bold rounded-lg border-amber-200/20 dark:border-border/25 bg-white dark:bg-[#12161A] focus:ring-1 focus:ring-accent p-0"
+              />
+              <span className="text-xs text-gray-400 dark:text-gray-500 select-none font-medium whitespace-nowrap">/ {totalPages}</span>
             </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onPageChange(layoutMode === 'spread' ? currentPage + 2 : currentPage + 1)}
+              disabled={layoutMode === 'spread' ? currentPage >= totalPages - 1 : currentPage >= totalPages}
+              className="h-8 w-8 p-0 rounded-lg hover:bg-amber-500/5 dark:hover:bg-[#181D23] transition-colors"
+              title="Next Page"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
           </div>
-          
-          {/* Next Mistake Button */}
+
+          {/* Next Mistake — inline if present */}
           {hasNextMistake && onNavigateToNextMistake && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => {
-                if (nextMistake) {
-                  onNavigateToNextMistake(nextMistake.surah, nextMistake.ayah);
-                }
+                if (nextMistake) onNavigateToNextMistake(nextMistake.surah, nextMistake.ayah);
               }}
-              className="h-9 px-3.5 rounded-xl bg-red-500/10 dark:bg-red-500/15 border-red-200/30 dark:border-red-900/30 text-red-755 dark:text-red-300 hover:bg-red-500/20 dark:hover:bg-red-500/25 transition-all font-semibold text-xs shadow-sm flex items-center"
+              className="h-10 px-3.5 rounded-xl bg-red-500/10 dark:bg-red-500/15 border-red-200/30 dark:border-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-500/20 dark:hover:bg-red-500/25 transition-all font-semibold text-xs shadow-sm flex items-center"
               title={`Go to next mistake: Surah ${nextMistake?.surah} Ayah ${nextMistake?.ayah}`}
             >
               <svg className="w-3.5 h-3.5 mr-1.5 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
@@ -338,65 +340,60 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
           )}
         </div>
 
-        {/* Right Section - Controls (Desktop Only) */}
-        <div className="hidden md:flex items-center space-x-1.5 lg:space-x-2.5 flex-shrink-0">
-          
-          {/* Segmented Layout Switcher */}
-          <div className="flex bg-amber-500/5 dark:bg-gray-800/80 p-0.5 rounded-xl border border-amber-200/35 dark:border-border/30 shadow-sm">
+        {/* ── Right: Layout switcher + tool buttons ── */}
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {/* Layout switcher — icon-only segmented control */}
+          <div className="flex bg-white/80 dark:bg-[#12161A]/80 backdrop-blur-md p-1 rounded-xl border border-amber-200/30 dark:border-border/30 shadow-sm">
             <button
               type="button"
               onClick={() => onReadingLayoutChange('mushaf')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+              className={`flex items-center justify-center w-9 h-8 rounded-lg transition-all ${
                 readingLayout === 'mushaf'
-                  ? 'bg-white dark:bg-[#12161A] text-amber-855 dark:text-accent shadow-sm border border-amber-200/20 dark:border-border/20'
-                  : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-305 border border-transparent'
+                  ? 'bg-amber-500/10 dark:bg-accent/10 text-amber-700 dark:text-accent shadow-sm'
+                  : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
               }`}
-              title="Continuous Page Flow Mode"
+              title="Continuous Page Flow"
             >
-              <Book className="h-3.5 w-3.5 text-amber-600 dark:text-accent opacity-80" />
-              <span className="hidden xl:inline">Continuous</span>
+              <Book className="h-4 w-4" />
             </button>
             <button
               type="button"
               onClick={() => onReadingLayoutChange('mushaf_15lines')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+              className={`flex items-center justify-center w-9 h-8 rounded-lg transition-all ${
                 readingLayout === 'mushaf_15lines'
-                  ? 'bg-white dark:bg-[#12161A] text-amber-855 dark:text-accent shadow-sm border border-amber-200/20 dark:border-border/20'
-                  : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-305 border border-transparent'
+                  ? 'bg-amber-500/10 dark:bg-accent/10 text-amber-700 dark:text-accent shadow-sm'
+                  : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
               }`}
-              title="Standard 15-Line Page Mode"
+              title="Standard 15-Line Page"
             >
-              <Layers className="h-3.5 w-3.5 text-amber-600 dark:text-accent opacity-80" />
-              <span className="hidden xl:inline">15-Line</span>
+              <Layers className="h-4 w-4" />
             </button>
             <button
               type="button"
               onClick={() => onReadingLayoutChange('verse')}
-              className={`flex items-center space-x-1.5 px-3 py-1.5 text-xs font-bold rounded-lg transition-all ${
+              className={`flex items-center justify-center w-9 h-8 rounded-lg transition-all ${
                 readingLayout === 'verse'
-                  ? 'bg-white dark:bg-[#12161A] text-amber-855 dark:text-accent shadow-sm border border-amber-200/20 dark:border-border/20'
-                  : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-305 border border-transparent'
+                  ? 'bg-amber-500/10 dark:bg-accent/10 text-amber-700 dark:text-accent shadow-sm'
+                  : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
               }`}
-              title="Editorial List Mode"
+              title="Verse List Mode"
             >
-              <BookOpen className="h-3.5 w-3.5 text-amber-600 dark:text-accent opacity-80" />
-              <span className="hidden xl:inline">List</span>
+              <BookOpen className="h-4 w-4" />
             </button>
           </div>
 
-          {/* Display Settings / Appearance */}
+          {/* Display — icon button */}
           <Button
             variant="outline"
             size="sm"
             onClick={() => setShowViewSettings(true)}
-            className="h-9 px-3 rounded-xl border-amber-200/40 dark:border-[#2C3440] hover:bg-amber-500/5 dark:hover:bg-[#181D23] text-gray-700 dark:text-gray-300 font-semibold text-xs flex items-center"
+            className="h-10 w-10 p-0 rounded-xl bg-white/80 dark:bg-[#12161A]/80 backdrop-blur-md border-amber-200/30 dark:border-border/30 hover:bg-amber-50/50 dark:hover:bg-[#181D23] text-gray-600 dark:text-gray-300 shadow-sm flex items-center justify-center"
             title="Display Settings"
           >
-            <Settings className="h-3.5 w-3.5 mr-1.5 text-gray-500 dark:text-gray-400" />
-            <span className="hidden xl:inline">Display</span>
+            <Settings className="h-4 w-4" />
           </Button>
-            
-          {/* Audio Settings */}
+
+          {/* Audio — icon button with label on xl */}
           <Button
             variant="outline"
             size="sm"
@@ -404,22 +401,22 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
               setAudioTab('reciters');
               setShowReciterSelector(true);
             }}
-            className="h-9 px-3 rounded-xl border-amber-200/40 dark:border-[#2C3440] hover:bg-amber-500/5 dark:hover:bg-[#181D23] text-gray-700 dark:text-gray-300 font-semibold text-xs flex items-center"
+            className="h-10 px-3 rounded-xl bg-white/80 dark:bg-[#12161A]/80 backdrop-blur-md border-amber-200/30 dark:border-border/30 hover:bg-amber-50/50 dark:hover:bg-[#181D23] text-gray-600 dark:text-gray-300 shadow-sm flex items-center gap-2"
             title="Audio Settings & Reciter Selection"
           >
-            <Volume2 className="h-3.5 w-3.5 mr-1.5 text-gray-500 dark:text-gray-400" />
-            <span className="hidden xl:inline">Audio</span>
+            <Volume2 className="h-4 w-4" />
+            <span className="hidden xl:inline text-xs font-semibold">Audio</span>
           </Button>
 
-          {/* Add Review Button */}
+          {/* Add Review — primary CTA */}
           {onEnhancedMemorization && (
             <Button
               variant="outline"
               size="sm"
               onClick={onEnhancedMemorization}
-              className="h-9 px-3.5 rounded-xl btn-primary font-bold text-xs shadow-sm flex items-center"
+              className="h-10 px-4 rounded-xl btn-primary font-bold text-xs shadow-md flex items-center gap-2"
             >
-              <Target className="h-3.5 w-3.5 mr-1.5" />
+              <Target className="h-4 w-4" />
               <span className="hidden lg:inline">Add Review</span>
             </Button>
           )}
@@ -1121,33 +1118,43 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
             </div>
 
             {audioTab === 'reciters' ? (
-              <div className="space-y-3 max-h-80 overflow-y-auto scrollbar-thin pr-1">
+              <div ref={reciterListRef} className="space-y-3 max-h-80 overflow-y-auto scrollbar-thin pr-1">
                 {reciterGroups.map((group) => (
                   <div key={group.label} className="space-y-1">
-                    <div className="px-2 pt-1 pb-1 text-[10px] font-bold tracking-wider uppercase text-amber-700/70 dark:text-accent/70 border-b border-amber-200/15 dark:border-border/15">
-                      {group.label}
+                    <div className="px-2 pt-1 pb-1 flex items-baseline gap-2 border-b border-amber-200/15 dark:border-border/15">
+                      <span className="text-[10px] font-bold tracking-wider uppercase text-amber-700/70 dark:text-accent/70">{group.label}</span>
+                      <span className="text-[9px] text-gray-400 dark:text-gray-500 font-medium">{group.labelEn}</span>
                     </div>
                     {group.reciters.map((reciter) => (
-                      <Button
+                      <div
                         key={reciter.id}
-                        variant="ghost"
-                        className={`w-full justify-start h-11 rounded-xl px-4 text-left transition-all ${
-                          selectedReciter === reciter.id
-                            ? 'bg-amber-500/10 dark:bg-accent/10 border border-amber-500/20 dark:border-accent/20 text-amber-900 dark:text-accent font-semibold'
-                            : 'hover:bg-amber-500/5 dark:hover:bg-[#181D23] text-gray-700 dark:text-gray-300'
-                        }`}
-                        onClick={() => {
-                          onReciterChange(reciter.id);
-                          setShowReciterSelector(false);
-                        }}
+                        ref={selectedReciter === reciter.id ? selectedReciterRef : null}
                       >
-                        <span className="truncate text-xs font-semibold tracking-wide" title={reciter.name}>
-                          {reciter.name}
-                        </span>
-                        {selectedReciter === reciter.id && (
-                          <div className="ml-auto w-2 h-2 bg-amber-500 dark:bg-accent rounded-full flex-shrink-0" />
-                        )}
-                      </Button>
+                        <Button
+                          variant="ghost"
+                          className={`w-full justify-start h-auto py-2.5 rounded-xl px-4 text-left transition-all ${
+                            selectedReciter === reciter.id
+                              ? 'bg-amber-500/10 dark:bg-accent/10 border border-amber-500/20 dark:border-accent/20 text-amber-900 dark:text-accent font-semibold'
+                              : 'hover:bg-amber-500/5 dark:hover:bg-[#181D23] text-gray-700 dark:text-gray-300'
+                          }`}
+                          onClick={() => {
+                            onReciterChange(reciter.id);
+                            setShowReciterSelector(false);
+                          }}
+                        >
+                          <div className="flex flex-col items-start min-w-0 flex-1">
+                            <span className="truncate text-xs font-semibold tracking-wide" title={reciter.name} style={{ fontFamily: 'Amiri, serif', fontSize: '14px' }}>
+                              {reciter.name}
+                            </span>
+                            <span className="truncate text-[10px] text-gray-500 dark:text-gray-400 font-medium mt-0.5" title={reciter.englishName}>
+                              {reciter.englishName}
+                            </span>
+                          </div>
+                          {selectedReciter === reciter.id && (
+                            <div className="ml-auto w-2 h-2 bg-amber-500 dark:bg-accent rounded-full flex-shrink-0" />
+                          )}
+                        </Button>
+                      </div>
                     ))}
                   </div>
                 ))}
