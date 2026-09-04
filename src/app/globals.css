@@ -364,19 +364,135 @@ body {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent), var(--primary));
-  color: var(--primary-foreground);
+  background: linear-gradient(135deg, #D4AF37 0%, #B8860B 50%, #9B7B1E 100%);
+  color: #fff;
   font-weight: 600;
   padding: 0.625rem 1.25rem;
   border-radius: 0.75rem;
-  transition: all 0.2s ease-in-out;
-  box-shadow: 0 4px 12px -2px rgba(212, 175, 55, 0.2);
+  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow:
+    0 1px 2px rgba(180, 140, 30, 0.25),
+    0 4px 12px -2px rgba(180, 140, 30, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(212, 175, 55, 0.3);
 }
 
 .btn-primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 6px 16px -1px rgba(212, 175, 55, 0.35);
-  opacity: 0.95;
+  background: linear-gradient(135deg, #E0BC40 0%, #C69A1A 50%, #A98826 100%);
+  box-shadow:
+    0 2px 4px rgba(180, 140, 30, 0.3),
+    0 8px 20px -2px rgba(180, 140, 30, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.btn-primary:active {
+  transform: translateY(0);
+  box-shadow:
+    0 1px 2px rgba(180, 140, 30, 0.2),
+    inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* Dark mode refinement for primary button */
+.dark .btn-primary {
+  background: linear-gradient(135deg, #E8C547 0%, #D4AF37 50%, #B8941F 100%);
+  color: #1a1a1a;
+  box-shadow:
+    0 1px 2px rgba(212, 175, 55, 0.2),
+    0 4px 14px -2px rgba(212, 175, 55, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(212, 175, 55, 0.35);
+}
+
+.dark .btn-primary:hover {
+  background: linear-gradient(135deg, #F0D050 0%, #E0BC40 50%, #C6A028 100%);
+  box-shadow:
+    0 2px 4px rgba(212, 175, 55, 0.25),
+    0 8px 22px -2px rgba(212, 175, 55, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* ─── Modern surface pill — used by top bar controls ─── */
+.surface-pill {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(212, 175, 55, 0.12);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.03),
+    0 2px 8px -2px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.surface-pill:hover {
+  border-color: rgba(212, 175, 55, 0.25);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.04),
+    0 4px 12px -2px rgba(180, 140, 30, 0.08);
+}
+
+.dark .surface-pill {
+  background: rgba(20, 24, 30, 0.72);
+  border: 1px solid rgba(212, 175, 55, 0.08);
+  box-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.15),
+    0 2px 8px -2px rgba(0, 0, 0, 0.2);
+}
+
+.dark .surface-pill:hover {
+  border-color: rgba(212, 175, 55, 0.2);
+  box-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.2),
+    0 4px 14px -2px rgba(212, 175, 55, 0.1);
+}
+
+/* ─── Play button gradient — rich, warm gold with depth ─── */
+.play-btn-gradient {
+  background: linear-gradient(135deg, #E0A82E 0%, #C68A1A 100%);
+  box-shadow:
+    0 2px 6px -1px rgba(180, 140, 30, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.play-btn-gradient:hover {
+  background: linear-gradient(135deg, #ECB53A 0%, #D09822 100%);
+  box-shadow:
+    0 4px 10px -1px rgba(180, 140, 30, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.dark .play-btn-gradient {
+  background: linear-gradient(135deg, #E8C547 0%, #D4AF37 100%);
+  box-shadow:
+    0 2px 8px -1px rgba(212, 175, 55, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.dark .play-btn-gradient:hover {
+  background: linear-gradient(135deg, #F0D050 0%, #E0BC40 100%);
+  box-shadow:
+    0 4px 12px -1px rgba(212, 175, 55, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+/* ─── Progress bar fill — smooth, premium gold ─── */
+.progress-fill-gradient {
+  background: linear-gradient(90deg, #D4AF37 0%, #E0BC40 50%, #D4AF37 100%);
+}
+
+.dark .progress-fill-gradient {
+  background: linear-gradient(90deg, #E8C547 0%, #F0D050 50%, #E8C547 100%);
+}
+
+/* ─── Segmented control active state — refined ─── */
+.segmented-active {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.12), rgba(212, 175, 55, 0.06));
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.15), 0 1px 2px rgba(180, 140, 30, 0.08);
+}
+
+.dark .segmented-active {
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(212, 175, 55, 0.08));
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(212, 175, 55, 0.1);
 }
 
 .btn-secondary {

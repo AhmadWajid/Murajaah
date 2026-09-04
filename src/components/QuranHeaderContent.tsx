@@ -271,7 +271,7 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
               setSelectedSurahForAyah(currentSurah);
               setShowSurahSelector(true);
             }}
-            className="h-10 px-4 rounded-xl bg-white/80 dark:bg-[#12161A]/80 backdrop-blur-md border border-amber-200/30 dark:border-border/30 hover:border-amber-300/50 dark:hover:border-accent/30 hover:bg-amber-50/50 dark:hover:bg-[#181D23] text-amber-850 dark:text-accent font-semibold text-sm transition-all flex items-center gap-2 shadow-sm"
+            className="h-10 px-4 rounded-xl surface-pill hover:bg-amber-50/60 dark:hover:bg-[#181D23] text-amber-850 dark:text-accent font-semibold text-sm transition-all flex items-center gap-2"
             title="Select Surah and Verse"
           >
             <BookOpen className="h-4 w-4 text-amber-600 dark:text-accent opacity-80" />
@@ -283,7 +283,7 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
           </Button>
 
           {/* Page navigator pill */}
-          <div className="flex items-center gap-1 bg-white/80 dark:bg-[#12161A]/80 backdrop-blur-md rounded-xl border border-amber-200/30 dark:border-border/30 px-1.5 py-1 shadow-sm">
+          <div className="flex items-center gap-1 surface-pill rounded-xl px-1.5 py-1">
             <Button
               variant="ghost"
               size="sm"
@@ -343,13 +343,13 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
         {/* ── Right: Layout switcher + tool buttons ── */}
         <div className="flex items-center gap-2 flex-shrink-0">
           {/* Layout switcher — icon-only segmented control */}
-          <div className="flex bg-white/80 dark:bg-[#12161A]/80 backdrop-blur-md p-1 rounded-xl border border-amber-200/30 dark:border-border/30 shadow-sm">
+          <div className="flex surface-pill p-1 rounded-xl">
             <button
               type="button"
               onClick={() => onReadingLayoutChange('mushaf')}
               className={`flex items-center justify-center w-9 h-8 rounded-lg transition-all ${
                 readingLayout === 'mushaf'
-                  ? 'bg-amber-500/10 dark:bg-accent/10 text-amber-700 dark:text-accent shadow-sm'
+                  ? 'segmented-active text-amber-700 dark:text-accent'
                   : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
               }`}
               title="Continuous Page Flow"
@@ -361,7 +361,7 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
               onClick={() => onReadingLayoutChange('mushaf_15lines')}
               className={`flex items-center justify-center w-9 h-8 rounded-lg transition-all ${
                 readingLayout === 'mushaf_15lines'
-                  ? 'bg-amber-500/10 dark:bg-accent/10 text-amber-700 dark:text-accent shadow-sm'
+                  ? 'segmented-active text-amber-700 dark:text-accent'
                   : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
               }`}
               title="Standard 15-Line Page"
@@ -373,7 +373,7 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
               onClick={() => onReadingLayoutChange('verse')}
               className={`flex items-center justify-center w-9 h-8 rounded-lg transition-all ${
                 readingLayout === 'verse'
-                  ? 'bg-amber-500/10 dark:bg-accent/10 text-amber-700 dark:text-accent shadow-sm'
+                  ? 'segmented-active text-amber-700 dark:text-accent'
                   : 'text-gray-400 hover:text-gray-600 dark:hover:text-gray-300'
               }`}
               title="Verse List Mode"
@@ -387,7 +387,7 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
             variant="outline"
             size="sm"
             onClick={() => setShowViewSettings(true)}
-            className="h-10 w-10 p-0 rounded-xl bg-white/80 dark:bg-[#12161A]/80 backdrop-blur-md border-amber-200/30 dark:border-border/30 hover:bg-amber-50/50 dark:hover:bg-[#181D23] text-gray-600 dark:text-gray-300 shadow-sm flex items-center justify-center"
+            className="h-10 w-10 p-0 rounded-xl surface-pill hover:bg-amber-50/60 dark:hover:bg-[#181D23] text-gray-600 dark:text-gray-300 flex items-center justify-center"
             title="Display Settings"
           >
             <Settings className="h-4 w-4" />
@@ -401,7 +401,7 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
               setAudioTab('reciters');
               setShowReciterSelector(true);
             }}
-            className="h-10 px-3 rounded-xl bg-white/80 dark:bg-[#12161A]/80 backdrop-blur-md border-amber-200/30 dark:border-border/30 hover:bg-amber-50/50 dark:hover:bg-[#181D23] text-gray-600 dark:text-gray-300 shadow-sm flex items-center gap-2"
+            className="h-10 px-3 rounded-xl surface-pill hover:bg-amber-50/60 dark:hover:bg-[#181D23] text-gray-600 dark:text-gray-300 flex items-center gap-2"
             title="Audio Settings & Reciter Selection"
           >
             <Volume2 className="h-4 w-4" />

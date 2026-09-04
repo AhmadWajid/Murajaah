@@ -407,7 +407,7 @@ export default function AudioPlayer({
 
           {/* Progress fill */}
           <div
-            className="absolute inset-y-0 left-0 rounded-full bg-gradient-to-r from-amber-500 to-orange-500 dark:from-amber-400 dark:to-orange-400 transition-[width] duration-75"
+            className="absolute inset-y-0 left-0 rounded-full progress-fill-gradient transition-[width] duration-75"
             style={{ width: `${progressPct}%` }}
           />
         </div>
@@ -446,14 +446,18 @@ export default function AudioPlayer({
 
         {/* Progress thumb */}
         <div
-          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full bg-amber-500 dark:bg-amber-400 shadow transition-all duration-150 ${
+          className={`absolute top-1/2 -translate-y-1/2 -translate-x-1/2 rounded-full transition-all duration-150 ${
             isMobile
               ? 'w-3 h-3 opacity-100'
               : isExpanded
                 ? 'w-3 h-3 opacity-100'
                 : 'w-0 h-0 opacity-0'
           }`}
-          style={{ left: `${progressPct}%` }}
+          style={{
+            left: `${progressPct}%`,
+            background: 'linear-gradient(135deg, #E0BC40, #D4AF37)',
+            boxShadow: '0 1px 4px rgba(180, 140, 30, 0.3), inset 0 0.5px 0 rgba(255,255,255,0.2)',
+          }}
         />
       </div>
     );
@@ -493,9 +497,8 @@ export default function AudioPlayer({
             <button
               onClick={onTogglePlayPause}
               className="w-9 h-9 md:w-7 md:h-7 flex-shrink-0 flex items-center justify-center
-                bg-gradient-to-br from-amber-500 to-orange-500 dark:from-amber-400 dark:to-orange-400
-                text-white rounded-full shadow-sm
-                hover:shadow-md hover:scale-105 active:scale-95 transition-all duration-150"
+                play-btn-gradient text-white dark:text-gray-950 rounded-full
+                hover:scale-105 active:scale-95 transition-all duration-150"
               aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
