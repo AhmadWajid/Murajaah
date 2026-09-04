@@ -137,16 +137,24 @@ export default function AudioPlayer({
       if (segmentEnd > 0) {
         // Surah-mode: auto-advance when playback reaches the segment end,
         // since the underlying file keeps playing past the ayah boundary.
+        // Also handle 'ended' as a fallback (e.g. last ayah where file ends
+        // before or at segmentEnd due to timing precision).
         let advanced = false;
-        const handleTimeUpdate = () => {
-          if (!advanced && currentAudio.currentTime >= segmentEnd) {
+        const triggerNext = () => {
+          if (!advanced) {
             advanced = true;
             onPlayNext();
           }
         };
+        const handleTimeUpdate = () => {
+          if (currentAudio.currentTime >= segmentEnd) triggerNext();
+        };
+        const handleEnded = () => triggerNext();
         currentAudio.addEventListener('timeupdate', handleTimeUpdate);
+        currentAudio.addEventListener('ended', handleEnded);
         return () => {
           currentAudio.removeEventListener('timeupdate', handleTimeUpdate);
+          currentAudio.removeEventListener('ended', handleEnded);
         };
       } else {
         // Verse-mode: auto-advance when the per-ayah file ends.
@@ -271,7 +279,8 @@ export default function AudioPlayer({
           event.preventDefault();
           setLoopMode('custom');
           setShowCustomLoopInputs(true);
-          const now = currentAudio.currentTime;
+          // Convert absolute audio time to segment-relative time for loop markers
+          const now = currentAudio.currentTime - seekOffset;
           if (!isStartSet) handleSetStart(now);
           else if (!isEndSet) handleSetEnd(now);
           else handleReset();
@@ -281,14 +290,14 @@ export default function AudioPlayer({
           event.preventDefault();
           setLoopMode('custom');
           setShowCustomLoopInputs(true);
-          handleSetStart(currentAudio.currentTime);
+          handleSetStart(currentAudio.currentTime - seekOffset);
           break;
         }
         case ']': {
           event.preventDefault();
           setLoopMode('custom');
           setShowCustomLoopInputs(true);
-          handleSetEnd(currentAudio.currentTime);
+          handleSetEnd(currentAudio.currentTime - seekOffset);
           break;
         }
         case 'c':
