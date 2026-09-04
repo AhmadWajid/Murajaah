@@ -443,8 +443,8 @@ export default function AyahCard({
 
   const actionButtons = (
     <>
-      <button 
-        className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-amber-700/80 hover:text-amber-900 dark:text-amber-300/80 dark:hover:text-accent bg-amber-50/40 dark:bg-amber-950/20 hover:bg-amber-100/80 dark:hover:bg-amber-900/40 border border-amber-200/40 dark:border-amber-800/20 hover:border-amber-300 dark:hover:border-accent/40 rounded-full transition-all duration-350 hover:scale-105"
+      <button
+        className="flex items-center justify-center rounded-full w-8 h-8 sm:w-9 sm:h-9 text-amber-600 dark:text-amber-400 bg-amber-500/8 hover:bg-amber-500/15 dark:bg-amber-400/10 dark:hover:bg-amber-400/20 border border-amber-500/10 dark:border-amber-400/10 transition-all duration-200 hover:scale-108 active:scale-95"
         onClick={(e) => {
           e.stopPropagation();
           onPlayAudio(surahNumber, ayahNumber);
@@ -463,7 +463,7 @@ export default function AyahCard({
               e.stopPropagation();
               setShowReviewRatingDropdown(true);
             }}
-            className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-purple-700/80 hover:text-purple-900 dark:text-purple-400/80 dark:hover:text-purple-300 bg-purple-50/40 dark:bg-purple-950/20 hover:bg-purple-100/80 dark:hover:bg-purple-900/40 border border-purple-200/40 dark:border-purple-800/20 hover:border-purple-300 dark:hover:border-purple-500/40 rounded-full transition-all duration-350 hover:scale-105"
+            className="flex items-center justify-center rounded-full w-8 h-8 sm:w-9 sm:h-9 text-purple-600 dark:text-purple-400 bg-purple-500/8 hover:bg-purple-500/15 dark:bg-purple-400/10 dark:hover:bg-purple-400/20 border border-purple-500/10 dark:border-purple-400/10 transition-all duration-200 hover:scale-105 active:scale-95"
             title="Complete Review"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -472,13 +472,13 @@ export default function AyahCard({
           </button>
         </div>
       )}
-      
+
       {onToggleMistake && (
-        <button 
-          className={`w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center border rounded-full transition-all duration-350 hover:scale-105 ${
-            hasMistake 
-              ? 'text-red-700 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 bg-red-50/40 dark:bg-red-950/20 hover:bg-red-100/80 dark:hover:bg-red-900/40 border-red-200/40 dark:border-red-800/20 hover:border-red-300 dark:hover:border-red-500/40' 
-              : 'text-gray-600 hover:text-gray-900 dark:text-gray-400 dark:hover:text-gray-200 bg-gray-50/40 dark:bg-gray-900/20 hover:bg-gray-100/80 dark:hover:bg-gray-800/40 border-gray-200/40 dark:border-gray-800/20 hover:border-gray-300 dark:hover:bg-gray-600'
+        <button
+          className={`flex items-center justify-center rounded-full w-8 h-8 sm:w-9 sm:h-9 border transition-all duration-200 hover:scale-105 active:scale-95 ${
+            hasMistake
+              ? 'text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/15 dark:bg-red-400/10 dark:hover:bg-red-400/20 border-red-500/15 dark:border-red-400/15'
+              : 'text-gray-500 dark:text-gray-400 bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.05] dark:hover:bg-white/[0.08] border-black/[0.06] dark:border-white/[0.06]'
           } ${isMistakeLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
           onClick={handleMistakeToggle}
           disabled={isMistakeLoading}
@@ -496,8 +496,8 @@ export default function AyahCard({
         </button>
       )}
 
-      <button 
-        className="w-8 h-8 sm:w-9 sm:h-9 flex items-center justify-center text-amber-700/80 hover:text-amber-900 dark:text-amber-300/80 dark:hover:text-accent bg-amber-50/40 dark:bg-amber-950/20 hover:bg-amber-100/80 dark:hover:bg-amber-900/40 border border-amber-200/40 dark:border-amber-800/20 hover:border-amber-300 dark:hover:border-accent/40 rounded-full transition-all duration-300 hover:scale-105"
+      <button
+        className="flex items-center justify-center rounded-full w-8 h-8 sm:w-9 sm:h-9 text-amber-600 dark:text-amber-400 bg-amber-500/8 hover:bg-amber-500/15 dark:bg-amber-400/10 dark:hover:bg-amber-400/20 border border-amber-500/10 dark:border-amber-400/10 transition-all duration-200 hover:scale-105 active:scale-95"
         onClick={(e) => {
           e.stopPropagation();
           handleTafsirClick();
@@ -515,18 +515,29 @@ export default function AyahCard({
   const arabicTextContainer = (
     <div className="text-right mb-4 sm:mb-6 px-1 sm:px-0 overflow-visible">
       {shouldShowHidden ? (
-        <div className="text-center py-8">
-          <div className="text-gray-400 dark:text-gray-500 text-lg mb-2 font-sans">
-            [Hidden - Test your memory]
+        <div className="text-center py-10">
+          <div
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-medium mb-3"
+            style={{
+              background: 'rgba(212, 175, 55, 0.06)',
+              border: '1px solid rgba(212, 175, 55, 0.1)',
+              color: 'rgba(0, 0, 0, 0.4)',
+            }}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+            </svg>
+            Hidden — test your memory
           </div>
           <button
             onClick={(e) => {
               e.stopPropagation();
               onRevealMistake?.(surahNumber, ayahNumber);
             }}
-            className="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-200 underline font-sans"
+            className="text-sm font-semibold text-amber-600 dark:text-amber-400 hover:text-amber-800 dark:hover:text-amber-300 transition-colors font-sans"
           >
-            Click to reveal
+            Click to reveal →
           </button>
         </div>
       ) : (() => {
@@ -534,8 +545,8 @@ export default function AyahCard({
         if (!arabicText) {
           return (
             <div>
-              <div className="text-sm text-gray-500 dark:text-gray-400 italic mb-2 font-sans">
-                Loading Arabic text... (Debug: {surahNumber}:{ayahNumber})
+              <div className="text-sm text-gray-400 dark:text-gray-500 italic mb-2 font-sans">
+                Loading verse…
               </div>
               <div className="text-2xl text-gray-900 dark:text-white font-arabic" style={{ fontFamily: 'Amiri, serif', direction: 'rtl' }}>
                 بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ (Test Arabic)
@@ -664,18 +675,18 @@ export default function AyahCard({
 
       {/* Surah Header Card (Boxed mode) */}
       {isFirstAyahOfSurah && !borderless && (
-        <div className="mb-8 p-8 relative overflow-hidden bg-gradient-to-b from-[#FAF8F3] to-[#F3F0E6] dark:from-[#181D23] dark:to-[#12161A] rounded-3xl border border-amber-200/40 dark:border-amber-900/30 shadow-[0_4px_30px_-5px_rgba(0,0,0,0.02)] text-center animate-fade-in-up">
-          <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05] pointer-events-none" style={{ backgroundImage: 'radial-gradient(var(--accent) 1px, transparent 1px)', backgroundSize: '16px 16px' }}></div>
+        <div className="surah-header-card mb-8 p-8 sm:p-10 relative overflow-hidden rounded-3xl text-center animate-fade-in-up">
+          <div className="absolute inset-0 opacity-[0.02] dark:opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(rgba(212, 175, 55, 0.5) 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
           <div className="relative z-10">
-            <span className="text-xs font-semibold text-amber-700/80 dark:text-accent/80 tracking-wider uppercase font-sans block mb-1">Surah</span>
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white font-serif-header mb-1.5 drop-shadow-sm">
+            <span className="text-[10px] font-bold text-amber-600/60 dark:text-amber-400/50 tracking-[0.2em] uppercase font-sans block mb-2">Surah</span>
+            <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-gray-100 font-serif-header mb-2">
               {surahName}
             </h2>
-            <div className="text-sm font-sans text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2 flex-wrap">
+            <div className="text-sm font-sans text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2.5 flex-wrap">
               <span>{surahTranslation}</span>
-              <span className="text-amber-400 dark:text-accent/60">•</span>
+              <span className="w-1 h-1 rounded-full bg-amber-400/40 dark:bg-amber-400/30" />
               <span>Chapter {surahNumber}</span>
-              <span className="text-amber-400 dark:text-accent/60">•</span>
+              <span className="w-1 h-1 rounded-full bg-amber-400/40 dark:bg-amber-400/30" />
               <span>{numberOfAyahs} Verses</span>
             </div>
             
@@ -731,26 +742,22 @@ export default function AyahCard({
         className={`relative group rounded-2xl transition-all duration-300 ${
           isMobile ? 'cursor-default' : 'cursor-pointer'
         } ${
-          borderless 
-            ? 'border-0 bg-transparent shadow-none p-4 sm:p-5 lg:px-6 lg:py-8 border-b border-dashed border-amber-200/20 dark:border-border/10 overflow-hidden' 
-            : 'border border-border/60 bg-white/80 dark:bg-[#12161A]/85 backdrop-blur-md p-4 sm:p-5 lg:p-7 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.03)] dark:shadow-[0_4px_25px_rgba(0,0,0,0.2)]'
+          borderless
+            ? 'border-0 bg-transparent shadow-none p-4 sm:p-5 lg:px-6 lg:py-8 border-b border-dashed border-amber-200/15 dark:border-border/8 overflow-hidden'
+            : 'ayah-card-surface p-4 sm:p-5 lg:p-7'
         } ${
           isMemorization ? `border-l-4 ${highlightClass}` : ''
         } ${
-          isSelected 
-            ? (borderless 
-                ? 'bg-amber-500/5 dark:bg-accent/5 shadow-inner' 
-                : 'border-amber-500/80 dark:border-accent bg-gradient-to-r from-amber-500/5 to-amber-500/2 dark:from-accent/5 dark:to-transparent shadow-[0_0_20px_rgba(212,175,55,0.12)]')
+          isSelected
+            ? (borderless
+                ? 'bg-amber-500/[0.04] dark:bg-accent/[0.04]'
+                : 'ayah-card-selected')
             : ''
         } ${
-          isInHighlightedRange 
-            ? (borderless 
-                ? 'bg-purple-500/5 dark:bg-purple-500/5 shadow-inner'
-                : 'border-purple-500/80 dark:border-purple-500/80 bg-gradient-to-r from-purple-500/5 to-purple-500/2 dark:from-purple-500/10 dark:to-transparent shadow-[0_0_20px_rgba(167,139,250,0.12)]')
-            : ''
-        } ${
-          !isSelected && !isInHighlightedRange && !isMobile 
-            ? 'hover:bg-gradient-to-r hover:from-amber-500/3 hover:to-transparent dark:hover:from-accent/4 dark:hover:to-transparent' 
+          isInHighlightedRange
+            ? (borderless
+                ? 'bg-purple-500/[0.04] dark:bg-purple-500/[0.04]'
+                : 'border-purple-400/40 dark:border-purple-500/30')
             : ''
         }`}
         style={borderless ? {} : { paddingLeft: `${padding}px`, paddingRight: `${padding}px`, paddingTop: '1.5rem', paddingBottom: '1.5rem' }}
@@ -777,8 +784,14 @@ export default function AyahCard({
                 {borderless ? (
                   <VerseStarMedallion num={ayahNumber} className="w-8 h-8 text-amber-500/85 dark:text-accent/80 flex-shrink-0" />
                 ) : (
-                  <div className="w-8 h-8 sm:w-9 sm:h-9 bg-gradient-to-br from-amber-500 to-orange-500 dark:from-amber-400 dark:to-accent rounded-full flex items-center justify-center shadow-sm">
-                    <span className="text-white dark:text-gray-950 font-bold text-xs sm:text-sm">
+                  <div
+                    className="w-8 h-8 sm:w-9 sm:h-9 rounded-full flex items-center justify-center"
+                    style={{
+                      background: 'linear-gradient(135deg, #E0BC40 0%, #D4AF37 50%, #C69A1A 100%)',
+                      boxShadow: '0 1px 3px rgba(180, 140, 30, 0.2), inset 0 0.5px 0 rgba(255, 255, 255, 0.2)',
+                    }}
+                  >
+                    <span className="text-white font-bold text-xs sm:text-sm">
                       {ayahNumber}
                     </span>
                   </div>
@@ -819,7 +832,7 @@ export default function AyahCard({
 
           {/* English Translation */}
           {showTranslation && !shouldShowHidden && (
-            <div className="text-gray-700 dark:text-gray-300 leading-relaxed border-t border-amber-200/20 dark:border-border/30 pt-4 mt-4 text-left">
+            <div className="text-gray-600 dark:text-gray-400 leading-relaxed pt-5 mt-5 text-left border-t border-black/[0.04] dark:border-white/[0.04]">
               <div 
                 className="translation-text text-gray-700 dark:text-gray-300"
                 style={{ 

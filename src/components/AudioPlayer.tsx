@@ -20,6 +20,14 @@ interface AudioPlayerProps {
   /** Absolute end (seconds) of the current ayah segment within the audio file.
    *  When > 0, auto-advance triggers at this point instead of the 'ended' event. */
   segmentEnd?: number;
+  /** English reciter name for display */
+  reciterName?: string;
+  /** Arabic reciter name for display */
+  reciterArabicName?: string;
+  /** English surah name for display */
+  surahName?: string;
+  /** Arabic surah name for display */
+  surahArabicName?: string;
 }
 
 export default function AudioPlayer({
@@ -33,6 +41,10 @@ export default function AudioPlayer({
   onPlayNext,
   seekOffset = 0,
   segmentEnd = 0,
+  reciterName,
+  reciterArabicName,
+  surahName,
+  surahArabicName,
 }: AudioPlayerProps) {
   const [loopMode, setLoopMode] = useState<'none' | 'custom'>('none');
   const [customLoop, setCustomLoop] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
@@ -407,8 +419,11 @@ export default function AudioPlayer({
 
           {/* Progress fill */}
           <div
-            className="absolute inset-y-0 left-0 rounded-full progress-fill-gradient transition-[width] duration-75"
-            style={{ width: `${progressPct}%` }}
+            className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-75"
+            style={{
+              width: `${progressPct}%`,
+              background: 'linear-gradient(90deg, #D4AF37 0%, #E0BC40 50%, #D4AF37 100%)',
+            }}
           />
         </div>
 
@@ -471,7 +486,7 @@ export default function AudioPlayer({
 
         {/* ═══ Main Player Bar ═══ */}
         <div
-          className="relative border-t md:border border-black/[0.06] dark:border-white/[0.06] md:rounded-2xl overflow-visible"
+          className="relative border-t md:border border-black/[0.06] dark:border-white/[0.06] md:rounded-lg overflow-visible"
           style={{
             background: 'rgba(255,255,255,0.82)',
             backdropFilter: 'blur(28px) saturate(150%)',
@@ -481,7 +496,7 @@ export default function AudioPlayer({
         >
           {/* Dark mode overlay */}
           <div
-            className="hidden dark:block absolute inset-0 md:rounded-2xl"
+            className="hidden dark:block absolute inset-0 md:rounded-lg"
             style={{
               background: 'rgba(12,15,20,0.85)',
               backdropFilter: 'blur(28px) saturate(150%)',
@@ -491,14 +506,18 @@ export default function AudioPlayer({
           />
 
           {/* ── Content row ── */}
-          <div className="relative flex items-center gap-2 px-3 py-2 md:px-3 md:py-1.5">
+          <div className="relative flex items-center gap-2 px-3 py-2 md:px-4 md:py-2.5">
 
             {/* Play/Pause */}
             <button
               onClick={onTogglePlayPause}
-              className="w-9 h-9 md:w-7 md:h-7 flex-shrink-0 flex items-center justify-center
-                play-btn-gradient text-white dark:text-gray-950 rounded-full
+              className="w-9 h-9 md:w-9 md:h-9 flex-shrink-0 flex items-center justify-center
+                text-white dark:text-gray-950 rounded-md
                 hover:scale-105 active:scale-95 transition-all duration-150"
+              style={{
+                background: 'linear-gradient(135deg, #E0A82E 0%, #C68A1A 100%)',
+                boxShadow: '0 2px 6px -1px rgba(180, 140, 30, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2)',
+              }}
               aria-label={isPlaying ? 'Pause' : 'Play'}
             >
               {isPlaying ? (
@@ -512,14 +531,14 @@ export default function AudioPlayer({
               )}
             </button>
 
-            {/* Ayah info */}
+            {/* Ayah info — English surah name + verse number */}
             <div className="flex-shrink-0 min-w-0">
-              <p className="text-[11px] md:text-[10px] font-semibold text-gray-800 dark:text-gray-100 font-sans truncate leading-tight">
+              <p className="text-[11px] md:text-xs font-semibold text-gray-800 dark:text-gray-100 font-sans truncate leading-tight">
                 {currentPlayingAyah
-                  ? `${currentPlayingAyah.surah}:${currentPlayingAyah.ayah}`
+                  ? `${surahName || `Surah ${currentPlayingAyah.surah}`} · ${currentPlayingAyah.ayah}`
                   : '—'}
               </p>
-              <p className="text-[9px] text-gray-400 dark:text-gray-500 font-sans tabular-nums leading-tight">
+              <p className="text-[9px] md:text-[10px] text-gray-400 dark:text-gray-500 font-sans tabular-nums leading-tight">
                 {formatTime(currentTime)}<span className="opacity-40"> / </span>{formatTime(duration)}
               </p>
             </div>
@@ -534,12 +553,12 @@ export default function AudioPlayer({
             </div>
 
             {/* ── Right controls ── */}
-            <div className="flex items-center gap-0.5 flex-shrink-0">
+            <div className="flex items-center gap-0.5 md:gap-1 flex-shrink-0">
 
               {/* Speed */}
               <button
                 onClick={cycleSpeed}
-                className={`h-6 px-1.5 flex items-center justify-center rounded-md text-[10px] font-bold font-sans tabular-nums transition-all duration-150
+                className={`h-7 px-2 flex items-center justify-center rounded-md text-[11px] font-bold font-sans tabular-nums transition-all duration-150
                   ${playbackSpeed !== 1
                     ? 'bg-amber-500/12 dark:bg-amber-400/12 text-amber-600 dark:text-amber-400'
                     : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
@@ -553,22 +572,22 @@ export default function AudioPlayer({
               <button
                 aria-label={loopMode === 'custom' ? 'Loop On' : 'Loop Off'}
                 onClick={() => setLoopMode(prev => prev === 'none' ? 'custom' : 'none')}
-                className={`w-7 h-7 md:w-6 md:h-6 flex items-center justify-center rounded-lg transition-all duration-150 ${
+                className={`w-7 h-7 md:w-8 md:h-8 flex items-center justify-center rounded-lg transition-all duration-150 ${
                   loopMode === 'custom'
                     ? 'bg-amber-500/12 dark:bg-amber-400/12 text-amber-600 dark:text-amber-400'
                     : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
                 }`}
               >
-                <Repeat className={`w-3.5 h-3.5 md:w-3 md:h-3 ${loopMode === 'none' ? 'opacity-40' : ''}`} />
+                <Repeat className={`w-3.5 h-3.5 md:w-4 md:h-4 ${loopMode === 'none' ? 'opacity-40' : ''}`} />
               </button>
 
               {/* Close */}
               <button
                 onClick={onStop}
-                className="w-7 h-7 md:w-6 md:h-6 flex items-center justify-center rounded-lg text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-all duration-150"
+                className="w-7 h-7 md:w-8 md:h-8 flex items-center justify-center rounded-lg text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/[0.04] dark:hover:bg-white/[0.06] transition-all duration-150"
                 aria-label="Close Player"
               >
-                <X className="w-3.5 h-3.5 md:w-3 md:h-3" />
+                <X className="w-3.5 h-3.5 md:w-4 md:h-4" />
               </button>
             </div>
           </div>

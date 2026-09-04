@@ -41,7 +41,14 @@ const TOTAL_QURAN_PAGES = 604;
 
 export default function QuranPage() {
   return (
-    <Suspense fallback={<div>Loading...</div>}>
+    <Suspense fallback={
+      <div className="reading-surface min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <div className="w-12 h-12 mx-auto mb-4 rounded-full loading-shimmer" />
+          <p className="text-sm font-medium text-amber-700/60 dark:text-amber-400/50 font-sans">Loading Quran…</p>
+        </div>
+      </div>
+    }>
       <QuranPageContent />
     </Suspense>
   );
@@ -71,7 +78,7 @@ function QuranPageContent() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [currentSurah, setCurrentSurah] = useState(1);
   const [currentAyah, setCurrentAyah] = useState(1);
-  const [readingLayout, setReadingLayout] = useState<'mushaf' | 'mushaf_15lines' | 'verse'>('verse');
+  const [readingLayout, setReadingLayout] = useState<'verse'>('verse');
   const [activeAyah, setActiveAyah] = useState<{ surah: number; ayah: number } | null>(null);
   const [pageData, setPageData] = useState<PageData | null>(null);
   const [previousPageData, setPreviousPageData] = useState<PageData | null>(null);
@@ -126,7 +133,7 @@ function QuranPageContent() {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('quran-reading-layout');
-      if (saved === 'mushaf' || saved === 'mushaf_15lines' || saved === 'verse') {
+      if (saved === 'verse') {
         setReadingLayout(saved as any);
       }
     }
@@ -1391,7 +1398,12 @@ function QuranPageContent() {
   if (!isInitialized) return null;
 
   return (
-    <div className={`min-h-screen bg-gray-50 dark:bg-gray-900 px-0 sm:px-4 transition-[padding] duration-300 ${currentAudio ? 'pb-80' : 'pb-32'}`}>
+    <div
+      className="reading-surface min-h-screen px-0 sm:px-4 transition-[padding] duration-300"
+      style={{
+        paddingBottom: currentAudio ? '20rem' : '8rem',
+      }}
+    >
       {/* Header */}
       <AppHeader 
         pageType="quran"
@@ -1538,6 +1550,10 @@ function QuranPageContent() {
         onPlayNext={playNextAyah}
         seekOffset={audioSegmentStart}
         segmentEnd={audioSegmentEnd}
+        reciterName={getReciterById(selectedReciter)?.englishName}
+        reciterArabicName={getReciterById(selectedReciter)?.name}
+        surahName={surahList.find(s => s.number === currentPlayingAyah?.surah)?.englishName}
+        surahArabicName={surahList.find(s => s.number === currentPlayingAyah?.surah)?.name}
       />
 
       

@@ -160,7 +160,7 @@ interface QuranContentProps {
   wordByWordData: any[];
   showWordByWordTooltip: boolean;
   padding?: number;
-  readingLayout?: 'mushaf' | 'mushaf_15lines' | 'verse';
+  readingLayout?: 'verse';
   activeAyah?: { surah: number; ayah: number } | null;
   onActiveAyahChange?: (ayah: { surah: number; ayah: number } | null) => void;
 }
@@ -302,49 +302,12 @@ export default function QuranContent({
 
   // Diagnostic log for tooltips
   useEffect(() => {
-    if (readingLayout === 'mushaf_15lines') {
-      console.log('[15-Line Mushaf Diagnostics]', {
-        showWordByWordTooltip,
-        wordByWordDataLength: wordByWordData?.length,
-        layout15DataWordsCount: layout15Data ? Object.values(layout15Data.wordsByLine).flat().length : 0
-      });
-    }
-  }, [readingLayout, showWordByWordTooltip, wordByWordData, layout15Data]);
+    // 15-line mushaf mode removed; no diagnostics needed
+  }, []);
 
   useEffect(() => {
-    if (readingLayout !== 'mushaf_15lines') return;
-    const pageNum = pageData?.number;
-    if (!pageNum) return;
-    
-    let active = true;
-    const loadFullDetails = async () => {
-      setLoading15(true);
-      try {
-        const fontSuccess = await qpcFontLoader.loadPageFont(pageNum);
-        if (active) {
-          setFontLoaded15(fontSuccess);
-        }
-        
-        const response = await fetch(`/api/tajweed?action=pageFullDetails&page=${pageNum}`);
-        if (!response.ok) throw new Error('Failed to load 15-line details');
-        const data = await response.json();
-        if (active) {
-          setLayout15Data(data);
-        }
-      } catch (error) {
-        console.error('Error loading 15-line details:', error);
-      } finally {
-        if (active) {
-          setLoading15(false);
-        }
-      }
-    };
-    
-    loadFullDetails();
-    return () => {
-      active = false;
-    };
-  }, [pageData?.number, readingLayout]);
+    // 15-line mushaf mode removed; no data loading needed
+  }, [pageData?.number]);
 
   const isAyahInMemorization = (surah: number, ayahNumber: number) => {
     return memorizationItems.some(item => 
@@ -916,69 +879,9 @@ export default function QuranContent({
   return (
     <main className="min-h-screen bg-[#FDFBF7] dark:bg-[#0B0D0E] translation-loading">
       <div className="max-w-7xl mx-auto" style={{ paddingLeft: `${padding}px`, paddingRight: `${padding}px` }}>
-        
-        {readingLayout === 'mushaf' ? (
-          /* Continuous Mushaf Layout */
-          <div className="space-y-8 p-2 sm:p-4 animate-fade-in">
-            {layoutMode === 'spread' ? (
-              /* Two-Page Spread Layout with 3D Book features */
-              <div className="relative flex flex-col lg:flex-row gap-0 rounded-3xl overflow-hidden border border-amber-500/20 dark:border-accent/15 shadow-2xl bg-[#FAF8F5]/30 dark:bg-[#12161A]/30 p-1">
-                {/* Left Page (Current Page) */}
-                <div className="flex-1 relative flex">
-                  {renderMushafPage(pageData, 'left')}
-                </div>
-                
-                {/* Central Crease / Spine (only visible when side-by-side on lg screens) */}
-                <div className="hidden lg:block absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-16 z-30 pointer-events-none bg-gradient-to-r from-transparent via-black/10 to-transparent dark:via-black/30" />
-                <div className="hidden lg:block absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-0.5 z-30 pointer-events-none bg-amber-500/20 dark:bg-accent/20" />
-                
-                {/* Right Page (Previous Page) */}
-                <div className="flex-1 relative flex">
-                  {renderMushafPage(previousPageData, 'right')}
-                </div>
-              </div>
-            ) : (
-              /* Single Page Layout */
-              <div className="max-w-3xl mx-auto">
-                {renderMushafPage(pageData, 'single')}
-              </div>
-            )}
 
-            {/* Active Verse Commentary Panel removed - now renders in sliding drawer */}
-          </div>
-        ) : readingLayout === 'mushaf_15lines' ? (
-          /* 15-Line Mushaf Layout */
-          <div className="space-y-8 p-2 sm:p-4 animate-fade-in">
-            {layoutMode === 'spread' ? (
-              /* Two-Page Spread Layout with 3D Book features */
-              <div className="relative flex flex-col lg:flex-row gap-0 rounded-3xl overflow-hidden border border-amber-500/20 dark:border-accent/15 shadow-2xl bg-[#FAF8F5]/30 dark:bg-[#12161A]/30 p-1">
-                {/* Left Page (Current Page) */}
-                <div className="flex-1 relative flex">
-                  {render15LinesMushafPage(pageData, 'left')}
-                </div>
-                
-                {/* Central Crease / Spine (only visible when side-by-side on lg screens) */}
-                <div className="hidden lg:block absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-16 z-30 pointer-events-none bg-gradient-to-r from-transparent via-black/10 to-transparent dark:via-black/30" />
-                <div className="hidden lg:block absolute top-0 bottom-0 left-1/2 -translate-x-1/2 w-0.5 z-30 pointer-events-none bg-amber-500/20 dark:bg-accent/20" />
-                
-                {/* Right Page (Previous Page) */}
-                <div className="flex-1 relative flex">
-                  {render15LinesMushafPage(previousPageData, 'right')}
-                </div>
-              </div>
-            ) : (
-              /* Single Page Layout */
-              <div className="max-w-3xl mx-auto">
-                {render15LinesMushafPage(pageData, 'single')}
-              </div>
-            )}
-
-            {/* Active Verse Commentary Panel removed - now renders in sliding drawer */}
-          </div>
-        ) : (
-          /* Borderless Editorial List Layout */
+        {(
           layoutMode === 'spread' ? (
-            /* Two-Page Spread Layout - RTL Order */
             <div className="flex gap-2 sm:gap-6 p-2 sm:p-6">
               {/* Left Page (Current Page) */}
               <Card className="flex-1 min-h-screen border-0 shadow-none bg-transparent">
@@ -1186,7 +1089,6 @@ export default function QuranContent({
               )}
             </div>
           ) : (
-            /* Single Page Layout */
             <div className="max-w-3xl mx-auto py-2 sm:py-6 relative pr-4 lg:pr-8">
               {/* Vertical timeline line on the right side, acting as a book margin guideline */}
               <div className="hidden lg:block absolute right-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-amber-500/25 via-amber-500/5 to-transparent pointer-events-none" />
@@ -1346,7 +1248,7 @@ export default function QuranContent({
 
         {/* Sliding detail drawer for active verse in Mushaf modes */}
         <AyahDetailDrawer
-          isOpen={!!activeAyah && (readingLayout === 'mushaf' || readingLayout === 'mushaf_15lines')}
+          isOpen={false}
           onClose={() => onActiveAyahChange?.(null)}
           ayah={activeAyahData}
           pageData={pageData?.ayahs?.includes(activeAyahData) ? pageData : previousPageData}

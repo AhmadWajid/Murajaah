@@ -759,3 +759,113 @@ body {
   }
 }
 
+/* ─── Hide number input spinner arrows completely ─── */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* ─── Premium reading surface — warm paper-like background ─── */
+.reading-surface {
+  background-color: var(--background);
+  background-image:
+    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(212, 175, 55, 0.03), transparent 70%);
+}
+
+.dark .reading-surface {
+  background-color: var(--background);
+  background-image:
+    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(212, 175, 55, 0.02), transparent 70%);
+}
+
+/* ─── Premium ayah card surface ─── */
+.ayah-card-surface {
+  background: rgba(255, 255, 255, 0.6);
+  backdrop-filter: blur(12px) saturate(130%);
+  -webkit-backdrop-filter: blur(12px) saturate(130%);
+  border: 1px solid rgba(212, 175, 55, 0.1);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), 0 4px 16px -4px rgba(0, 0, 0, 0.03);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ayah-card-surface:hover {
+  border-color: rgba(212, 175, 55, 0.2);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03), 0 8px 24px -4px rgba(180, 140, 30, 0.06);
+}
+
+.dark .ayah-card-surface {
+  background: rgba(18, 22, 26, 0.6);
+  border: 1px solid rgba(212, 175, 55, 0.06);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 4px 16px -4px rgba(0, 0, 0, 0.15);
+}
+
+.dark .ayah-card-surface:hover {
+  border-color: rgba(212, 175, 55, 0.12);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), 0 8px 24px -4px rgba(212, 175, 55, 0.04);
+}
+
+/* ─── Ayah card selected state ─── */
+.ayah-card-selected {
+  border-color: rgba(212, 175, 55, 0.35) !important;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.04), rgba(212, 175, 55, 0.01)) !important;
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.1), 0 4px 20px -4px rgba(180, 140, 30, 0.1) !important;
+}
+
+.dark .ayah-card-selected {
+  border-color: rgba(212, 175, 55, 0.25) !important;
+  background: linear-gradient(135deg, rgba(212, 175, 55, 0.06), rgba(212, 175, 55, 0.02)) !important;
+  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.08), 0 4px 24px -4px rgba(212, 175, 55, 0.06) !important;
+}
+
+/* ─── Action button — refined pill ─── */
+.ayah-action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9999px;
+  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  cursor: pointer;
+}
+
+.ayah-action-btn:hover {
+  transform: scale(1.08);
+}
+
+.ayah-action-btn:active {
+  transform: scale(0.95);
+}
+
+/* ─── Surah header — premium gradient card ─── */
+.surah-header-card {
+  background:
+    radial-gradient(ellipse 70% 80% at 50% 0%, rgba(212, 175, 55, 0.06), transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(248, 245, 237, 0.3) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.12);
+  box-shadow: 0 4px 30px -5px rgba(0, 0, 0, 0.02);
+}
+
+.dark .surah-header-card {
+  background:
+    radial-gradient(ellipse 70% 80% at 50% 0%, rgba(212, 175, 55, 0.04), transparent 70%),
+    linear-gradient(180deg, rgba(24, 29, 35, 0.5) 0%, rgba(18, 22, 26, 0.3) 100%);
+  border: 1px solid rgba(212, 175, 55, 0.08);
+  box-shadow: 0 4px 30px -5px rgba(0, 0, 0, 0.15);
+}
+
+/* ─── Loading skeleton — branded shimmer ─── */
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.loading-shimmer {
+  background: linear-gradient(90deg, rgba(212, 175, 55, 0.04) 25%, rgba(212, 175, 55, 0.08) 50%, rgba(212, 175, 55, 0.04) 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
