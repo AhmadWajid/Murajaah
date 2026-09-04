@@ -7,8 +7,8 @@ import { addMemorizationItem, updateMemorizationItem, getMemorizationItem, toggl
 import { useOptimizedData } from '@/lib/hooks/useOptimizedData';
 import { MistakeData } from '@/lib/supabase/database';
 import { MemorizationItem, updateInterval, createMemorizationItem } from '@/lib/spacedRepetition';
-import { getSurah, getQuranMeta, getPage, getAyah, fetchPageWithTranslation, SurahListItem, getAyahAudioUrl } from '@/lib/quranService';
-import { DEFAULT_RECITER_ID, resolveReciterId } from '@/lib/recitations';
+import { getSurah, getQuranMeta, getPage, getAyah, fetchPageWithTranslation, SurahListItem } from '@/lib/quranService';
+import { DEFAULT_RECITER_ID, resolveReciterId, getAyahAudioPlan, getReciterById, AudioPlan } from '@/lib/recitations';
 import { generateMemorizationId } from '@/lib/utils';
 import AppHeader from '@/components/AppHeader';
 import QuranHeaderContent from '@/components/QuranHeaderContent';
@@ -93,6 +93,10 @@ function QuranPageContent() {
   const [duration, setDuration] = useState(0);
   const [currentPlayingAyah, setCurrentPlayingAyah] = useState<{surah: number, ayah: number} | null>(null);
   const [selectedReciter, setSelectedReciter] = useState(DEFAULT_RECITER_ID);
+  // Segment window for surah-mode reciters (absolute seconds within the audio file).
+  // For verse-mode reciters these stay 0 and the whole file is the segment.
+  const [audioSegmentStart, setAudioSegmentStart] = useState(0);
+  const [audioSegmentEnd, setAudioSegmentEnd] = useState(0);
   const [showTranslation, setShowTranslation] = useState(true);
   
   // Font settings state (will be loaded asynchronously)
@@ -1138,34 +1142,82 @@ function QuranPageContent() {
         currentAudio.currentTime = 0;
       }
 
-      const audioUrl = getAyahAudioUrl(surahNumber, ayahNumber, selectedReciter);
-      const audio = new Audio(audioUrl);
+      const plan = await getAyahAudioPlan(selectedReciter, surahNumber, ayahNumber);
+      const reciter = getReciterById(selectedReciter);
+      const isSurahMode = plan.mode === 'surah' && plan.segmentEnd > 0;
+
+      const audio = new Audio(plan.url);
       audio.preload = 'metadata';
-      
+
+      // Segment window (absolute seconds). For verse mode the whole file is used.
+      const segStart = isSurahMode ? plan.segmentStart : 0;
+      const segEnd = isSurahMode ? plan.segmentEnd : 0;
+
+      setAudioSegmentStart(segStart);
+      setAudioSegmentEnd(segEnd);
       setCurrentAudio(audio);
       setCurrentPlayingAyah({ surah: surahNumber, ayah: ayahNumber });
       setIsPlaying(false);
       setCurrentTime(0);
       setDuration(0);
-      
+
       // Setup event listeners
-      setupAudioEventListeners(audio, surahNumber, ayahNumber, audioUrl);
-      
-      // Start playing
-      await audio.play();
-      setIsPlaying(true);
+      setupAudioEventListeners(audio, surahNumber, ayahNumber, plan.url, reciter.mode, segStart, segEnd);
+
+      // Start playing. For surah mode, seek to the segment start first.
+      const startPlayback = async () => {
+        if (isSurahMode && segStart > 0) {
+          try { audio.currentTime = segStart; } catch { /* seek after play if needed */ }
+        }
+        await audio.play();
+        setIsPlaying(true);
+      };
+
+      if (isSurahMode && segStart > 0) {
+        // Some browsers can't seek until metadata is loaded; wait for it.
+        const onReady = () => {
+          startPlayback().catch((err) => console.error('Error starting segment playback:', err));
+        };
+        if (audio.readyState >= 1) {
+          onReady();
+        } else {
+          audio.addEventListener('loadedmetadata', onReady, { once: true });
+        }
+      } else {
+        await startPlayback();
+      }
     } catch (error) {
       console.error('Error playing audio:', error);
     }
   };
 
-  const setupAudioEventListeners = (audio: HTMLAudioElement, surahNumber: number, ayahNumber: number, audioUrl: string) => {
+  const setupAudioEventListeners = (
+    audio: HTMLAudioElement,
+    surahNumber: number,
+    ayahNumber: number,
+    audioUrl: string,
+    reciterMode: 'verse' | 'surah',
+    segStart: number,
+    segEnd: number
+  ) => {
+    const isSurahMode = reciterMode === 'surah' && segEnd > 0;
+
     audio.addEventListener('loadedmetadata', () => {
-      setDuration(audio.duration);
+      if (isSurahMode) {
+        // Display duration relative to the ayah segment.
+        setDuration(Math.max(0, segEnd - segStart));
+      } else {
+        setDuration(audio.duration);
+      }
     });
 
     audio.addEventListener('timeupdate', () => {
-      setCurrentTime(audio.currentTime);
+      if (isSurahMode) {
+        const rel = audio.currentTime - segStart;
+        setCurrentTime(Math.max(0, Math.min(rel, segEnd - segStart)));
+      } else {
+        setCurrentTime(audio.currentTime);
+      }
     });
 
     // Note: the 'ended' event for auto-advance is handled by AudioPlayer's
@@ -1182,7 +1234,7 @@ function QuranPageContent() {
         }
       }, 150);
     });
-    
+
     audio.addEventListener('error', (e) => {
       console.error('Audio error:', {
         error: audio.error,
@@ -1484,6 +1536,8 @@ function QuranPageContent() {
         onTogglePlayPause={togglePlayPause}
         onStop={stopAudio}
         onPlayNext={playNextAyah}
+        seekOffset={audioSegmentStart}
+        segmentEnd={audioSegmentEnd}
       />
 
       

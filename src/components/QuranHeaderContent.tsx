@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { RECITERS } from '@/lib/recitations';
+import { RECITER_GROUPS } from '@/lib/recitations';
 import { 
   ChevronLeft, 
   ChevronRight, 
@@ -192,8 +192,8 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
     loadTranslations();
   }, []);
 
-  // Reciter options (EveryAyah.com)
-  const reciters = RECITERS;
+  // Reciter options grouped by playback mode (verse / full-surah)
+  const reciterGroups = RECITER_GROUPS;
 
   const currentSurahData = surahList.find(s => s.number === currentSurah);
   const surahName = currentSurahData ? currentSurahData.name : 'Unknown Surah';
@@ -1121,28 +1121,35 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
             </div>
 
             {audioTab === 'reciters' ? (
-              <div className="space-y-1.5 max-h-80 overflow-y-auto scrollbar-thin pr-1">
-                {reciters.map((reciter) => (
-                  <Button
-                    key={reciter.id}
-                    variant="ghost"
-                    className={`w-full justify-start h-12 rounded-xl px-4 text-left transition-all ${
-                      selectedReciter === reciter.id 
-                        ? 'bg-amber-500/10 dark:bg-accent/10 border border-amber-500/20 dark:border-accent/20 text-amber-900 dark:text-accent font-semibold' 
-                        : 'hover:bg-amber-500/5 dark:hover:bg-[#181D23] text-gray-700 dark:text-gray-300'
-                    }`}
-                    onClick={() => {
-                      onReciterChange(reciter.id);
-                      setShowReciterSelector(false);
-                    }}
-                  >
-                    <span className="truncate text-xs font-semibold tracking-wide" title={reciter.name}>
-                      {reciter.name}
-                    </span>
-                    {selectedReciter === reciter.id && (
-                      <div className="ml-auto w-2 h-2 bg-amber-500 dark:bg-accent rounded-full flex-shrink-0" />
-                    )}
-                  </Button>
+              <div className="space-y-3 max-h-80 overflow-y-auto scrollbar-thin pr-1">
+                {reciterGroups.map((group) => (
+                  <div key={group.label} className="space-y-1">
+                    <div className="px-2 pt-1 pb-1 text-[10px] font-bold tracking-wider uppercase text-amber-700/70 dark:text-accent/70 border-b border-amber-200/15 dark:border-border/15">
+                      {group.label}
+                    </div>
+                    {group.reciters.map((reciter) => (
+                      <Button
+                        key={reciter.id}
+                        variant="ghost"
+                        className={`w-full justify-start h-11 rounded-xl px-4 text-left transition-all ${
+                          selectedReciter === reciter.id
+                            ? 'bg-amber-500/10 dark:bg-accent/10 border border-amber-500/20 dark:border-accent/20 text-amber-900 dark:text-accent font-semibold'
+                            : 'hover:bg-amber-500/5 dark:hover:bg-[#181D23] text-gray-700 dark:text-gray-300'
+                        }`}
+                        onClick={() => {
+                          onReciterChange(reciter.id);
+                          setShowReciterSelector(false);
+                        }}
+                      >
+                        <span className="truncate text-xs font-semibold tracking-wide" title={reciter.name}>
+                          {reciter.name}
+                        </span>
+                        {selectedReciter === reciter.id && (
+                          <div className="ml-auto w-2 h-2 bg-amber-500 dark:bg-accent rounded-full flex-shrink-0" />
+                        )}
+                      </Button>
+                    ))}
+                  </div>
                 ))}
               </div>
             ) : (

@@ -13,6 +13,13 @@ interface AudioPlayerProps {
   onTogglePlayPause: () => void;
   onStop: () => void;
   onPlayNext?: () => void;
+  /** Absolute offset (seconds) of the current ayah segment within the audio file.
+   *  Non-zero for surah-mode reciters; the progress bar/loop markers operate
+   *  relative to the segment and this offset is added when seeking. */
+  seekOffset?: number;
+  /** Absolute end (seconds) of the current ayah segment within the audio file.
+   *  When > 0, auto-advance triggers at this point instead of the 'ended' event. */
+  segmentEnd?: number;
 }
 
 export default function AudioPlayer({
@@ -24,6 +31,8 @@ export default function AudioPlayer({
   onTogglePlayPause,
   onStop,
   onPlayNext,
+  seekOffset = 0,
+  segmentEnd = 0,
 }: AudioPlayerProps) {
   const [loopMode, setLoopMode] = useState<'none' | 'custom'>('none');
   const [customLoop, setCustomLoop] = useState<{ start: number; end: number }>({ start: 0, end: 0 });
@@ -101,19 +110,21 @@ export default function AudioPlayer({
     if (currentAudio) currentAudio.playbackRate = playbackSpeed;
   }, [currentAudio, playbackSpeed]);
 
-  // Handle loop logic
+  // Handle loop logic + segment-based auto-advance (surah-mode reciters)
   useEffect(() => {
     if (!currentAudio) return;
     currentAudio.loop = false;
+
     if (loopMode === 'custom') {
       const handleTimeUpdate = () => {
-        if (isEndSet && customLoop.end > 0 && currentAudio.currentTime > customLoop.end) {
-          currentAudio.currentTime = customLoop.start;
+        // Loop markers are segment-relative; add seekOffset for absolute position.
+        if (isEndSet && customLoop.end > 0 && currentAudio.currentTime > seekOffset + customLoop.end) {
+          currentAudio.currentTime = seekOffset + customLoop.start;
           currentAudio.play();
         }
       };
       const handleEnded = () => {
-        currentAudio.currentTime = customLoop.start;
+        currentAudio.currentTime = seekOffset + customLoop.start;
         currentAudio.play();
       };
       currentAudio.addEventListener('timeupdate', handleTimeUpdate);
@@ -123,16 +134,32 @@ export default function AudioPlayer({
         currentAudio.removeEventListener('ended', handleEnded);
       };
     } else if (loopMode === 'none' && onPlayNext) {
-      // No loop — auto-advance to next verse when audio ends
-      const handleEnded = () => {
-        onPlayNext();
-      };
-      currentAudio.addEventListener('ended', handleEnded);
-      return () => {
-        currentAudio.removeEventListener('ended', handleEnded);
-      };
+      if (segmentEnd > 0) {
+        // Surah-mode: auto-advance when playback reaches the segment end,
+        // since the underlying file keeps playing past the ayah boundary.
+        let advanced = false;
+        const handleTimeUpdate = () => {
+          if (!advanced && currentAudio.currentTime >= segmentEnd) {
+            advanced = true;
+            onPlayNext();
+          }
+        };
+        currentAudio.addEventListener('timeupdate', handleTimeUpdate);
+        return () => {
+          currentAudio.removeEventListener('timeupdate', handleTimeUpdate);
+        };
+      } else {
+        // Verse-mode: auto-advance when the per-ayah file ends.
+        const handleEnded = () => {
+          onPlayNext();
+        };
+        currentAudio.addEventListener('ended', handleEnded);
+        return () => {
+          currentAudio.removeEventListener('ended', handleEnded);
+        };
+      }
     }
-  }, [currentAudio, loopMode, customLoop, duration, isEndSet, onPlayNext]);
+  }, [currentAudio, loopMode, customLoop, duration, isEndSet, onPlayNext, seekOffset, segmentEnd]);
 
   // Auto-show/hide custom loop inputs
   useEffect(() => {
@@ -161,7 +188,7 @@ export default function AudioPlayer({
       } else if (draggingMarker.current === 'end') {
         handleSetEnd(time);
       } else if (isScrubbing && currentAudio) {
-        currentAudio.currentTime = time;
+        currentAudio.currentTime = seekOffset + time;
       }
     };
     const onUp = () => {
@@ -179,7 +206,7 @@ export default function AudioPlayer({
       window.removeEventListener('touchmove', onMove);
       window.removeEventListener('touchend', onUp);
     };
-  }, [isScrubbing, draggingMarker.current, currentAudio, duration]);
+  }, [isScrubbing, draggingMarker.current, currentAudio, duration, seekOffset]);
 
   const handleSetStart = (time: number) => {
     const newStart = Math.max(0, Math.min(duration, time));
@@ -221,11 +248,11 @@ export default function AudioPlayer({
           break;
         case 'ArrowLeft':
           event.preventDefault();
-          currentAudio.currentTime = Math.max(0, currentAudio.currentTime - 10);
+          currentAudio.currentTime = Math.max(seekOffset, currentAudio.currentTime - 10);
           break;
         case 'ArrowRight':
           event.preventDefault();
-          currentAudio.currentTime = Math.min(currentAudio.duration, currentAudio.currentTime + 10);
+          currentAudio.currentTime = Math.min(segmentEnd > 0 ? segmentEnd : currentAudio.duration, currentAudio.currentTime + 10);
           break;
         case 'ArrowUp':
           event.preventDefault();
@@ -276,7 +303,7 @@ export default function AudioPlayer({
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [currentAudio, onTogglePlayPause, onStop, isStartSet, isEndSet, loopMode, showCustomLoopInputs, duration, customLoop]);
+  }, [currentAudio, onTogglePlayPause, onStop, isStartSet, isEndSet, loopMode, showCustomLoopInputs, duration, customLoop, seekOffset, segmentEnd]);
 
   const formatTime = (time: number) => {
     const minutes = Math.floor(time / 60);
@@ -323,7 +350,7 @@ export default function AudioPlayer({
           }
           setIsScrubbing(true);
           const rect = e.currentTarget.getBoundingClientRect();
-          currentAudio.currentTime = ((e.clientX - rect.left) / rect.width) * duration;
+          currentAudio.currentTime = seekOffset + ((e.clientX - rect.left) / rect.width) * duration;
         }}
         onTouchStart={(e) => {
           if (!currentAudio || duration <= 0) return;
@@ -346,7 +373,7 @@ export default function AudioPlayer({
           setIsScrubbing(true);
           const rect = e.currentTarget.getBoundingClientRect();
           const x = e.touches[0].clientX - rect.left;
-          currentAudio.currentTime = (Math.max(0, Math.min(x, rect.width)) / rect.width) * duration;
+          currentAudio.currentTime = seekOffset + (Math.max(0, Math.min(x, rect.width)) / rect.width) * duration;
         }}
       >
         {/* Track background */}

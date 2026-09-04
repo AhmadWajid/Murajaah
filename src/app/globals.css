@@ -348,6 +348,21 @@ body {
   border-color: rgba(197, 168, 128, 0.35);
 }
 
+/* Verse action buttons: fade slightly on desktop mice, but never fully hide.
+   Touch devices (iPad) that match this query still see the buttons at reduced
+   opacity, keeping them usable without hover. */
+@media (hover: hover) and (pointer: fine) and (min-width: 1024px) {
+  .ayah-actions-toolbar {
+    opacity: 0.5;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+
+  .group:hover .ayah-actions-toolbar,
+  .group:focus-within .ayah-actions-toolbar {
+    opacity: 1;
+  }
+}
+
 .btn-primary {
   background: linear-gradient(135deg, var(--accent), var(--primary));
   color: var(--primary-foreground);

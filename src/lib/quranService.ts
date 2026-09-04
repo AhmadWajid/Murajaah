@@ -1,5 +1,5 @@
 import { ALQURAN_API_BASE, DEFAULT_EDITIONS } from './quran';
-import { DEFAULT_RECITER_ID, getEveryAyahAudioUrl } from './recitations';
+import { DEFAULT_RECITER_ID, getVerseAyahAudioUrl, getSurahAudioUrl } from './recitations';
 
 export interface QuranApiResponse {
   code: number;
@@ -154,15 +154,13 @@ export async function searchQuran(
   return response.data.matches;
 }
 
-// Get individual ayah audio URL (EveryAyah.com)
+// Get individual ayah audio URL (per-ayah file for verse-mode reciters).
 export function getAyahAudioUrl(surahNumber: number, ayahNumber: number, reciter: string = DEFAULT_RECITER_ID, _bitrate?: number): string {
-  return getEveryAyahAudioUrl(surahNumber, ayahNumber, reciter);
+  return getVerseAyahAudioUrl(surahNumber, ayahNumber, reciter);
 }
 
-// Surah-level audio is not provided by EveryAyah; fall back to sequential ayah URLs via getAyahRangeAudioUrls.
-export function getSurahAudioUrl(surahNumber: number, reciter: string = DEFAULT_RECITER_ID, _bitrate?: number): string {
-  return getEveryAyahAudioUrl(surahNumber, 1, reciter);
-}
+// Surah-level audio URL (full-surah file for surah-mode reciters).
+export { getSurahAudioUrl };
 
 // Utility function to get audio URL for an ayah
 export function getAudioUrl(surahNumber: number, ayahNumber: number, reciter: string = DEFAULT_RECITER_ID, bitrate?: number): string {

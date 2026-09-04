@@ -808,8 +808,8 @@ export default function AyahCard({
               )}
             </div>
             
-            {/* Actions toolbar */}
-            <div className={`flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0 ${borderless ? 'lg:opacity-0 lg:translate-y-1 lg:group-hover:opacity-100 lg:group-hover:translate-y-0 transition-all duration-300' : ''}`}>
+            {/* Actions toolbar — hover-hide only on desktop mice; always visible on touch (iPad) */}
+            <div className={`flex items-center gap-1.5 sm:gap-2.5 flex-shrink-0 ${borderless ? 'ayah-actions-toolbar transition-all duration-300' : ''}`}>
               {actionButtons}
             </div>
           </div>
