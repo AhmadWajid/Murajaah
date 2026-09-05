@@ -199,33 +199,24 @@ export function TajweedAyahText({
       })) as unknown as TajweedWord[];
       setTajweedWords(plainWords);
 
-      // Also load tajweed data so revealed words show color-coded tajweed.
-      // Merge rules + text into existing plain words by index, preserving IDs
-      // so visibleWordIds state remains valid and no layout shift occurs.
-      const loadAndMerge = async () => {
+      // Load tajweed data from the DB (source of truth for word boundaries
+      // and tajweed rules). The API text and DB can have different word
+      // splits (e.g. the API may split a word + its stopping mark into two
+      // "words" while the DB keeps them as one), so merging by index breaks.
+      // Instead, replace the plain words entirely with DB words so the verse
+      // marker (e.g. "٧٦") is consistently hidden/revealed like all other
+      // words.
+      const loadAndReplace = async () => {
         try {
           const words = await getTajweedWords(surahNumber, ayahNumber);
           if (words && words.length > 0) {
-            setTajweedWords(prev => {
-              if (prev.length === 0) return prev;
-              return prev.map((plainWord, idx) => {
-                const tajweedWord = words[idx] as unknown as TajweedWord;
-                if (tajweedWord) {
-                  return {
-                    ...plainWord,
-                    text: tajweedWord.text,
-                    tajweedRules: tajweedWord.tajweedRules || []
-                  };
-                }
-                return plainWord;
-              }) as unknown as TajweedWord[];
-            });
+            setTajweedWords(words as unknown as TajweedWord[]);
           }
         } catch {
           // Keep plain words on error
         }
       };
-      loadAndMerge();
+      loadAndReplace();
     } else {
       loadTajweedData();
     }
