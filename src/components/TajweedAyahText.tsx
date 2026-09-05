@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { TajweedWord } from '@/lib/tajweedService';
+import { TajweedWord, TAJWEED_COLORS, getTajweedTooltip } from '@/lib/tajweedService';
 import { qpcFontLoader } from '@/lib/qpcFontLoader';
 import { Tooltip } from 'react-tooltip';
 import { useTajweedCache } from '@/lib/hooks/useTajweedCache';
@@ -25,6 +25,7 @@ interface TajweedAyahTextProps {
   disableTajweedColors?: boolean; // NEW PROP
   isMobile?: boolean; // Add mobile detection prop
   displayMode?: 'block' | 'inline'; // NEW PROP
+  useV4Tajweed?: boolean; // Use V4 COLRv1 color fonts (1441H print)
 }
 
 export function TajweedAyahText({ 
@@ -45,6 +46,7 @@ export function TajweedAyahText({
   disableTajweedColors = false, // NEW DEFAULT
   isMobile = false, // NEW DEFAULT
   displayMode = 'block',
+  useV4Tajweed = false,
 }: TajweedAyahTextProps) {
   const Tag = displayMode === 'inline' ? 'span' : 'div';
   const { getTajweedWords, isTajweedLoading } = useTajweedCache();
@@ -207,6 +209,122 @@ export function TajweedAyahText({
   const tooltipData: Array<{ id: string; content: string; bgColor: string }> = [];
   const translationTooltipData: Array<{ id: string; content: string; wordId: string }> = [];
 
+  // Combining marks that attach to the PRECEDING base letter.
+  // Splitting them into a separate <span> detaches them from their base.
+  const isCombiningMark = (ch: string) =>
+    /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7-\u06E8\u06EA-\u06ED]/.test(ch);
+
+  // Tatweel (ـ U+0640) is a JOINING character — it connects letters horizontally.
+  const isTatweel = (ch: string) => ch === '\u0640';
+
+  // A rule is "mark-only" if it contains no base letters — just tatweel + combining marks.
+  // These rules are rendered as absolutely positioned overlays to avoid breaking text shaping.
+  const isMarkOnly = (text: string) =>
+    text.length > 0 && [...text].every(ch => isCombiningMark(ch) || isTatweel(ch));
+
+  // When a rule starts with a combining mark, pull the last base letter (+ its
+  // attached marks) from the preceding text into the rule span.
+  const splitBeforeBaseLetter = (beforeText: string): [string, string] => {
+    let splitAt = beforeText.length;
+    for (let i = beforeText.length - 1; i >= 0; i--) {
+      if (!isCombiningMark(beforeText[i])) {
+        splitAt = i;
+        break;
+      }
+    }
+    return [beforeText.slice(0, splitAt), beforeText.slice(splitAt)];
+  };
+
+  // When a rule starts with tatweel, pull the first base letter from the
+  // FOLLOWING text into the rule span so the tatweel can connect forward.
+  const splitAfterNextBaseLetter = (afterText: string): [string, string] => {
+    if (!afterText) return ['', ''];
+    let splitAt = 0;
+    // Skip the first base letter and any combining marks attached to it
+    for (let i = 0; i < afterText.length; i++) {
+      if (!isCombiningMark(afterText[i]) && !isTatweel(afterText[i])) {
+        // Found first base letter — include it and any following combining marks
+        splitAt = i + 1;
+        while (splitAt < afterText.length && isCombiningMark(afterText[splitAt])) {
+          splitAt++;
+        }
+        break;
+      }
+    }
+    return [afterText.slice(0, splitAt), afterText.slice(splitAt)];
+  };
+
+  // Render tajweed-colored segments for a word (no tooltips — used in hide-words overlay)
+  const renderTajweedColoredText = (word: TajweedWord) => {
+    if (!word.tajweedRules || word.tajweedRules.length === 0) {
+      return word.text;
+    }
+    const text = word.text;
+    const rules = word.tajweedRules;
+    const segments: React.ReactNode[] = [];
+    let lastIndex = 0;
+    const sortedRules = [...rules].sort((a, b) => a.startIndex - b.startIndex);
+    sortedRules.forEach((rule, ruleIndex) => {
+      const ruleColor = getTajweedColor(rule.class);
+      const firstChar = rule.text[0];
+      const ruleStartsWithCombining = firstChar && isCombiningMark(firstChar);
+      const markOnly = isMarkOnly(rule.text);
+
+      if (rule.startIndex > lastIndex) {
+        const beforeText = text.slice(lastIndex, rule.startIndex);
+        if (markOnly) {
+          // Mark-only rule: keep in text flow as plain text to preserve shaping
+          segments.push(
+            <span key={`text-${word.id}-${ruleIndex}`} style={{ fontSize: `${currentFontSize}px` }}>
+              {beforeText}{rule.text}
+            </span>
+          );
+        } else if (ruleStartsWithCombining && beforeText.length > 0) {
+          // Combining mark: pull last base letter from BEFORE into rule span
+          const [textBeforeBase, baseWithMarks] = splitBeforeBaseLetter(beforeText);
+          if (textBeforeBase) {
+            segments.push(
+              <span key={`text-${word.id}-${ruleIndex}`} style={{ fontSize: `${currentFontSize}px` }}>
+                {textBeforeBase}
+              </span>
+            );
+          }
+          segments.push(
+            <span key={`rule-${word.id}-${ruleIndex}`} className={ruleColor} style={{ fontSize: `${currentFontSize}px` }}>
+              {baseWithMarks}{rule.text}
+            </span>
+          );
+        } else {
+          segments.push(
+            <span key={`text-${word.id}-${ruleIndex}`} style={{ fontSize: `${currentFontSize}px` }}>
+              {beforeText}
+            </span>
+          );
+          segments.push(
+            <span key={`rule-${word.id}-${ruleIndex}`} className={ruleColor} style={{ fontSize: `${currentFontSize}px` }}>
+              {rule.text}
+            </span>
+          );
+        }
+      } else {
+        segments.push(
+          <span key={`rule-${word.id}-${ruleIndex}`} className={ruleColor} style={{ fontSize: `${currentFontSize}px` }}>
+            {rule.text}
+          </span>
+        );
+      }
+      lastIndex = rule.endIndex;
+    });
+    if (lastIndex < text.length) {
+      segments.push(
+        <span key={`text-${word.id}-end`} style={{ fontSize: `${currentFontSize}px` }}>
+          {text.slice(lastIndex)}
+        </span>
+      );
+    }
+    return segments;
+  };
+
   // Always render with Tajweed highlighting
   const renderWordWithTajweed = (word: TajweedWord, index: number) => {
     // Find the translation for this word if available and feature is enabled
@@ -245,6 +363,7 @@ export function TajweedAyahText({
       hoverTimeoutRef.current = setTimeout(() => setHoveredTajweedWordId(null), 80);
     };
 
+    // V4 rendering is disabled — using span-based coloring with combining mark fix
     if (hideWords) {
       // Find the translation for this word if available
       let translation = '';
@@ -300,24 +419,24 @@ export function TajweedAyahText({
               isWordVisible ? 'opacity-0' : 'opacity-100'
             }`}
             style={{
-              backgroundColor: 'rgba(249, 250, 251, 0.9)',
+              backgroundColor: 'transparent',
               border: '1px dashed rgba(156, 163, 175, 0.6)',
               borderRadius: '3px'
             }}
           />
-          
-          {/* Visible text when revealed */}
+
+          {/* Visible text when revealed — with tajweed coloring */}
           <span
             className={`transition-opacity duration-200 absolute inset-0 flex items-center justify-center ${
               isWordVisible ? 'opacity-100' : 'opacity-0'
             }`}
             style={{
               fontSize: `${currentFontSize}px`,
-              backgroundColor: 'rgba(255, 255, 255, 0.95)',
+              backgroundColor: 'transparent',
               borderRadius: '3px'
             }}
           >
-            {word.text}
+            {renderTajweedColoredText(word)}
           </span>
         </span>
       );
@@ -372,41 +491,104 @@ export function TajweedAyahText({
     let lastIndex = 0;
     const sortedRules = [...rules].sort((a, b) => a.startIndex - b.startIndex);
     sortedRules.forEach((rule, ruleIndex) => {
-      // Add text before the rule
-      if (rule.startIndex > lastIndex) {
-        segments.push(
-          <span 
-            key={`text-${word.id}-${ruleIndex}`}
-            style={{ fontSize: `${currentFontSize}px` }}
-          >
-            {text.slice(lastIndex, rule.startIndex)}
-          </span>
-        );
-      }
       // Add the rule text with tooltip trigger only
       const ruleColor = getTajweedColor(rule.class);
       const ruleDescription = getTajweedDescription(rule.class);
       const tooltipId = `tajweed-tooltip-${word.id}-${ruleIndex}`;
       const bgColor = ruleColorMap[rule.class] || '#222';
       tooltipData.push({ id: tooltipId, content: ruleDescription, bgColor });
-      segments.push(
-        <span
-          key={`rule-${word.id}-${ruleIndex}`}
-          className={ruleColor}
-          data-tooltip-id={tooltipId}
-          data-tooltip-content={ruleDescription}
-          style={{ fontSize: `${currentFontSize}px` }}
-          onMouseEnter={handleTajweedMouseEnter}
-          onMouseLeave={handleTajweedMouseLeave}
-        >
-          {rule.text}
-        </span>
-      );
+      const firstChar = rule.text[0];
+      const ruleStartsWithCombining = firstChar && isCombiningMark(firstChar);
+      const markOnly = isMarkOnly(rule.text);
+      // Add text before the rule
+      if (rule.startIndex > lastIndex) {
+        const beforeText = text.slice(lastIndex, rule.startIndex);
+        if (markOnly) {
+          // Mark-only rule (tatweel + combining marks, no base letters):
+          // Keep in the text flow as plain text to preserve shaping.
+          // Attach tooltip to the preceding text span instead.
+          segments.push(
+            <span
+              key={`text-${word.id}-${ruleIndex}`}
+              className="cursor-help tajweed-rule"
+              data-tooltip-id={tooltipId}
+              data-tooltip-content={ruleDescription}
+              style={{ fontSize: `${currentFontSize}px` }}
+              onMouseEnter={handleTajweedMouseEnter}
+              onMouseLeave={handleTajweedMouseLeave}
+            >
+              {beforeText}{rule.text}
+            </span>
+          );
+        } else if (ruleStartsWithCombining && beforeText.length > 0) {
+          // Combining mark: pull last base letter from BEFORE into rule span
+          const [textBeforeBase, baseWithMarks] = splitBeforeBaseLetter(beforeText);
+          if (textBeforeBase) {
+            segments.push(
+              <span
+                key={`text-${word.id}-${ruleIndex}`}
+                style={{ fontSize: `${currentFontSize}px` }}
+              >
+                {textBeforeBase}
+              </span>
+            );
+          }
+          segments.push(
+            <span
+              key={`rule-${word.id}-${ruleIndex}`}
+              className={`${ruleColor} cursor-help tajweed-rule`}
+              data-tooltip-id={tooltipId}
+              data-tooltip-content={ruleDescription}
+              style={{ fontSize: `${currentFontSize}px` }}
+              onMouseEnter={handleTajweedMouseEnter}
+              onMouseLeave={handleTajweedMouseLeave}
+            >
+              {baseWithMarks}{rule.text}
+            </span>
+          );
+        } else {
+          segments.push(
+            <span
+              key={`text-${word.id}-${ruleIndex}`}
+              style={{ fontSize: `${currentFontSize}px` }}
+            >
+              {beforeText}
+            </span>
+          );
+          segments.push(
+            <span
+              key={`rule-${word.id}-${ruleIndex}`}
+              className={`${ruleColor} cursor-help tajweed-rule`}
+              data-tooltip-id={tooltipId}
+              data-tooltip-content={ruleDescription}
+              style={{ fontSize: `${currentFontSize}px` }}
+              onMouseEnter={handleTajweedMouseEnter}
+              onMouseLeave={handleTajweedMouseLeave}
+            >
+              {rule.text}
+            </span>
+          );
+        }
+      } else {
+        segments.push(
+          <span
+            key={`rule-${word.id}-${ruleIndex}`}
+            className={`${ruleColor} cursor-help tajweed-rule`}
+            data-tooltip-id={tooltipId}
+            data-tooltip-content={ruleDescription}
+            style={{ fontSize: `${currentFontSize}px` }}
+            onMouseEnter={handleTajweedMouseEnter}
+            onMouseLeave={handleTajweedMouseLeave}
+          >
+            {rule.text}
+          </span>
+        );
+      }
       lastIndex = rule.endIndex;
     });
     if (lastIndex < text.length) {
       segments.push(
-        <span 
+        <span
           key={`text-${word.id}-end`}
           style={{ fontSize: `${currentFontSize}px` }}
         >
@@ -458,7 +640,7 @@ export function TajweedAyahText({
          className={`leading-relaxed sm:leading-loose text-amber-900 dark:text-amber-100 font-arabic arabic-text uthmanic-hafs ${className}`} 
         dir="rtl"
         style={{
-          fontFamily: fontLoaded ? qpcFontLoader.getFontFamily(pageNumber || 1) : "'qpc-v2-fallback', 'Amiri', serif",
+          fontFamily: fontLoaded ? qpcFontLoader.getFontFamily(pageNumber || 1) : "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif",
           fontSize: `${currentFontSize}px`,
           lineHeight: displayMode === 'inline' ? 'inherit' : '1.8',
           textAlign: displayMode === 'inline' ? 'inherit' : 'right',
@@ -551,57 +733,11 @@ export function TajweedAyahText({
 
 // Helper functions for tajweed colors and descriptions
 function getTajweedColor(ruleClass: string): string {
-  const colors: Record<string, string> = {
-    ham_wasl: 'text-red-500',
-    laam_shamsiyah: 'text-yellow-600',
-    madda_normal: 'text-green-500',
-    madda_permissible: 'text-green-500',
-    madda_necessary: 'text-green-600',
-    slnt: 'text-gray-600',
-    ghunnah: 'text-indigo-600',
-    qalaqah: 'text-orange-600',
-    ikhafa: 'text-purple-600',
-    madda_obligatory_mottasel: 'text-green-600',
-    madda_obligatory_monfasel: 'text-green-600',
-    iqlab: 'text-teal-600',
-    izhar: 'text-blue-500',
-    idgham_ghunnah: 'text-blue-600',
-    idgham_wo_ghunnah: 'text-blue-500',
-    ikhafa_shafawi: 'text-purple-600',
-    idgham_shafawi: 'text-blue-600',
-    izhar_shafawi: 'text-blue-500',
-    madd_al_tamkeen: 'text-green-500',
-    tafkheem: 'text-red-600',
-    tarqeeq: 'text-blue-400',
-  };
-  return colors[ruleClass] || 'text-gray-600';
+  return TAJWEED_COLORS[ruleClass] || 'text-gray-600';
 }
 
 function getTajweedDescription(ruleClass: string): string {
-  const descriptions: Record<string, string> = {
-    ham_wasl: 'Hamza Wasl - Silent hamza at the beginning of words',
-    laam_shamsiyah: 'Laam Shamsiyah - Solar laam (assimilated)',
-    madda_normal: 'Madda Normal - Natural prolongation',
-    madda_permissible: 'Madda Permissible - Can be prolonged for 2-6 counts',
-    madda_necessary: 'Madda Necessary - Must be prolonged for 4-5 counts',
-    slnt: 'Silent - Letter is not pronounced',
-    ghunnah: 'Ghunnah - Nasalization for 2 counts',
-    qalaqah: 'Qalaqah - Bouncing sound on qalqalah letters (ق ط ب ج د)',
-    ikhafa: 'Ikhafa - Partial hiding of noon/tanween',
-    madda_obligatory_mottasel: 'Madda Obligatory Connected - Must be prolonged for 4-5 counts',
-    madda_obligatory_monfasel: 'Madda Obligatory Separated - Must be prolonged for 4-5 counts',
-    iqlab: 'Iqlab - Converting noon to meem when followed by ب',
-    izhar: 'Izhar - Clear pronunciation of noon/tanween',
-    idgham_ghunnah: 'Idgham with Ghunnah - Assimilation with nasalization',
-    idgham_wo_ghunnah: 'Idgham without Ghunnah - Assimilation without nasalization',
-    ikhafa_shafawi: 'Ikhafa Shafawi - Partial hiding with labial letters',
-    idgham_shafawi: 'Idgham Shafawi - Assimilation with labial letters',
-    izhar_shafawi: 'Izhar Shafawi - Clear pronunciation with labial',
-    madd_al_tamkeen: 'Madd Al Tamkeen - Strengthening prolongation',
-    tafkheem: 'Tafkheem - Heavy/thick pronunciation',
-    tarqeeq: 'Tarqeeq - Light/thin pronunciation',
-  };
-  return descriptions[ruleClass] || ruleClass;
+  return getTajweedTooltip(ruleClass);
 } 
 
 // Map tajweed rule class to a hex color for tooltip backgrounds
@@ -621,6 +757,8 @@ const ruleColorMap: Record<string, string> = {
   izhar: '#3b82f6', // blue-500
   idgham_ghunnah: '#2563eb', // blue-600
   idgham_wo_ghunnah: '#3b82f6',
+  idgham_mutajanisayn: '#2563eb',
+  idgham_mutaqaribayn: '#2563eb',
   ikhafa_shafawi: '#a78bfa',
   idgham_shafawi: '#2563eb',
   izhar_shafawi: '#3b82f6',

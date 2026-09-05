@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { TajweedWord, TAJWEED_COLORS, TAJWEED_DESCRIPTIONS } from '@/lib/tajweedService';
+import { TajweedWord, TAJWEED_COLORS, getTajweedTooltip } from '@/lib/tajweedService';
 import { qpcFontLoader } from '@/lib/qpcFontLoader';
 
 interface TajweedTextProps {
@@ -47,12 +47,12 @@ export function TajweedText({ words, className = '', showTooltips = true }: Tajw
 
       // Add the rule text with styling
       const ruleColor = TAJWEED_COLORS[rule.class] || 'text-gray-600';
-      const ruleDescription = TAJWEED_DESCRIPTIONS[rule.class] || rule.class;
+      const ruleDescription = getTajweedTooltip(rule.class);
       
       const ruleElement = (
         <span
           key={`rule-${word.id}-${ruleIndex}`}
-          className={`${ruleColor} font-semibold ${showTooltips ? 'cursor-help' : ''}`}
+          className={`${ruleColor} font-semibold ${showTooltips ? 'cursor-help tajweed-rule' : ''}`}
           title={showTooltips ? ruleDescription : undefined}
         >
           {rule.text}
@@ -84,7 +84,7 @@ export function TajweedText({ words, className = '', showTooltips = true }: Tajw
       className={`leading-relaxed ${className}`} 
       dir="rtl"
       style={{
-        fontFamily: fontLoaded ? qpcFontLoader.getFontFamily(1) : "'qpc-v2-fallback', 'Amiri', serif",
+        fontFamily: fontLoaded ? qpcFontLoader.getFontFamily(1) : "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif",
         textAlign: 'right',
         fontFeatureSettings: fontLoaded ? "'liga' 1, 'kern' 1" : "normal"
       }}

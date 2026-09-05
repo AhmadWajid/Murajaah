@@ -33,6 +33,8 @@ export const TAJWEED_COLORS: Record<string, string> = {
   izhar: 'text-blue-500',
   idgham_ghunnah: 'text-blue-600',
   idgham_wo_ghunnah: 'text-blue-500',
+  idgham_mutajanisayn: 'text-blue-600',
+  idgham_mutaqaribayn: 'text-blue-600',
   ikhafa_shafawi: 'text-purple-600',
   idgham_shafawi: 'text-blue-600',
   izhar_shafawi: 'text-blue-500',
@@ -46,7 +48,7 @@ export const TAJWEED_DESCRIPTIONS: Record<string, string> = {
   ham_wasl: 'Hamza Wasl - Silent hamza at the beginning of words',
   laam_shamsiyah: 'Laam Shamsiyah - Solar laam (assimilated)',
   madda_normal: 'Madda Normal - Natural prolongation',
-  madda_permissible: 'Madda Permissible - Can be prolonged for 2-6 counts',
+  madda_permissible: 'Madda Tabi\'i (Normal) - Natural letter madd, 2 counts',
   madda_necessary: 'Madda Necessary - Must be prolonged for 4-5 counts',
   slnt: 'Silent - Letter is not pronounced',
   ghunnah: 'Ghunnah - Nasalization for 2 counts',
@@ -58,6 +60,8 @@ export const TAJWEED_DESCRIPTIONS: Record<string, string> = {
   izhar: 'Izhar - Clear pronunciation of noon/tanween',
   idgham_ghunnah: 'Idgham with Ghunnah - Assimilation with nasalization',
   idgham_wo_ghunnah: 'Idgham without Ghunnah - Assimilation without nasalization',
+  idgham_mutajanisayn: 'Idgham Mutajanisayn - Assimilation of letters with the same articulation point',
+  idgham_mutaqaribayn: 'Idgham Mutaqaribayn - Assimilation of letters with close articulation points',
   ikhafa_shafawi: 'Ikhafa Shafawi - Partial hiding with labial letters',
   idgham_shafawi: 'Idgham Shafawi - Assimilation with labial letters',
   izhar_shafawi: 'Izhar Shafawi - Clear pronunciation with labial',
@@ -65,6 +69,115 @@ export const TAJWEED_DESCRIPTIONS: Record<string, string> = {
   tafkheem: 'Tafkheem - Heavy/thick pronunciation',
   tarqeeq: 'Tarqeeq - Light/thin pronunciation',
 };
+
+// Arabic names for tajweed rules (authoritative names, since English labels can be inaccurate)
+export const TAJWEED_ARABIC_NAMES: Record<string, string> = {
+  ham_wasl: 'همزة الوصل',
+  laam_shamsiyah: 'لام شمسية',
+  madda_normal: 'مد طبيعي',
+  madda_permissible: 'مَدّ طبيعي',
+  madda_necessary: 'مد لازم',
+  slnt: 'لا يُلفَظ',
+  ghunnah: 'غُنَّة',
+  qalaqah: 'قلقلة',
+  ikhafa: 'إخفاء',
+  madda_obligatory_mottasel: 'مد واجب متصل',
+  madda_obligatory_monfasel: 'مد جائز منفصل',
+  iqlab: 'إقلاب',
+  izhar: 'إظهار',
+  idgham_ghunnah: 'إدغام بغنة',
+  idgham_wo_ghunnah: 'إدغام بغير غنة',
+  idgham_mutajanisayn: 'إدغام متجانسين',
+  idgham_mutaqaribayn: 'إدغام متقاربين',
+  ikhafa_shafawi: 'إخفاء شفوي',
+  idgham_shafawi: 'إدغام شفوي',
+  izhar_shafawi: 'إظهار شفوي',
+  madd_al_tamkeen: 'مد التمكين',
+  tafkheem: 'تفخيم',
+  tarqeeq: 'ترقيق',
+};
+
+// Builds tooltip text: "الإخفاء — Ikhafa"
+export function getTajweedTooltip(ruleClass: string): string {
+  const english = TAJWEED_DESCRIPTIONS[ruleClass] || ruleClass;
+  const arabic = TAJWEED_ARABIC_NAMES[ruleClass];
+  // Use short English name (first part before " - ")
+  const shortEnglish = english.split(' - ')[0];
+  return arabic ? `${arabic} — ${shortEnglish}` : shortEnglish;
+}
+
+// Short Arabic explanation for each rule (used in the per-ayah breakdown)
+export const TAJWEED_ARABIC_DETAILS: Record<string, string> = {
+  ghunnah: 'صوت يخرج من الخَيْشوم — حركتان',
+  qalaqah: 'اضطراب صوت الحرف عند سكونه (ق ط ب ج د)',
+  idgham_ghunnah: 'إدغام النون الساكنة أو التنوين في حروف: ي ن م و',
+  idgham_wo_ghunnah: 'إدغام النون الساكنة أو التنوين في حرفَي: ل ر',
+  idgham_mutajanisayn: 'إدغام حرفين متماثلين في المخرج والصفة',
+  idgham_mutaqaribayn: 'إدغام حرفين متقاربين في المخرج أو الصفة',
+  ikhafa: 'إخفاء النون الساكنة أو التنوين عند ١٥ حرفًا (ص ذ ث ك ج ...)',
+  ikhafa_shafawi: 'إخفاء الميم الساكنة قبل باء',
+  iqlab: 'نون ساكنة أو تنوين قبل باء تُقلب ميمًا',
+  idgham_shafawi: 'إدغام الميم الساكنة في ميم',
+  izhar: 'إظهار النون الساكنة أو التنوين عند حروف الحلق (ء ه ع ح غ خ)',
+  izhar_shafawi: 'إظهار الميم الساكنة عند بقية الحروف',
+  madda_normal: 'مقدار المد حركتان',
+  madda_permissible: 'حرف مدّ ساكن مسبوق بحركة من جنسه — حركتان',
+  madda_necessary: '٦ حركات',
+  madda_obligatory_mottasel: '٤-٥ حركات (همز بعد حرف المد في كلمة واحدة)',
+  madda_obligatory_monfasel: '٢-٤-٥ حركات (همز في أول الكلمة التالية)',
+  ham_wasl: 'لا تُنطق في الوصل',
+  laam_shamsiyah: 'لا تُنطق — تُدغم في الحرف التالي',
+  slnt: 'حرف لا يُنطق',
+  madd_al_tamkeen: 'مد لتثبيت النطق بين همزتين',
+  tafkheem: 'تسمين صوت الحرف',
+  tarqeeq: 'ترقيق صوت الحرف',
+};
+
+// English translations of the Arabic rule details
+export const TAJWEED_ENGLISH_DETAILS: Record<string, string> = {
+  ghunnah: 'Nasal sound from the nose — held 2 counts',
+  qalaqah: 'Echoing/bouncing sound when the letter is sakin (ق ط ب ج د)',
+  idgham_ghunnah: 'Merge noon sakinah/tanween into: ي ن م و',
+  idgham_wo_ghunnah: 'Merge noon sakinah/tanween into: ل ر',
+  idgham_mutajanisayn: 'Merge two letters identical in articulation point',
+  idgham_mutaqaribayn: 'Merge two letters close in articulation point',
+  ikhafa: 'Hide noon sakinah/tanween before 15 letters (ص ذ ث ك ج ...)',
+  ikhafa_shafawi: 'Hide meem sakinah before ب',
+  iqlab: 'Noon sakinah/tanween before ب converts to meem',
+  idgham_shafawi: 'Merge meem sakinah into a following meem',
+  izhar: 'Pronounce clearly at throat letters (ء ه ع ح غ خ)',
+  izhar_shafawi: 'Pronounce meem sakinah clearly at all other letters',
+  madda_normal: 'Prolonged 2 counts',
+  madda_permissible: 'Sakin madd letter (و ي ا) preceded by a matching vowel — 2 counts',
+  madda_necessary: 'Prolonged 6 counts',
+  madda_obligatory_mottasel: '4-5 counts (hamza after madd letter in the same word)',
+  madda_obligatory_monfasel: '2-4-5 counts (hamza at the start of the next word)',
+  ham_wasl: 'Not pronounced when starting from it',
+  laam_shamsiyah: 'Not pronounced — assimilated into the next letter',
+  slnt: 'Letter is written but not pronounced',
+  madd_al_tamkeen: 'Prolongation easing two consecutive hamzas',
+  tafkheem: 'Heavy/thick pronunciation of the letter',
+  tarqeeq: 'Light/thin pronunciation of the letter',
+};
+
+export interface TajweedRuleInfo {
+  ruleClass: string;
+  arabicName: string;
+  arabicDetail: string;
+  english: string;
+  englishDetail: string;
+}
+
+// Full info for a rule class: Arabic name + Arabic detail + English description
+export function getTajweedRuleInfo(ruleClass: string): TajweedRuleInfo {
+  return {
+    ruleClass,
+    arabicName: TAJWEED_ARABIC_NAMES[ruleClass] || ruleClass,
+    arabicDetail: TAJWEED_ARABIC_DETAILS[ruleClass] || '',
+    english: TAJWEED_DESCRIPTIONS[ruleClass] || ruleClass,
+    englishDetail: TAJWEED_ENGLISH_DETAILS[ruleClass] || '',
+  };
+}
 
 // API functions for fetching tajweed data
 export async function getTajweedWords(surah: number, ayah: number): Promise<TajweedWord[]> {

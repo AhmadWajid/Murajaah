@@ -1,14 +1,42 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400..900;1,400..900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Figtree:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:is(.dark *));
+
+/* Trapezoid tab for header collapse/expand — wide base on the border, narrow point below */
+.header-tab {
+  width: 64px;
+  height: 26px;
+  clip-path: polygon(0% 0%, 100% 0%, 78% 100%, 22% 100%);
+  background: #d4b04a;
+  box-shadow: 0 3px 6px -2px rgba(0,0,0,0.15);
+  transition: background 0.2s;
+}
+.header-tab:hover {
+  background: #c9a23a;
+}
+.dark .header-tab {
+  background: #b8941e;
+}
+.dark .header-tab:hover {
+  background: #a68415;
+}
 
 /* QPC V2 Font - High-quality Arabic font for Quran text */
 /* We'll dynamically load page-specific fonts, but here's a fallback */
 @font-face {
   font-family: 'qpc-v2-fallback';
   src: url('/fonts/QPC V2 Font.ttf/p1.ttf') format('truetype');
+  font-display: swap;
+  font-weight: normal;
+  font-style: normal;
+}
+
+/* UthmanicHafs V22 — global Arabic font for all Arabic text on the site */
+@font-face {
+  font-family: 'UthmanicHafs_V22';
+  src: url('https://static-cdn.tarteel.ai/qul/fonts/UthmanicHafs_V22.woff2?v=3.3') format('woff2');
   font-display: swap;
   font-weight: normal;
   font-style: normal;
@@ -74,7 +102,7 @@
 /* Force font size for translation text */
 .translation-text {
   font-size: inherit !important;
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Inter', sans-serif;
 }
 
 /* Override any Tailwind font size classes */
@@ -162,7 +190,7 @@
 /* Tafsir Modal Styles */
 .tafsir-content {
   line-height: 1.8;
-  font-family: 'Outfit', sans-serif;
+  font-family: 'Inter', sans-serif;
 }
 
 .tafsir-content p {
@@ -233,6 +261,9 @@
 
 /* Comprehensive Arabic text mobile fix */
 .arabic-text, .uthmanic-hafs, .font-arabic {
+  /* Use the QPC Uthmanic Hafs font for all Arabic text */
+  font-family: 'UthmanicHafs_V22', 'Amiri', serif !important;
+  font-feature-settings: 'liga' 1, 'calt' 1, 'ccmp' 1, 'kern' 1, 'mark' 1, 'mkmk' 1;
   /* Reset all text wrapping properties */
   white-space: normal !important;
   word-wrap: break-word !important;
@@ -290,19 +321,19 @@
 
 body {
   background-color: var(--background);
-  font-family: 'Outfit', var(--font-geist-sans), sans-serif;
+  font-family: 'Inter', var(--font-geist-sans), sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
 .arabic-text {
-  font-family: 'Amiri', serif;
+  font-family: 'UthmanicHafs_V22', 'Amiri', serif;
   direction: rtl;
   text-align: right;
 }
 
 /* QPC V2 Font classes for Quran text */
 .qpc-font {
-  font-family: 'qpc-v2', 'qpc-v2-fallback', 'Amiri', serif !important;
+  font-family: 'UthmanicHafs_V22', 'qpc-v2', 'qpc-v2-fallback', 'Amiri', serif !important;
   font-feature-settings: 'liga' 1, 'kern' 1, 'calt' 1, 'rlig' 1, 'ccmp' 1, 'locl' 1, 'mark' 1, 'mkmk' 1;
 }
 
@@ -320,7 +351,7 @@ body {
 }
 
 .quran-text {
-  font-family: 'qpc-v2', 'qpc-v2-fallback', 'Amiri', serif !important;
+  font-family: 'UthmanicHafs_V22', 'qpc-v2', 'qpc-v2-fallback', 'Amiri', serif !important;
   font-feature-settings: 'liga' 1, 'kern' 1, 'calt' 1, 'rlig' 1, 'ccmp' 1, 'locl' 1, 'mark' 1, 'mkmk' 1;
   direction: rtl;
   text-align: right;
@@ -711,8 +742,8 @@ body {
   --color-sidebar-ring: var(--sidebar-ring);
   
   /* Custom Font Families */
-  --font-sans: 'Outfit', var(--font-geist-sans), sans-serif;
-  --font-serif-header: 'Playfair Display', serif;
+  --font-sans: 'Inter', var(--font-geist-sans), sans-serif;
+  --font-serif-header: 'Figtree', 'Inter', sans-serif;
 }
 
 :root {
@@ -869,3 +900,10 @@ input[type="number"] {
   animation: shimmer 1.5s infinite;
 }
 
+
+/* ─── Tajweed rule hit-area ───
+   Combining-mark segments (ـٰ ۥ ّ etc.) have near-zero width, so the
+   invisible ::after overlay widens the hover target without shifting glyphs. */
+.tajweed-rule {
+  position: relative;
+}

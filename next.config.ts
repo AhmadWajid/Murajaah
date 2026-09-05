@@ -1,8 +1,10 @@
 import type { NextConfig } from "next";
+import { dirname } from "path";
+import { fileURLToPath } from "url";
 
 const nextConfig: NextConfig = {
   turbopack: {
-    root: __dirname,
+    root: dirname(fileURLToPath(import.meta.url)),
   },
   experimental: {
     optimizePackageImports: ['tailwindcss'],

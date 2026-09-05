@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, X } from 'lucide-react';
 import SelectedAyahsModal from './SelectedAyahsModal';
 import { TajweedAyahText } from './TajweedAyahText';
-import { TajweedWord, TAJWEED_COLORS, TAJWEED_DESCRIPTIONS } from '@/lib/tajweedService';
+import { TajweedWord, TAJWEED_COLORS, getTajweedTooltip } from '@/lib/tajweedService';
 import { qpcFontLoader } from '@/lib/qpcFontLoader';
 import { createPortal } from 'react-dom';
 import { Tooltip } from 'react-tooltip';
@@ -163,6 +163,7 @@ interface QuranContentProps {
   readingLayout?: 'verse';
   activeAyah?: { surah: number; ayah: number } | null;
   onActiveAyahChange?: (ayah: { surah: number; ayah: number } | null) => void;
+  playingAyah?: { surah: number; ayah: number } | null;
 }
 
 export default function QuranContent({
@@ -205,6 +206,7 @@ export default function QuranContent({
   readingLayout = 'verse',
   activeAyah = null,
   onActiveAyahChange,
+  playingAyah = null,
 }: QuranContentProps) {
   const [showSelectedAyahsModal, setShowSelectedAyahsModal] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
@@ -441,7 +443,7 @@ export default function QuranContent({
                   {/* Independent Bismillah Line below Surah Heading */}
                   {hasBismillah && (
                     <div className="text-center py-4 mb-4 select-none">
-                      <div className="inline-block px-8 py-2 border-b border-amber-500/10 dark:border-accent/10 text-2xl sm:text-3xl text-amber-950 dark:text-amber-100 font-arabic text-center" style={{ fontFamily: 'Amiri, serif', direction: 'rtl' }}>
+                      <div className="inline-block px-8 py-2 border-b border-amber-500/10 dark:border-accent/10 text-2xl sm:text-3xl text-amber-950 dark:text-amber-100 font-arabic text-center" style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif", direction: 'rtl' }}>
                         بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ
                       </div>
                     </div>
@@ -459,6 +461,7 @@ export default function QuranContent({
                       const ayahNo = ayah.numberInSurah;
                       const ayahKey = `${surahNo}:${ayahNo}`;
                       const isActive = activeAyah && activeAyah.surah === surahNo && activeAyah.ayah === ayahNo;
+                      const isPlaying = playingAyah && playingAyah.surah === surahNo && playingAyah.ayah === ayahNo;
                       
                       let arText = (ayah.text || '').replace(/\r?\n|\r/g, ' ').trim();
                       if (ayahNo === 1 && surahNo !== 1 && surahNo !== 9) {
@@ -486,11 +489,13 @@ export default function QuranContent({
                               onActiveAyahChange?.({ surah: surahNo, ayah: ayahNo });
                             }}
                             className={`inline cursor-pointer select-text transition-colors duration-200 ${
-                              isActive 
-                                ? 'bg-amber-500/15 dark:bg-accent/20 rounded-sm' 
-                                : isSelected
-                                  ? 'bg-amber-500/8 dark:bg-accent/10'
-                                  : 'hover:bg-amber-500/5 dark:hover:bg-accent/10'
+                              isActive
+                                ? 'bg-amber-500/15 dark:bg-accent/20 rounded-sm'
+                                : isPlaying
+                                  ? 'bg-amber-500/10 dark:bg-accent/12 rounded-sm ring-1 ring-amber-500/15 dark:ring-accent/15'
+                                  : isSelected
+                                    ? 'bg-amber-500/8 dark:bg-accent/10'
+                                    : 'hover:bg-amber-500/5 dark:hover:bg-accent/10'
                             } ${isMemorized ? reviewGlowClass : ''}`}>
                             <TajweedAyahText
                               ayahText={arText}
@@ -616,7 +621,7 @@ export default function QuranContent({
               if (line.line_type === 'basmallah') {
                 return (
                   <div key={`line-${line.line_number}`} className="text-center py-2 select-none">
-                    <div className="inline-block px-6 py-1 border-b border-amber-500/10 dark:border-accent/10 text-xl sm:text-2xl text-amber-950 dark:text-amber-100 font-arabic text-center" style={{ fontFamily: 'Amiri, serif', direction: 'rtl' }}>
+                    <div className="inline-block px-6 py-1 border-b border-amber-500/10 dark:border-accent/10 text-xl sm:text-2xl text-amber-950 dark:text-amber-100 font-arabic text-center" style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif", direction: 'rtl' }}>
                       بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ
                     </div>
                   </div>
@@ -686,21 +691,26 @@ export default function QuranContent({
                           const segments: React.ReactNode[] = [];
                           let lastIndex = 0;
                           const sortedRules = [...rules].sort((a, b) => a.startIndex - b.startIndex);
-                          
-                          sortedRules.forEach((rule, ruleIndex) => {
-                            if (rule.startIndex > lastIndex) {
-                              segments.push(
-                                <span 
-                                  key={`text-${wordId}-${ruleIndex}`}
-                                  style={{ fontSize: `${arabicFontSize}px` }}
-                                >
-                                  {text.slice(lastIndex, rule.startIndex)}
-                                </span>
-                              );
+                          // Combining marks / tatweel that must stay attached to the preceding base letter.
+                          const isCombiningOrTatweel = (ch: string) =>
+                            /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7-\u06E8\u06EA-\u06ED\u0640]/.test(ch);
+                          // Split beforeText at the last base letter so we can pull it into the rule span
+                          const splitBeforeBaseLetter = (beforeText: string): [string, string] => {
+                            let splitAt = beforeText.length;
+                            for (let i = beforeText.length - 1; i >= 0; i--) {
+                              if (!isCombiningOrTatweel(beforeText[i])) {
+                                splitAt = i;
+                                break;
+                              }
                             }
+                            return [beforeText.slice(0, splitAt), beforeText.slice(splitAt)];
+                          };
+
+                          sortedRules.forEach((rule, ruleIndex) => {
                             const ruleColor = TAJWEED_COLORS[rule.class] || 'text-gray-600';
-                            const ruleDescription = TAJWEED_DESCRIPTIONS[rule.class] || rule.class;
+                            const ruleDescription = getTajweedTooltip(rule.class);
                             const tooltipId = 'tajweed-tooltip-15line';
+                            const ruleStartsWithCombining = rule.text.length > 0 && isCombiningOrTatweel(rule.text[0]);
 
                             const handleTajweedMouseEnter = () => {
                               if (hoverTimeoutRef15.current) clearTimeout(hoverTimeoutRef15.current);
@@ -710,25 +720,79 @@ export default function QuranContent({
                               hoverTimeoutRef15.current = setTimeout(() => setHoveredTajweedWordId15(null), 80);
                             };
 
-                            segments.push(
-                              <span 
-                                key={`rule-${wordId}-${ruleIndex}`} 
-                                className={ruleColor}
-                                data-tooltip-id={tooltipId}
-                                data-tooltip-content={ruleDescription}
-                                style={{ fontSize: `${arabicFontSize}px` }}
-                                onMouseEnter={handleTajweedMouseEnter}
-                                onMouseLeave={handleTajweedMouseLeave}
-                              >
-                                {rule.text}
-                              </span>
-                            );
+                            if (rule.startIndex > lastIndex) {
+                              const beforeText = text.slice(lastIndex, rule.startIndex);
+                              if (ruleStartsWithCombining && beforeText.length > 0) {
+                                // Pull the last base letter into the rule span so the combining mark
+                                // stays in the same text node as its base letter.
+                                const [textBeforeBase, baseWithMarks] = splitBeforeBaseLetter(beforeText);
+                                if (textBeforeBase) {
+                                  segments.push(
+                                    <span
+                                      key={`text-${wordId}-${ruleIndex}`}
+                                      style={{ fontSize: `${arabicFontSize}px` }}
+                                    >
+                                      {textBeforeBase}
+                                    </span>
+                                  );
+                                }
+                                segments.push(
+                                  <span
+                                    key={`rule-${wordId}-${ruleIndex}`}
+                                    className={`${ruleColor} cursor-help tajweed-rule`}
+                                    data-tooltip-id={tooltipId}
+                                    data-tooltip-content={ruleDescription}
+                                    style={{ fontSize: `${arabicFontSize}px` }}
+                                    onMouseEnter={handleTajweedMouseEnter}
+                                    onMouseLeave={handleTajweedMouseLeave}
+                                  >
+                                    {baseWithMarks}{rule.text}
+                                  </span>
+                                );
+                              } else {
+                                segments.push(
+                                  <span
+                                    key={`text-${wordId}-${ruleIndex}`}
+                                    style={{ fontSize: `${arabicFontSize}px` }}
+                                  >
+                                    {beforeText}
+                                  </span>
+                                );
+                                segments.push(
+                                  <span
+                                    key={`rule-${wordId}-${ruleIndex}`}
+                                    className={`${ruleColor} cursor-help tajweed-rule`}
+                                    data-tooltip-id={tooltipId}
+                                    data-tooltip-content={ruleDescription}
+                                    style={{ fontSize: `${arabicFontSize}px` }}
+                                    onMouseEnter={handleTajweedMouseEnter}
+                                    onMouseLeave={handleTajweedMouseLeave}
+                                  >
+                                    {rule.text}
+                                  </span>
+                                );
+                              }
+                            } else {
+                              segments.push(
+                                <span
+                                  key={`rule-${wordId}-${ruleIndex}`}
+                                  className={`${ruleColor} cursor-help tajweed-rule`}
+                                  data-tooltip-id={tooltipId}
+                                  data-tooltip-content={ruleDescription}
+                                  style={{ fontSize: `${arabicFontSize}px` }}
+                                  onMouseEnter={handleTajweedMouseEnter}
+                                  onMouseLeave={handleTajweedMouseLeave}
+                                >
+                                  {rule.text}
+                                </span>
+                              );
+                            }
                             lastIndex = rule.endIndex;
                           });
-                          
+
                           if (lastIndex < text.length) {
                             segments.push(
-                              <span 
+                              <span
                                 key={`text-${wordId}-end`}
                                 style={{ fontSize: `${arabicFontSize}px` }}
                               >
@@ -763,7 +827,7 @@ export default function QuranContent({
                                   : 'hover:bg-amber-500/5 dark:hover:bg-accent/10'
                             } ${isMemorized ? reviewGlowClass : ''}`}
                             style={{
-                              fontFamily: fontLoaded15 ? qpcFontLoader.getFontFamily(pageNum) : "'qpc-v2-fallback', 'Amiri', serif",
+                              fontFamily: fontLoaded15 ? qpcFontLoader.getFontFamily(pageNum) : "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif",
                               fontSize: `${arabicFontSize}px`,
                               direction: 'rtl',
                               whiteSpace: 'nowrap',
@@ -784,26 +848,26 @@ export default function QuranContent({
                                 isWordVisible ? 'opacity-0' : 'opacity-100'
                               }`}
                               style={{
-                                backgroundColor: 'rgba(249, 250, 251, 0.9)',
+                                backgroundColor: 'transparent',
                                 border: '1px dashed rgba(156, 163, 175, 0.6)',
                                 borderRadius: '3px',
                                 zIndex: 10
                               }}
                             />
-                            
-                            {/* Visible text when revealed */}
+
+                            {/* Visible text when revealed — with tajweed coloring */}
                             <span
                               className={`transition-opacity duration-200 absolute inset-0 flex items-center justify-center ${
                                 isWordVisible ? 'opacity-100' : 'opacity-0'
                               }`}
                               style={{
                                 fontSize: `${arabicFontSize}px`,
-                                backgroundColor: 'rgba(255, 255, 255, 0.95)',
+                                backgroundColor: 'transparent',
                                 borderRadius: '3px',
                                 zIndex: 20
                               }}
                             >
-                              {word.text}
+                              {renderWordContent()}
                             </span>
                           </span>
                         );
@@ -828,7 +892,7 @@ export default function QuranContent({
                                 : 'hover:bg-amber-500/5 dark:hover:bg-accent/10'
                           } ${isMemorized ? reviewGlowClass : ''}`}
                           style={{
-                            fontFamily: fontLoaded15 ? qpcFontLoader.getFontFamily(pageNum) : "'qpc-v2-fallback', 'Amiri', serif",
+                            fontFamily: fontLoaded15 ? qpcFontLoader.getFontFamily(pageNum) : "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif",
                             fontSize: `${arabicFontSize}px`,
                             direction: 'rtl',
                             whiteSpace: 'nowrap',
@@ -882,38 +946,39 @@ export default function QuranContent({
 
         {(
           layoutMode === 'spread' ? (
-            <div className="flex gap-2 sm:gap-6 p-2 sm:p-6">
-              {/* Left Page (Current Page) */}
+            <div className={`flex gap-2 sm:gap-6 p-2 sm:p-6 ${currentPage % 2 === 1 ? 'flex-row-reverse' : ''}`}>
+              {/* Current Page — right if odd, left if even (like a real mushaf) */}
               <Card className="flex-1 min-h-screen border-0 shadow-none bg-transparent">
                 <div className="p-1 sm:p-4">
-                  {/* Page Header */}
-                  <div className="text-center mb-10 pb-6 border-b border-amber-200/20 dark:border-border/30">
-                    <div className="text-xs uppercase tracking-widest text-amber-700/80 dark:text-accent/80 mb-2 font-sans font-semibold">
-                      {pageData?.ayahs && pageData.ayahs.length > 0 ? 
-                        (() => {
-                          const uniqueSurahs = Array.from(
-                            new Set(pageData.ayahs.map((ayah: any) => ayah?.surah?.number).filter(Boolean))
-                          ).map(surahNumber => {
-                            const ayah = pageData.ayahs.find((a: any) => a?.surah?.number === surahNumber);
-                            return ayah?.surah;
-                          }).filter(Boolean);
-                          
-                          if (uniqueSurahs.length === 1) {
-                            return `${uniqueSurahs[0].englishName} (${uniqueSurahs[0].englishNameTranslation})`;
-                          } else if (uniqueSurahs.length > 1) {
-                            return uniqueSurahs.map(surah => 
-                              `${surah.englishName} (${surah.englishNameTranslation})`
-                            ).join(' • ');
-                          } else {
-                            return 'Current Page';
-                          }
-                        })() : 
-                        'Current Page'
-                      }
+                  {/* Page Header — English name | divider | Arabic name ... page number */}
+                  <div className="flex items-center justify-between mb-8 pb-3 border-b border-amber-500/15 dark:border-accent/10">
+                    <div className="flex items-center gap-3 min-w-0">
+                      {pageData?.ayahs && pageData.ayahs.length > 0 && (() => {
+                        const uniqueSurahs = Array.from(new Set(pageData.ayahs.map((a: any) => a?.surah?.number).filter(Boolean)));
+                        const arabicNames = uniqueSurahs.map(s => pageData.ayahs.find((a: any) => a?.surah?.number === s)?.surah?.name).filter(Boolean);
+                        const englishNames = uniqueSurahs.map(s => pageData.ayahs.find((a: any) => a?.surah?.number === s)?.surah?.englishName).filter(Boolean);
+                        return (
+                          <>
+                            {englishNames.length > 0 && (
+                              <span className="text-sm font-semibold text-amber-800/70 dark:text-amber-200/60 font-serif-header tracking-wide truncate">
+                                {englishNames.join(' • ')}
+                              </span>
+                            )}
+                            {arabicNames.length > 0 && englishNames.length > 0 && (
+                              <span className="text-amber-400/40 dark:text-accent/30 text-xs">|</span>
+                            )}
+                            {arabicNames.length > 0 && (
+                              <span className="text-base text-amber-900 dark:text-amber-100 font-arabic" dir="rtl">
+                                {arabicNames.join(' • ')}
+                              </span>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
-                    <h2 className="text-3xl font-bold text-gray-900 dark:text-white font-serif-header">
+                    <span className="text-xs font-semibold text-amber-700/60 dark:text-amber-300/50 tracking-wide font-sans flex-shrink-0">
                       Page {currentPage}
-                    </h2>
+                    </span>
                   </div>
 
                   {/* Current Page Content */}
@@ -933,13 +998,13 @@ export default function QuranContent({
                               status={getMemorizationStatus(surahNumber, ayahNumber)}
                               isSelected={Array.from(selectedAyahs).some(sel => sel.surah === surahNumber && sel.ayah === ayahNumber)}
                               isInHighlightedRange={(() => {
-                                const isInHighlightedRange = !!(highlightedRange && 
-                                  highlightedRange.surah === surahNumber && 
-                                  ayahNumber >= highlightedRange.start && 
+                                const isInHighlightedRange = !!(highlightedRange &&
+                                  highlightedRange.surah === surahNumber &&
+                                  ayahNumber >= highlightedRange.start &&
                                   ayahNumber <= highlightedRange.end);
-                                const isInReviewOnPage = reviewsOnPage?.some(review => 
-                                  review.surah === surahNumber && 
-                                  ayahNumber >= review.ayahStart && 
+                                const isInReviewOnPage = reviewsOnPage?.some(review =>
+                                  review.surah === surahNumber &&
+                                  ayahNumber >= review.ayahStart &&
                                   ayahNumber <= review.ayahEnd
                                 ) || false;
                                 return isInHighlightedRange || isInReviewOnPage;
@@ -969,6 +1034,7 @@ export default function QuranContent({
                               padding={padding}
                               borderless={true}
                               layoutMode={layoutMode}
+                              isCurrentlyPlaying={!!playingAyah && playingAyah.surah === surahNumber && playingAyah.ayah === ayahNumber}
                             />
                           </div>
                         );
@@ -982,36 +1048,39 @@ export default function QuranContent({
                 </div>
               </Card>
 
-              {/* Right Page (Previous Page) */}
+              {/* Adjacent Page — left if current is odd, right if current is even */}
               {previousPageData && (
                 <Card className="flex-1 min-h-screen border-0 shadow-none bg-transparent">
                   <div className="p-1 sm:p-4">
-                    {/* Page Header */}
-                    <div className="text-center mb-10 pb-6 border-b border-amber-200/20 dark:border-border/30">
-                      <div className="text-xs uppercase tracking-widest text-amber-700/80 dark:text-accent/80 mb-2 font-sans font-semibold">
-                        {previousPageData ? 
-                          (() => {
-                            const uniqueSurahs = Array.from(
-                              new Set(previousPageData.ayahs.map((ayah: any) => ayah.surah?.number || previousPageData?.surah || 1))
-                            ).map(surahNumber => {
-                              const ayah = previousPageData.ayahs.find((a: any) => (a.surah?.number || previousPageData?.surah || 1) === surahNumber);
-                              return ayah?.surah;
-                            }).filter(Boolean);
-                            
-                            if (uniqueSurahs.length === 1) {
-                              return `${uniqueSurahs[0].englishName} (${uniqueSurahs[0].englishNameTranslation})`;
-                            } else {
-                              return uniqueSurahs.map(surah => 
-                                `${surah.englishName} (${surah.englishNameTranslation})`
-                              ).join(' • ');
-                            }
-                          })() : 
-                          'Previous Page'
-                        }
+                    {/* Page Header — English name | divider | Arabic name ... page number */}
+                    <div className="flex items-center justify-between mb-8 pb-3 border-b border-amber-500/15 dark:border-accent/10">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {previousPageData?.ayahs && previousPageData.ayahs.length > 0 && (() => {
+                          const uniqueSurahs = Array.from(new Set(previousPageData.ayahs.map((a: any) => a?.surah?.number).filter(Boolean)));
+                          const arabicNames = uniqueSurahs.map(s => previousPageData.ayahs.find((a: any) => a?.surah?.number === s)?.surah?.name).filter(Boolean);
+                          const englishNames = uniqueSurahs.map(s => previousPageData.ayahs.find((a: any) => a?.surah?.number === s)?.surah?.englishName).filter(Boolean);
+                          return (
+                            <>
+                              {englishNames.length > 0 && (
+                                <span className="text-sm font-semibold text-amber-800/70 dark:text-amber-200/60 font-serif-header tracking-wide truncate">
+                                  {englishNames.join(' • ')}
+                                </span>
+                              )}
+                              {arabicNames.length > 0 && englishNames.length > 0 && (
+                                <span className="text-amber-400/40 dark:text-accent/30 text-xs">|</span>
+                              )}
+                              {arabicNames.length > 0 && (
+                                <span className="text-base text-amber-900 dark:text-amber-100 font-arabic" dir="rtl">
+                                  {arabicNames.join(' • ')}
+                                </span>
+                              )}
+                            </>
+                          );
+                        })()}
                       </div>
-                      <h2 className="text-3xl font-bold text-gray-900 dark:text-white font-serif-header">
-                        Page {previousPageData?.number || (currentPage === 1 ? currentPage + 1 : currentPage - 1)}
-                      </h2>
+                      <span className="text-xs font-semibold text-amber-700/60 dark:text-amber-300/50 tracking-wide font-sans flex-shrink-0">
+                        Page {previousPageData?.number || (currentPage % 2 === 1 ? currentPage + 1 : currentPage - 1)}
+                      </span>
                     </div>
 
                     {/* Previous Page Content */}
@@ -1070,17 +1139,18 @@ export default function QuranContent({
                               padding={padding}
                               borderless={true}
                               layoutMode={layoutMode}
+                              isCurrentlyPlaying={!!playingAyah && playingAyah.surah === surahNumber && playingAyah.ayah === ayahNumber}
                             />
                           );
                         })
-                      ) : currentPage === 1 ? (
+                      ) : (currentPage % 2 === 1 && currentPage >= 604) || (currentPage % 2 === 0 && currentPage <= 1) ? (
                         <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                          <div className="text-lg font-medium mb-2">Beginning of Quran</div>
-                          <div className="text-sm">This is the first page</div>
+                          <div className="text-lg font-medium mb-2">{currentPage >= 604 ? 'End of Quran' : 'Beginning of Quran'}</div>
+                          <div className="text-sm">{currentPage >= 604 ? 'This is the last page' : 'This is the first page'}</div>
                         </div>
                       ) : (
                         <div className="text-center py-12 text-gray-500 dark:text-gray-400">
-                          <div className="animate-pulse">Loading previous page...</div>
+                          <div className="animate-pulse">Loading adjacent page...</div>
                         </div>
                       )}
                     </div>
@@ -1093,34 +1163,35 @@ export default function QuranContent({
               {/* Vertical timeline line on the right side, acting as a book margin guideline */}
               <div className="hidden lg:block absolute right-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-amber-500/25 via-amber-500/5 to-transparent pointer-events-none" />
               <div className="p-1 sm:p-4">
-                {/* Page Header */}
-                <div className="text-center mb-10 pb-6 border-b border-amber-200/20 dark:border-border/30">
-                  <div className="text-xs uppercase tracking-widest text-amber-700/80 dark:text-accent/80 mb-2 font-sans font-semibold">
-                    {pageData?.ayahs && pageData.ayahs.length > 0 ? 
-                      (() => {
-                        const uniqueSurahs = Array.from(
-                          new Set(pageData.ayahs.map((ayah: any) => ayah?.surah?.number).filter(Boolean))
-                        ).map(surahNumber => {
-                          const ayah = pageData.ayahs.find((a: any) => a?.surah?.number === surahNumber);
-                          return ayah?.surah;
-                        }).filter(Boolean);
-                        
-                        if (uniqueSurahs.length === 1) {
-                          return `${uniqueSurahs[0].englishName} (${uniqueSurahs[0].englishNameTranslation})`;
-                        } else if (uniqueSurahs.length > 1) {
-                          return uniqueSurahs.map(surah => 
-                            `${surah.englishName} (${surah.englishNameTranslation})`
-                          ).join(' • ');
-                        } else {
-                          return 'Loading...';
-                        }
-                      })() : 
-                      'Loading...'
-                    }
+                {/* Page Header — English name | divider | Arabic name ... page number */}
+                <div className="flex items-center justify-between mb-8 pb-3 border-b border-amber-500/15 dark:border-accent/10">
+                  <div className="flex items-center gap-3 min-w-0">
+                    {pageData?.ayahs && pageData.ayahs.length > 0 && (() => {
+                      const uniqueSurahs = Array.from(new Set(pageData.ayahs.map((a: any) => a?.surah?.number).filter(Boolean)));
+                      const arabicNames = uniqueSurahs.map(s => pageData.ayahs.find((a: any) => a?.surah?.number === s)?.surah?.name).filter(Boolean);
+                      const englishNames = uniqueSurahs.map(s => pageData.ayahs.find((a: any) => a?.surah?.number === s)?.surah?.englishName).filter(Boolean);
+                      return (
+                        <>
+                          {englishNames.length > 0 && (
+                            <span className="text-sm font-semibold text-amber-800/70 dark:text-amber-200/60 font-serif-header tracking-wide truncate">
+                              {englishNames.join(' • ')}
+                            </span>
+                          )}
+                          {arabicNames.length > 0 && englishNames.length > 0 && (
+                            <span className="text-amber-400/40 dark:text-accent/30 text-xs">|</span>
+                          )}
+                          {arabicNames.length > 0 && (
+                            <span className="text-base text-amber-900 dark:text-amber-100 font-arabic" dir="rtl">
+                              {arabicNames.join(' • ')}
+                            </span>
+                          )}
+                        </>
+                      );
+                    })()}
                   </div>
-                  <h2 className="text-3xl font-bold text-gray-900 dark:text-white font-serif-header">
-                    {pageData?.number ? `Page ${pageData.number}` : 'Surah View'}
-                  </h2>
+                  <span className="text-xs font-semibold text-amber-700/60 dark:text-amber-300/50 tracking-wide font-sans flex-shrink-0">
+                    {pageData?.number ? `Page ${pageData.number}` : ''}
+                  </span>
                 </div>
 
                 {/* Single Page Content */}
@@ -1176,6 +1247,7 @@ export default function QuranContent({
                             padding={padding}
                             borderless={true}
                             layoutMode={layoutMode}
+                            isCurrentlyPlaying={!!playingAyah && playingAyah.surah === surahNumber && playingAyah.ayah === ayahNumber}
                           />
                         </div>
                       );

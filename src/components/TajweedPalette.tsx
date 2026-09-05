@@ -230,7 +230,7 @@ export function TajweedPalette({ className = '', showDetails = true }: TajweedPa
                     <span className="text-xs text-gray-500">Letters:</span>
                     <span 
                       className="text-xl sm:text-2xl font-arabic"
-                      style={{ fontFamily: "'qpc-v2-fallback', 'Amiri', serif" }}
+                      style={{ fontFamily: "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif" }}
                     >
                       {rule.letters}
                     </span>
@@ -240,7 +240,7 @@ export function TajweedPalette({ className = '', showDetails = true }: TajweedPa
                       <span className="text-xs text-gray-500">Examples:</span>
                       <span 
                         className="text-lg sm:text-xl font-arabic"
-                        style={{ fontFamily: "'qpc-v2-fallback', 'Amiri', serif" }}
+                        style={{ fontFamily: "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif" }}
                       >
                         {rule.examples}
                       </span>

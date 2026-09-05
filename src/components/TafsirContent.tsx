@@ -63,7 +63,7 @@ export function TafsirContent({ content }: TafsirContentProps) {
                           className={`leading-loose font-arabic text-amber-900 dark:text-amber-100 ${isTitle ? 'text-2xl font-bold' : 'text-xl'}`}
                           dir="rtl"
                           style={{
-                            fontFamily: "'qpc-v2-fallback', 'Amiri', serif",
+                            fontFamily: "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif",
                             lineHeight: '2.2',
                             textAlign: 'right',
                             wordBreak: 'keep-all',
@@ -132,7 +132,7 @@ export function TafsirContent({ content }: TafsirContentProps) {
                         className={`leading-loose font-arabic text-amber-900 dark:text-amber-100 ${isTitle ? 'text-2xl font-bold' : 'text-xl'}`}
                         dir="rtl"
                         style={{
-                          fontFamily: "'qpc-v2-fallback', 'Amiri', serif",
+                          fontFamily: "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif",
                           lineHeight: '2.2',
                           textAlign: 'right',
                           wordBreak: 'keep-all',

@@ -113,7 +113,7 @@ export function QuranPage({ className = '' }: QuranPageProps) {
             <div 
               className="text-2xl font-bold text-green-600 mb-1"
               style={{
-                fontFamily: fontLoaded ? qpcFontLoader.getFontFamily(currentPage) : "'qpc-v2-fallback', 'Amiri', serif",
+                fontFamily: fontLoaded ? qpcFontLoader.getFontFamily(currentPage) : "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif",
                 fontFeatureSettings: fontLoaded ? "'liga' 1, 'kern' 1" : "normal"
               }}
             >
@@ -131,7 +131,7 @@ export function QuranPage({ className = '' }: QuranPageProps) {
             <div 
               className="text-xl text-gray-700 font-medium"
               style={{
-                fontFamily: fontLoaded ? qpcFontLoader.getFontFamily(currentPage) : "'qpc-v2-fallback', 'Amiri', serif",
+                fontFamily: fontLoaded ? qpcFontLoader.getFontFamily(currentPage) : "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif",
                 fontFeatureSettings: fontLoaded ? "'liga' 1, 'kern' 1" : "normal"
               }}
             >
@@ -155,7 +155,7 @@ export function QuranPage({ className = '' }: QuranPageProps) {
             key={line.line_number} 
             className={`py-2 ${lineDataItem.lineInfo.isCentered ? 'text-center' : 'text-right'}`}
             style={{
-              fontFamily: fontLoaded ? qpcFontLoader.getFontFamily(currentPage) : "'qpc-v2-fallback', 'Amiri', serif",
+              fontFamily: fontLoaded ? qpcFontLoader.getFontFamily(currentPage) : "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif",
               fontFeatureSettings: fontLoaded ? "'liga' 1, 'kern' 1" : "normal"
             }}
           >

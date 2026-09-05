@@ -3,12 +3,14 @@
 import { useState, useEffect } from 'react';
 import { MistakeData } from '@/lib/supabase/database';
 import { TajweedAyahText } from './TajweedAyahText';
+import { TajweedBreakdownModal } from './TajweedBreakdownModal';
 import { TafsirContent } from './TafsirContent';
 import ReactMarkdown from 'react-markdown';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { formatAyahRange, formatAyahRangeArabic } from '@/lib/quran';
+import { qpcFontLoader } from '@/lib/qpcFontLoader';
 
 /** Strip tajweed <rule class="...">text</rule> tags from a string, keeping only the inner text. Handles nested tags. */
 function stripRuleTags(text: string): string {
@@ -112,6 +114,7 @@ interface AyahCardProps {
   padding?: number;
   borderless?: boolean;
   layoutMode?: 'spread' | 'single';
+  isCurrentlyPlaying?: boolean;
 }
 
 export default function AyahCard({
@@ -146,13 +149,27 @@ export default function AyahCard({
   padding = 0,
   borderless = false,
   layoutMode = 'single',
+  isCurrentlyPlaying = false,
 }: AyahCardProps) {
   // Local state for immediate visual feedback
   const [localMistakeState, setLocalMistakeState] = useState<Record<string, boolean>>({});
   const [isMistakeLoading, setIsMistakeLoading] = useState(false);
+  const [qpcFontReady, setQpcFontReady] = useState(false);
+
+  // Load QPC font for Bismillah and Arabic surah name
+  useEffect(() => {
+    const page = ayah.page || 1;
+    let cancelled = false;
+    qpcFontLoader.loadPageFont(page).then(loaded => {
+      if (!cancelled) setQpcFontReady(loaded);
+    });
+    return () => { cancelled = true; };
+  }, [ayah.page]);
 
 
   const [showReviewRatingDropdown, setShowReviewRatingDropdown] = useState(false);
+  // Tajweed breakdown modal state
+  const [showTajweedBreakdown, setShowTajweedBreakdown] = useState(false);
   // Tafsir modal state
   const [showTafsir, setShowTafsir] = useState(false);
   const [tafsirData, setTafsirData] = useState<any>(null);
@@ -228,6 +245,7 @@ export default function AyahCard({
   const ayahNumber = ayah.numberInSurah;
   const surahNumber = ayah.surah?.number || pageData?.surah || 1;
   const surahName = ayah.surah?.englishName || 'Unknown Surah';
+  const surahArabicName = ayah.surah?.name || '';
   const surahTranslation = ayah.surah?.englishNameTranslation || '';
   const numberOfAyahs = ayah.surah?.numberOfAyahs || 0;
   
@@ -497,6 +515,21 @@ export default function AyahCard({
       )}
 
       <button
+        className="flex items-center justify-center rounded-full w-8 h-8 sm:w-9 sm:h-9 text-teal-600 dark:text-teal-400 bg-teal-500/8 hover:bg-teal-500/15 dark:bg-teal-400/10 dark:hover:bg-teal-400/20 border border-teal-500/10 dark:border-teal-400/10 transition-all duration-200 hover:scale-105 active:scale-95"
+        onClick={(e) => {
+          e.stopPropagation();
+          setShowTajweedBreakdown(true);
+        }}
+        title="Tajweed rules — أحكام التجويد"
+      >
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h10M4 18h13" />
+          <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
+          <circle cx="21" cy="18" r="1.5" fill="currentColor" stroke="none" />
+        </svg>
+      </button>
+
+      <button
         className="flex items-center justify-center rounded-full w-8 h-8 sm:w-9 sm:h-9 text-amber-600 dark:text-amber-400 bg-amber-500/8 hover:bg-amber-500/15 dark:bg-amber-400/10 dark:hover:bg-amber-400/20 border border-amber-500/10 dark:border-amber-400/10 transition-all duration-200 hover:scale-105 active:scale-95"
         onClick={(e) => {
           e.stopPropagation();
@@ -548,7 +581,7 @@ export default function AyahCard({
               <div className="text-sm text-gray-400 dark:text-gray-500 italic mb-2 font-sans">
                 Loading verse…
               </div>
-              <div className="text-2xl text-gray-900 dark:text-white font-arabic" style={{ fontFamily: 'Amiri, serif', direction: 'rtl' }}>
+              <div className="text-2xl text-gray-900 dark:text-white font-arabic" style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif", direction: 'rtl' }}>
                 بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ (Test Arabic)
               </div>
             </div>
@@ -618,7 +651,7 @@ export default function AyahCard({
     <div key={ayah.number} className="relative">
       {/* Ornate Ruku and Sajdah Margin Medallions (Floating in right margin on desktop) */}
       {borderless && isStartOfRuku() && (
-        <div className="hidden lg:flex absolute -right-14 top-6 items-center justify-center w-10 h-10 select-none pointer-events-auto z-20 group/ruku transition-all duration-300 hover:scale-110">
+        <div className="hidden lg:flex absolute -left-14 top-6 items-center justify-center w-10 h-10 select-none pointer-events-auto z-20 group/ruku transition-all duration-300 hover:scale-110">
           <svg viewBox="0 0 36 36" fill="none" className="w-10 h-10 text-amber-500/80 dark:text-accent/80 drop-shadow-sm" xmlns="http://www.w3.org/2000/svg">
             <circle cx="18" cy="18" r="14" stroke="currentColor" strokeWidth="1" />
             <circle cx="18" cy="18" r="12" stroke="currentColor" strokeWidth="0.5" strokeDasharray="1.5 1.5" />
@@ -631,19 +664,19 @@ export default function AyahCard({
             <text x="18" y="21.5" textAnchor="middle" fontSize="11" fontWeight="bold" fill="currentColor" className="font-serif">ع</text>
             <text x="18" y="29.5" textAnchor="middle" fontSize="7" fontWeight="extrabold" fill="currentColor" className="font-sans">{(ayah.ruku)}</text>
           </svg>
-          <span className="absolute -left-12 top-1/2 -translate-y-1/2 text-[9px] font-bold tracking-wider text-amber-800 dark:text-accent bg-[#FAF8F5]/95 dark:bg-[#12161A]/95 border border-amber-200/20 dark:border-border/20 px-2 py-0.5 rounded-md opacity-0 group-hover/ruku:opacity-100 transition-opacity font-sans whitespace-nowrap shadow-sm">Ruku' {ayah.ruku}</span>
+          <span className="absolute -right-12 top-1/2 -translate-y-1/2 text-[9px] font-bold tracking-wider text-amber-800 dark:text-accent bg-[#FAF8F5]/95 dark:bg-[#12161A]/95 border border-amber-200/20 dark:border-border/20 px-2 py-0.5 rounded-md opacity-0 group-hover/ruku:opacity-100 transition-opacity font-sans whitespace-nowrap shadow-sm">Ruku' {ayah.ruku}</span>
         </div>
       )}
 
       {borderless && hasSajdah && (
-        <div className="hidden lg:flex absolute -right-14 top-20 items-center justify-center w-10 h-10 select-none pointer-events-auto z-20 group/sajdah transition-all duration-300 hover:scale-110">
+        <div className="hidden lg:flex absolute -left-14 top-20 items-center justify-center w-10 h-10 select-none pointer-events-auto z-20 group/sajdah transition-all duration-300 hover:scale-110">
           <svg viewBox="0 0 36 36" fill="none" className="w-10 h-10 text-amber-500/80 dark:text-accent/80 drop-shadow-sm" xmlns="http://www.w3.org/2000/svg">
             <rect x="7" y="7" width="22" height="22" rx="2" transform="rotate(45 18 18)" stroke="currentColor" strokeWidth="1" />
             <circle cx="18" cy="18" r="9" stroke="currentColor" strokeWidth="0.5" strokeDasharray="1.5 1.5" />
             <path d="M14 21.5 C14 18.5, 22 18.5, 22 21.5 Z" fill="currentColor" fillOpacity={0.15} stroke="currentColor" strokeWidth="0.75" />
             <path d="M18 13.5 L18 17 M16.5 15 L19.5 15" stroke="currentColor" strokeWidth="0.75" />
           </svg>
-          <span className="absolute -left-14 top-1/2 -translate-y-1/2 text-[9px] font-bold tracking-wider text-amber-800 dark:text-accent bg-[#FAF8F5]/95 dark:bg-[#12161A]/95 border border-amber-200/20 dark:border-border/20 px-2 py-0.5 rounded-md opacity-0 group-hover/sajdah:opacity-100 transition-opacity font-sans whitespace-nowrap shadow-sm">۩ Sajdah</span>
+          <span className="absolute -right-14 top-1/2 -translate-y-1/2 text-[9px] font-bold tracking-wider text-amber-800 dark:text-accent bg-[#FAF8F5]/95 dark:bg-[#12161A]/95 border border-amber-200/20 dark:border-border/20 px-2 py-0.5 rounded-md opacity-0 group-hover/sajdah:opacity-100 transition-opacity font-sans whitespace-nowrap shadow-sm">۩ Sajdah</span>
         </div>
       )}
 
@@ -673,38 +706,59 @@ export default function AyahCard({
         </div>
       )}
 
-      {/* Surah Header Card (Boxed mode) */}
+      {/* Elegant Surah Header Card (Boxed mode) */}
       {isFirstAyahOfSurah && !borderless && (
         <div className="surah-header-card mb-8 p-8 sm:p-10 relative overflow-hidden rounded-3xl text-center animate-fade-in-up">
           <div className="absolute inset-0 opacity-[0.02] dark:opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'radial-gradient(rgba(212, 175, 55, 0.5) 1px, transparent 1px)', backgroundSize: '20px 20px' }}></div>
+
+          {/* Decorative top ornament */}
+          <div className="flex items-center justify-center gap-3 mb-5">
+            <div className="flex-1 max-w-[100px] h-px bg-gradient-to-r from-transparent to-amber-500/25 dark:to-accent/20" />
+            <svg className="w-4 h-4 text-amber-500/35 dark:text-accent/30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <path d="M12 2 L14 8 L20 8 L15 12 L17 18 L12 14 L7 18 L9 12 L4 8 L10 8 Z" />
+            </svg>
+            <div className="flex-1 max-w-[100px] h-px bg-gradient-to-l from-transparent to-amber-500/25 dark:to-accent/20" />
+          </div>
+
           <div className="relative z-10">
-            <span className="text-[10px] font-bold text-amber-600/60 dark:text-amber-400/50 tracking-[0.2em] uppercase font-sans block mb-2">Surah</span>
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-800 dark:text-gray-100 font-serif-header mb-2">
+            <span className="text-[9px] font-bold text-amber-600/50 dark:text-amber-400/40 tracking-[0.3em] uppercase font-sans block mb-2">Surah</span>
+            {surahArabicName && (
+              <div
+                className="text-2xl sm:text-3xl text-amber-900 dark:text-amber-100 mb-1"
+                dir="rtl"
+                style={{
+                  fontFamily: qpcFontReady ? qpcFontLoader.getFontFamily(ayah.page || 1) : "'UthmanicHafs_V22', 'Amiri', serif",
+                  fontSize: `${arabicFontSize * 1.15}px`,
+                  lineHeight: '1.8',
+                }}
+              >
+                {surahArabicName}
+              </div>
+            )}
+            <h2 className="text-xl sm:text-2xl font-bold font-serif-header text-gray-700 dark:text-gray-200 mb-2">
               {surahName}
             </h2>
-            <div className="text-sm font-sans text-gray-500 dark:text-gray-400 flex items-center justify-center gap-2.5 flex-wrap">
+            <div className="text-[11px] font-sans text-gray-400 dark:text-gray-500 flex items-center justify-center gap-2 flex-wrap">
               <span>{surahTranslation}</span>
-              <span className="w-1 h-1 rounded-full bg-amber-400/40 dark:bg-amber-400/30" />
+              <span className="w-0.5 h-0.5 rounded-full bg-amber-400/40 dark:bg-amber-400/30" />
               <span>Chapter {surahNumber}</span>
-              <span className="w-1 h-1 rounded-full bg-amber-400/40 dark:bg-amber-400/30" />
+              <span className="w-0.5 h-0.5 rounded-full bg-amber-400/40 dark:bg-amber-400/30" />
               <span>{numberOfAyahs} Verses</span>
             </div>
-            
+
             {finalHasBismillah && (
-              <div className="mt-8 border-t border-amber-200/20 dark:border-amber-900/10 pt-6">
-                <div 
-                  className="leading-relaxed text-amber-950 dark:text-white font-arabic text-center py-2"
-                  style={{ 
-                    fontFamily: 'Amiri, serif', 
-                    direction: 'rtl', 
-                    fontSize: `${arabicFontSize * 1.25}px`,
-                    lineHeight: '2'
+              <div className="mt-8 border-t border-amber-200/15 dark:border-amber-900/10 pt-6">
+                <div
+                  className="leading-relaxed text-amber-950 dark:text-amber-50 font-arabic text-center py-2"
+                  style={{
+                    fontFamily: qpcFontReady ? qpcFontLoader.getFontFamily(ayah.page || 1) : "'UthmanicHafs_V22', 'Amiri', serif",
+                    direction: 'rtl',
+                    fontSize: `${arabicFontSize * 1.3}px`,
+                    lineHeight: '2',
+                    fontFeatureSettings: "'liga' 1, 'calt' 1, 'ccmp' 1, 'kern' 1, 'mark' 1, 'mkmk' 1",
                   }}
                 >
                   بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ
-                </div>
-                <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 font-sans mt-2 italic">
-                  In the name of Allah, the Most Gracious, the Most Merciful
                 </div>
               </div>
             )}
@@ -712,26 +766,66 @@ export default function AyahCard({
         </div>
       )}
 
-      {/* Minimalist Surah Header (Borderless mode) */}
+      {/* Elegant Surah Header (Borderless mode) — inspired by traditional mushaf chapter banners */}
       {isFirstAyahOfSurah && borderless && (
-        <div className="mt-14 mb-10 text-center select-none animate-fade-in-up relative z-10">
-          <span className="text-[10px] font-bold text-amber-700/80 dark:text-accent/80 tracking-widest uppercase font-sans block mb-1">Surah</span>
-          <h2 className="text-3xl sm:text-4xl font-extrabold font-serif-header text-gray-900 dark:text-white mb-2 drop-shadow-sm">
-            {surahName}
-          </h2>
-          <div className="text-xs text-gray-500 dark:text-gray-400 font-sans flex items-center justify-center gap-2 flex-wrap">
-            <span>{surahTranslation}</span>
-            <span className="text-amber-400 dark:text-accent/50">•</span>
-            <span>Chapter {surahNumber}</span>
-            <span className="text-amber-400 dark:text-accent/50">•</span>
-            <span>{numberOfAyahs} Verses</span>
+        <div className="my-6 select-none animate-fade-in-up relative z-10">
+          {/* Surah name row — English name | divider | Arabic name */}
+          <div className="flex items-center justify-center gap-4 sm:gap-6">
+            {/* English name */}
+            <h2 className="text-lg sm:text-xl font-bold font-serif-header text-amber-800 dark:text-amber-200 leading-tight text-right">
+              {surahName}
+            </h2>
+
+            {/* Divider */}
+            <div className="h-7 w-px bg-gradient-to-b from-transparent via-amber-500/30 dark:via-accent/25 to-transparent" />
+
+            {/* Arabic name */}
+            {surahArabicName && (
+              <div
+                className="text-xl sm:text-2xl text-amber-900 dark:text-amber-100"
+                dir="rtl"
+                style={{
+                  fontFamily: qpcFontReady ? qpcFontLoader.getFontFamily(ayah.page || 1) : "'UthmanicHafs_V22', 'Amiri', serif",
+                  fontSize: `${arabicFontSize * 1.1}px`,
+                  lineHeight: '1.6',
+                }}
+              >
+                {surahArabicName}
+              </div>
+            )}
           </div>
+
+          {/* Chapter number & verses — on its own line below */}
+          <div className="flex items-center justify-center gap-2 mt-2">
+            <span className="text-sm font-bold text-amber-700 dark:text-amber-300 font-sans">
+              {surahNumber}
+            </span>
+            <span className="text-[9px] text-amber-600/50 dark:text-amber-400/40 font-sans uppercase tracking-widest">
+              Surah
+            </span>
+            <span className="text-amber-400/30 dark:text-accent/25 text-xs">•</span>
+            <span className="text-xs text-gray-500 dark:text-gray-400 font-sans">
+              {numberOfAyahs} verses
+            </span>
+          </div>
+
+          {/* Bismillah — using QPC Quran font */}
           {finalHasBismillah && (
-            <div className="mt-8 mb-6 py-2 leading-relaxed text-amber-950 dark:text-white font-arabic text-3xl text-center" style={{ fontFamily: 'Amiri, serif', direction: 'rtl' }}>
-              بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ
+            <div className="mt-4 text-center">
+              <div
+                className="inline-block leading-relaxed text-amber-950 dark:text-amber-50 font-arabic text-center"
+                style={{
+                  fontFamily: qpcFontReady ? qpcFontLoader.getFontFamily(ayah.page || 1) : "'UthmanicHafs_V22', 'Amiri', serif",
+                  direction: 'rtl',
+                  fontSize: `${arabicFontSize * 1.2}px`,
+                  lineHeight: '1.8',
+                  fontFeatureSettings: "'liga' 1, 'calt' 1, 'ccmp' 1, 'kern' 1, 'mark' 1, 'mkmk' 1",
+                }}
+              >
+                بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ
+              </div>
             </div>
           )}
-          <div className="w-20 h-[1.5px] bg-gradient-to-r from-transparent via-amber-500/25 dark:via-accent/20 to-transparent mx-auto mt-6" />
         </div>
       )}
       
@@ -759,6 +853,10 @@ export default function AyahCard({
                 ? 'bg-purple-500/[0.04] dark:bg-purple-500/[0.04]'
                 : 'border-purple-400/40 dark:border-purple-500/30')
             : ''
+        } ${
+          isCurrentlyPlaying
+            ? 'bg-amber-500/[0.06] dark:bg-accent/[0.07] ring-1 ring-amber-500/40 dark:ring-accent/40 shadow-[0_0_18px_-4px_rgba(245,158,11,0.25)]'
+            : ''
         }`}
         style={borderless ? {} : { paddingLeft: `${padding}px`, paddingRight: `${padding}px`, paddingTop: '1.5rem', paddingBottom: '1.5rem' }}
         onClick={!isMobile ? () => onAyahClick(ayahNumber) : undefined}
@@ -770,13 +868,6 @@ export default function AyahCard({
         )}
 
         <div className="relative z-10 w-full">
-          {/* Backdrop Watermark for Stacked mode - placed on the left to avoid Arabic script */}
-          {borderless && (
-            <div className="absolute left-4 top-2 pointer-events-none select-none text-[7rem] font-serif-header font-extrabold text-amber-500/[0.015] dark:text-accent/[0.01] transition-all duration-500 group-hover:text-amber-500/[0.04] dark:group-hover:text-accent/[0.03]">
-              {String(ayahNumber).padStart(2, '0')}
-            </div>
-          )}
-
           {/* Header row: badge and actions */}
           <div className="flex items-center justify-between mb-4 sm:mb-5">
             <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
@@ -1043,6 +1134,15 @@ export default function AyahCard({
           </Card>
         </div>
       )}
+      {/* Tajweed Breakdown Modal */}
+      {showTajweedBreakdown && (
+        <TajweedBreakdownModal
+          surah={surahNumber}
+          ayah={ayahNumber}
+          onClose={() => setShowTajweedBreakdown(false)}
+        />
+      )}
+
       {/* Tafsir Modal */}
       {showTafsir && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm px-2 py-4">

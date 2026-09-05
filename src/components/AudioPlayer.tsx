@@ -179,12 +179,28 @@ export default function AudioPlayer({
         };
       } else {
         // Verse-mode: auto-advance when the per-ayah file ends.
-        const handleEnded = () => {
-          onPlayNext();
+        // On mobile, the 'ended' event can be unreliable, so we also watch
+        // timeupdate as a fallback when playback reaches the end.
+        let advanced = false;
+        const triggerNext = () => {
+          if (!advanced) {
+            advanced = true;
+            onPlayNext();
+          }
+        };
+        const handleEnded = () => triggerNext();
+        const handleTimeUpdate = () => {
+          if (currentAudio.duration > 0 &&
+              currentAudio.currentTime >= currentAudio.duration - 0.25 &&
+              !currentAudio.paused) {
+            triggerNext();
+          }
         };
         currentAudio.addEventListener('ended', handleEnded);
+        currentAudio.addEventListener('timeupdate', handleTimeUpdate);
         return () => {
           currentAudio.removeEventListener('ended', handleEnded);
+          currentAudio.removeEventListener('timeupdate', handleTimeUpdate);
         };
       }
     }

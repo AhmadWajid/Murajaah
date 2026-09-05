@@ -426,14 +426,20 @@ function QuranPageContent() {
             getPageForAyah(surahNumber, ayahNumber).then(pageNumber => {
               console.log(`Got page number for ayah: ${pageNumber}`);
               goToPage(pageNumber, true); // Skip saving for URL navigation
-              setHighlightedRange({ 
-                surah: surahNumber, 
-                start: ayahNumber, 
-                end: endAyahNumber 
-              });
+              // Use activeAyah for navigation highlight, not highlightedRange
+              // (highlightedRange is for actual review items only)
+              setActiveAyah({ surah: surahNumber, ayah: ayahNumber });
               // Update current position
               setCurrentSurah(surahNumber);
               setCurrentAyah(ayahNumber);
+              // Scroll to target after render
+              setTimeout(() => {
+                const ayahElement = document.getElementById(`ayah-${surahNumber}-${ayahNumber}`)
+                  || document.querySelector(`[data-ayah="${ayahNumber}"]`);
+                if (ayahElement) {
+                  ayahElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+              }, 600);
             });
             return;
           }
@@ -451,10 +457,17 @@ function QuranPageContent() {
       if (!isNaN(surahNumber) && !isNaN(ayahNumber)) {
         getPageForAyah(surahNumber, ayahNumber).then(pageNumber => {
           goToPage(pageNumber, true);
-          setHighlightedRange({ surah: surahNumber, start: ayahNumber, end: ayahNumber });
+          setActiveAyah({ surah: surahNumber, ayah: ayahNumber });
           // Update current position
           setCurrentSurah(surahNumber);
           setCurrentAyah(ayahNumber);
+          setTimeout(() => {
+            const ayahElement = document.getElementById(`ayah-${surahNumber}-${ayahNumber}`)
+              || document.querySelector(`[data-ayah="${ayahNumber}"]`);
+            if (ayahElement) {
+              ayahElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+          }, 600);
         });
         return;
       }
@@ -598,23 +611,29 @@ function QuranPageContent() {
       
 
       
-      // Load previous page for spread layout
+      // Load adjacent page for spread layout (like a real mushaf)
+      // Odd pages are on the right, even pages are on the left
+      // If current page is odd → fetch next page (even) for the left side
+      // If current page is even → fetch previous page (odd) for the right side
       if (layoutMode === 'spread') {
-        if (page > 1) {
-          const previousArabicPageData = await getPage(page - 1, 'quran-uthmani');
-          const previousTranslationPageData = await fetchPageWithTranslation(page - 1, selectedTranslation);
-          
-          const previousCombinedAyahs = previousArabicPageData.ayahs.map((arabicAyah: any, index: number) => ({
+        const isOddPage = page % 2 === 1;
+        const adjacentPage = isOddPage ? page + 1 : page - 1;
+
+        if (adjacentPage >= 1 && adjacentPage <= TOTAL_QURAN_PAGES) {
+          const adjacentArabicPageData = await getPage(adjacentPage, 'quran-uthmani');
+          const adjacentTranslationPageData = await fetchPageWithTranslation(adjacentPage, selectedTranslation);
+
+          const adjacentCombinedAyahs = adjacentArabicPageData.ayahs.map((arabicAyah: any, index: number) => ({
             ...arabicAyah,
-            translation: previousTranslationPageData?.data?.ayahs?.[index]?.text || '',
+            translation: adjacentTranslationPageData?.data?.ayahs?.[index]?.text || '',
           }));
-          
-          const previousPageData = {
-            ...previousArabicPageData,
-            ayahs: previousCombinedAyahs
+
+          const adjacentPageData = {
+            ...adjacentArabicPageData,
+            ayahs: adjacentCombinedAyahs
           };
-          
-          setPreviousPageData(previousPageData);
+
+          setPreviousPageData(adjacentPageData);
         } else {
           setPreviousPageData(null);
         }
@@ -707,24 +726,29 @@ function QuranPageContent() {
         });
       }
       
-      // Load translation data for previous page if in spread mode
-      if (layoutMode === 'spread' && page > 1) {
-        const previousTranslationPageData = await fetchPageWithTranslation(page - 1, selectedTranslation);
-        
-        if (previousTranslationPageData?.data?.ayahs) {
-          setPreviousPageData((prevPreviousPageData: any) => {
-            if (!prevPreviousPageData) return prevPreviousPageData;
-            
-            const updatedAyahs = prevPreviousPageData.ayahs.map((arabicAyah: any, index: number) => ({
-              ...arabicAyah,
-              translation: previousTranslationPageData.data.ayahs[index]?.text || '',
-            }));
-            
-            return {
-              ...prevPreviousPageData,
-              ayahs: updatedAyahs
-            };
-          });
+      // Load translation data for adjacent page if in spread mode
+      if (layoutMode === 'spread') {
+        const isOddPage = page % 2 === 1;
+        const adjacentPage = isOddPage ? page + 1 : page - 1;
+
+        if (adjacentPage >= 1 && adjacentPage <= TOTAL_QURAN_PAGES) {
+          const adjacentTranslationPageData = await fetchPageWithTranslation(adjacentPage, selectedTranslation);
+
+          if (adjacentTranslationPageData?.data?.ayahs) {
+            setPreviousPageData((prevAdjacentPageData: any) => {
+              if (!prevAdjacentPageData) return prevAdjacentPageData;
+
+              const updatedAyahs = prevAdjacentPageData.ayahs.map((arabicAyah: any, index: number) => ({
+                ...arabicAyah,
+                translation: adjacentTranslationPageData.data.ayahs[index]?.text || '',
+              }));
+
+              return {
+                ...prevAdjacentPageData,
+                ayahs: updatedAyahs
+              };
+            });
+          }
         }
       }
       
@@ -757,12 +781,23 @@ function QuranPageContent() {
     try {
       const pageNumber = await getPageForAyah(surahNumber, ayahNumber);
       goToPage(pageNumber, true); // Skip saving for programmatic navigation
-      setHighlightedRange({ surah: surahNumber, start: ayahNumber, end: ayahNumber });
-      
+      // Don't set highlightedRange — that's for actual review items only.
+      // Use activeAyah for the subtle navigation highlight instead.
+      setActiveAyah({ surah: surahNumber, ayah: ayahNumber });
+
       // Update current position
       setCurrentSurah(surahNumber);
       setCurrentAyah(ayahNumber);
-      
+
+      // Scroll to the target ayah after the page renders
+      setTimeout(() => {
+        const ayahElement = document.getElementById(`ayah-${surahNumber}-${ayahNumber}`)
+          || document.querySelector(`[data-ayah="${ayahNumber}"]`);
+        if (ayahElement) {
+          ayahElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 600);
+
       // Update URL with ayah parameter and clear others
       const url = new URL(window.location.href);
       url.searchParams.set('ayah', `${surahNumber}:${ayahNumber}`);
@@ -829,6 +864,8 @@ function QuranPageContent() {
       setCurrentPage(page);
       // Only clear URL parameters and save page if not skipping
       if (!skipSave) {
+        // Clear review highlight when manually navigating away
+        setHighlightedRange(null);
         // Clear URL parameters when navigating normally
         const url = new URL(window.location.href);
         url.searchParams.delete('ayah');
@@ -1172,12 +1209,37 @@ function QuranPageContent() {
       setupAudioEventListeners(audio, surahNumber, ayahNumber, plan.url, reciter.mode, segStart, segEnd);
 
       // Start playing. For surah mode, seek to the segment start first.
-      const startPlayback = async () => {
+      const startPlayback = async (attempt = 0): Promise<void> => {
         if (isSurahMode && segStart > 0) {
           try { audio.currentTime = segStart; } catch { /* seek after play if needed */ }
         }
-        await audio.play();
-        setIsPlaying(true);
+        try {
+          await audio.play();
+          setIsPlaying(true);
+        } catch (err: any) {
+          // On mobile, play() can reject with AbortError if the audio hasn't
+          // buffered enough yet. Wait for canplay then retry (up to 3 times).
+          if ((err?.name === 'AbortError' || err?.name === 'NotSupportedError') && attempt < 3) {
+            await new Promise<void>((resolve) => {
+              const onReady = () => {
+                audio.removeEventListener('canplay', onReady);
+                resolve();
+              };
+              if (audio.readyState >= 2) {
+                resolve();
+              } else {
+                audio.addEventListener('canplay', onReady, { once: true });
+                // Safety timeout — don't wait forever
+                setTimeout(() => {
+                  audio.removeEventListener('canplay', onReady);
+                  resolve();
+                }, 1500);
+              }
+            });
+            return startPlayback(attempt + 1);
+          }
+          throw err;
+        }
       };
 
       if (isSurahMode && segStart > 0) {
@@ -1321,7 +1383,12 @@ function QuranPageContent() {
       return;
     }
 
-    // Navigate the page to show the next verse
+    // Play the next verse FIRST — on mobile, calling audio.play() must happen
+    // as close to the previous playback ending as possible. If we await page
+    // navigation first, iOS can drop the audio session and block play().
+    playAyahAudio(nextSurah, nextAyah);
+
+    // Navigate the page to show the next verse (non-blocking)
     try {
       const pageNumber = await getPageForAyah(nextSurah, nextAyah);
       if (pageNumber !== currentPage) {
@@ -1338,9 +1405,6 @@ function QuranPageContent() {
     } catch (error) {
       console.error('Error navigating to next ayah:', error);
     }
-
-    // Play the next verse
-    playAyahAudio(nextSurah, nextAyah);
   }, [currentPlayingAyah, currentPage]);
 
   // Fetch word-by-word translation for the current page
@@ -1536,6 +1600,7 @@ function QuranPageContent() {
         readingLayout={readingLayout}
         activeAyah={activeAyah}
         onActiveAyahChange={setActiveAyah}
+        playingAyah={isPlaying ? currentPlayingAyah : null}
       />
 
       {/* Audio Player */}

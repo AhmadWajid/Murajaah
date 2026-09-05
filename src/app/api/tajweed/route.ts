@@ -125,15 +125,27 @@ function parseTajweedRules(text: string): TajweedRule[] {
   const rules: TajweedRule[] = [];
   let segStart = 0;
 
+  // Combining marks (harakat, tanween, maddah, etc.) attach to the letter
+  // before them — a segment starting with one would detach it from its base
+  // when split into a separate <span>, so leave leading marks unstyled.
+  // Covers: U+0610-U+061A, U+064B-U+065F (standard diacritics),
+  // U+0670 (superscript alif — used in madda_normal),
+  // U+06D6-U+06DC, U+06DF-U+06E4, U+06E7-U+06E8, U+06EA-U+06ED (Quranic marks)
+  const isCombiningMark = (ch: string) => /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06DC\u06DF-\u06E4\u06E7-\u06E8\u06EA-\u06ED]/.test(ch);
+
   for (let i = 1; i <= cleaned.length; i++) {
     if (i === cleaned.length || charRuleClass[i] !== charRuleClass[segStart]) {
       if (charRuleClass[segStart] !== null) {
-        rules.push({
-          class: charRuleClass[segStart]!,
-          text: cleaned.substring(segStart, i),
-          startIndex: segStart,
-          endIndex: i,
-        });
+        let start = segStart;
+        while (start < i && isCombiningMark(cleaned[start])) start++;
+        if (start < i) {
+          rules.push({
+            class: charRuleClass[segStart]!,
+            text: cleaned.substring(start, i),
+            startIndex: start,
+            endIndex: i,
+          });
+        }
       }
       segStart = i;
     }

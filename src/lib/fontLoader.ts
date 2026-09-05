@@ -78,7 +78,7 @@ export class FontLoader {
   // Get appropriate font family based on loading state
   getFontFamily(): string {
     if (this.fontLoaded) {
-      return "'qpc-v2', 'qpc-v2-fallback', 'Amiri', serif";
+      return "'qpc-v2', 'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif";
     }
     return "'Amiri', serif";
   }
