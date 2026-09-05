@@ -32,7 +32,7 @@ export default function AppHeader({
         <div className="max-w-7xl mx-auto px-4">
           {/* Mobile: stacked vertically. Desktop: single row. */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between min-w-0 py-2 sm:min-h-20">
-            {/* Row 1 on mobile: Logo + Auth button side by side */}
+            {/* Row 1 on mobile: Logo. On desktop: left side. */}
             <div className="flex items-center justify-between sm:justify-start sm:space-x-6 flex-shrink-0 mb-2 sm:mb-0">
               {/* Logo */}
               <Link href="/" className="flex items-center space-x-2 sm:space-x-3 group">
@@ -55,19 +55,17 @@ export default function AppHeader({
                 </div>
               </Link>
 
-              {/* Auth button — on mobile, sits next to logo. On desktop, stays at the right. */}
+              {/* Auth button on mobile — sits at the right edge of the logo row */}
               {pageType === 'quran' && (
-                <div className="flex items-center gap-2 sm:ml-2 sm:pl-2 sm:border-l sm:border-gray-200 dark:sm:border-gray-700">
+                <div className="flex items-center gap-2 sm:hidden">
                   {user ? (
-                    <Button variant="outline" size="sm" onClick={signOut} className="px-2 sm:px-4">
-                      <LogOut className="h-4 w-4 sm:mr-2" />
-                      <span className="hidden sm:inline">Logout</span>
+                    <Button variant="outline" size="sm" onClick={signOut} className="px-2">
+                      <LogOut className="h-4 w-4" />
                     </Button>
                   ) : (
-                    <Button variant="outline" size="sm" asChild className="px-2 sm:px-4">
+                    <Button variant="outline" size="sm" asChild className="px-2">
                       <Link href="/auth">
-                        <User className="h-4 w-4 sm:mr-2" />
-                        <span className="hidden sm:inline">Login</span>
+                        <User className="h-4 w-4" />
                       </Link>
                     </Button>
                   )}
@@ -117,8 +115,26 @@ export default function AppHeader({
                 )}
               </div>
             ) : pageType === 'quran' ? (
-              <div className="flex-1 min-w-0">
-                {quranHeaderComponent}
+              <div className="flex-1 min-w-0 flex items-center">
+                <div className="flex-1 min-w-0">
+                  {quranHeaderComponent}
+                </div>
+                {/* Auth button on desktop — at the far right, after the Quran toolbar */}
+                <div className="hidden sm:flex items-center gap-2 ml-2 pl-2 border-l border-gray-200 dark:border-gray-700 flex-shrink-0">
+                  {user ? (
+                    <Button variant="outline" size="sm" onClick={signOut} className="px-2 sm:px-4">
+                      <LogOut className="h-4 w-4 sm:mr-2" />
+                      <span className="hidden sm:inline">Logout</span>
+                    </Button>
+                  ) : (
+                    <Button variant="outline" size="sm" asChild className="px-2 sm:px-4">
+                      <Link href="/auth">
+                        <User className="h-4 w-4 sm:mr-2" />
+                        <span className="hidden sm:inline">Login</span>
+                      </Link>
+                    </Button>
+                  )}
+                </div>
               </div>
             ) : null}
           </div>

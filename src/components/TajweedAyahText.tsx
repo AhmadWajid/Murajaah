@@ -181,12 +181,13 @@ export function TajweedAyahText({
   }, [surahNumber, ayahNumber, ayahText, getTajweedWords]);
 
   useEffect(() => {
+    if (!ayahText) {
+      setTajweedWords([]);
+      return;
+    }
+
     if (hideWords) {
-      if (!ayahText) {
-        setTajweedWords([]);
-        return;
-      }
-      // Construct plain words without tajweed rules synchronously
+      // Construct plain words synchronously for immediate hide-words UI
       const plainWords = ayahText.split(/\s+/).map((wordText, idx) => ({
         id: surahNumber * 1000000 + ayahNumber * 1000 + idx,
         location: `${surahNumber}:${ayahNumber}:${idx + 1}`,
@@ -197,10 +198,38 @@ export function TajweedAyahText({
         tajweedRules: []
       })) as unknown as TajweedWord[];
       setTajweedWords(plainWords);
+
+      // Also load tajweed data so revealed words show color-coded tajweed.
+      // Merge rules + text into existing plain words by index, preserving IDs
+      // so visibleWordIds state remains valid and no layout shift occurs.
+      const loadAndMerge = async () => {
+        try {
+          const words = await getTajweedWords(surahNumber, ayahNumber);
+          if (words && words.length > 0) {
+            setTajweedWords(prev => {
+              if (prev.length === 0) return prev;
+              return prev.map((plainWord, idx) => {
+                const tajweedWord = words[idx] as unknown as TajweedWord;
+                if (tajweedWord) {
+                  return {
+                    ...plainWord,
+                    text: tajweedWord.text,
+                    tajweedRules: tajweedWord.tajweedRules || []
+                  };
+                }
+                return plainWord;
+              }) as unknown as TajweedWord[];
+            });
+          }
+        } catch {
+          // Keep plain words on error
+        }
+      };
+      loadAndMerge();
     } else {
       loadTajweedData();
     }
-  }, [hideWords, ayahText, loadTajweedData, surahNumber, ayahNumber]);
+  }, [hideWords, ayahText, loadTajweedData, surahNumber, ayahNumber, getTajweedWords]);
 
   // Always use arabicFontSize for Arabic text
   const currentFontSize = arabicFontSize;
@@ -395,8 +424,8 @@ export function TajweedAyahText({
       return (
         <span
           key={word.id}
-          className="inline transition-all duration-200 relative cursor-pointer"
-          style={{ 
+          className="inline relative cursor-pointer"
+          style={{
             fontSize: `${currentFontSize}px`,
             fontFeatureSettings: fontLoaded ? "'liga' 1, 'kern' 1, 'calt' 1, 'rlig' 1, 'ccmp' 1, 'locl' 1, 'mark' 1, 'mkmk' 1" : "'liga' 0, 'kern' 0, 'calt' 0, 'rlig' 0, 'ccmp' 0, 'locl' 0, 'mark' 0, 'mkmk' 0"
           }}
@@ -405,39 +434,31 @@ export function TajweedAyahText({
           data-tooltip-id={showWordByWordTooltip && translation ? translationTooltipId : undefined}
           data-word-tooltip
         >
-          {/* Invisible text that takes up natural space */}
-          <span 
-            className="opacity-0" 
-            style={{fontSize: `${currentFontSize}px`}}
-          >
-            {word.text}
-          </span>
-          
-          {/* Overlay for hiding/showing */}
+          {/* The word itself — always rendered as inline text so Arabic
+              ligature shaping works identically to non-hide mode.
+              Opacity is toggled to hide/reveal. No flex, no absolute
+              positioning on the text (those break letter connections). */}
           <span
-            className={`transition-opacity duration-200 absolute inset-0 flex items-center justify-center ${
-              isWordVisible ? 'opacity-0' : 'opacity-100'
-            }`}
-            style={{
-              backgroundColor: 'transparent',
-              border: '1px dashed rgba(156, 163, 175, 0.6)',
-              borderRadius: '3px'
-            }}
-          />
-
-          {/* Visible text when revealed — with tajweed coloring */}
-          <span
-            className={`transition-opacity duration-200 absolute inset-0 flex items-center justify-center ${
+            className={`transition-opacity duration-200 ${
               isWordVisible ? 'opacity-100' : 'opacity-0'
             }`}
-            style={{
-              fontSize: `${currentFontSize}px`,
-              backgroundColor: 'transparent',
-              borderRadius: '3px'
-            }}
+            style={{ fontSize: `${currentFontSize}px` }}
           >
             {renderTajweedColoredText(word)}
           </span>
+
+          {/* Dashed border placeholder — shown when word is hidden.
+              Absolutely positioned so it doesn't affect text flow. */}
+          {!isWordVisible && (
+            <span
+              className="absolute inset-0 pointer-events-none"
+              style={{
+                backgroundColor: 'transparent',
+                border: '1px dashed rgba(156, 163, 175, 0.6)',
+                borderRadius: '3px'
+              }}
+            />
+          )}
         </span>
       );
     }
@@ -662,7 +683,7 @@ export function TajweedAyahText({
           boxSizing: 'border-box',
         } as React.CSSProperties}
       >
-        {isTajweedLoading(surahNumber, ayahNumber) ? (
+        {!hideWords && isTajweedLoading(surahNumber, ayahNumber) ? (
           displayMode === 'inline' ? (
             <span className="inline-flex items-center mx-1 text-xs text-amber-600/40 animate-pulse font-sans">
               ...
