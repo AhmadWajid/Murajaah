@@ -315,12 +315,15 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
           </div>
         </ControlGroup>
 
-        {/* Mistake navigation — warning semantic, compact dropdown */}
-        {(hasPrevMistake || hasNextMistake) && onNavigateToNextMistake && (
+        {/* Mistake navigation — always rendered to reserve space and prevent
+            layout shift. Disabled/muted when no mistakes exist, active with
+            warning styling when mistakes are present. */}
+        {onNavigateToNextMistake && (
           <div ref={mistakeBtnRef} className="relative">
             <Button
               variant="outline"
               size="sm"
+              disabled={!hasPrevMistake && !hasNextMistake}
               onClick={() => {
                 if (!showMistakeMenu && mistakeBtnRef.current) {
                   const rect = mistakeBtnRef.current.getBoundingClientRect();
@@ -328,8 +331,12 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                 }
                 setShowMistakeMenu(!showMistakeMenu);
               }}
-              className="h-9 px-2.5 border-warning/30 bg-warning/10 text-warning hover:bg-warning/15 hover:text-warning font-semibold text-xs"
-              title="Mistake navigation"
+              className={`h-9 px-2.5 font-semibold text-xs transition-colors ${
+                hasPrevMistake || hasNextMistake
+                  ? 'border-warning/30 bg-warning/10 text-warning hover:bg-warning/15 hover:text-warning'
+                  : 'border-border bg-secondary text-muted-foreground/40 cursor-default'
+              }`}
+              title={hasPrevMistake || hasNextMistake ? 'Mistake navigation' : 'No mistakes marked'}
               aria-expanded={showMistakeMenu}
               aria-haspopup="menu"
             >
@@ -337,10 +344,12 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
               <span className="hidden lg:inline">Mistakes</span>
-              <ChevronLeft className={`h-3 w-3 sm:ml-1 transition-transform duration-200 ${showMistakeMenu ? '-rotate-90' : 'rotate-90'}`} />
+              {(hasPrevMistake || hasNextMistake) && (
+                <ChevronLeft className={`h-3 w-3 sm:ml-1 transition-transform duration-200 ${showMistakeMenu ? '-rotate-90' : 'rotate-90'}`} />
+              )}
             </Button>
 
-            {showMistakeMenu && mounted && mistakeMenuPos && createPortal(
+            {showMistakeMenu && mounted && mistakeMenuPos && (hasPrevMistake || hasNextMistake) && createPortal(
               <>
                 <div className="fixed inset-0 z-40" onClick={() => setShowMistakeMenu(false)} />
                 <div
