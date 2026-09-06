@@ -26,6 +26,9 @@ interface TajweedAyahTextProps {
   disableTajweedColors?: boolean;
   displayMode?: 'block' | 'inline';
   useV4Tajweed?: boolean;
+  /** CSS color for the dashed placeholder boxes when hideWords is active.
+   *  Defaults to gray. Pass a warning/red color for mistake-hidden mode. */
+  hideBoxColor?: string;
 }
 
 export function TajweedAyahText({
@@ -46,6 +49,7 @@ export function TajweedAyahText({
   disableTajweedColors = false,
   displayMode = 'block',
   useV4Tajweed = false,
+  hideBoxColor = 'rgba(239, 68, 68, 0.5)',
 }: TajweedAyahTextProps) {
   const Tag = displayMode === 'inline' ? 'span' : 'div';
   const isMobile = useIsMobile();
@@ -440,7 +444,7 @@ export function TajweedAyahText({
               className="absolute inset-0 pointer-events-none"
               style={{
                 backgroundColor: 'transparent',
-                border: '1px dashed rgba(156, 163, 175, 0.6)',
+                border: `1px dashed ${hideBoxColor}`,
                 borderRadius: '3px'
               }}
             />
