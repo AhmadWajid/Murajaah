@@ -1,188 +1,79 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { TOPIC_COLORS, TOPIC_ARABIC_NAMES, TOPIC_ENGLISH_NAMES } from '@/lib/tajweedService';
 
-interface TajweedRule {
-  id: number;
+interface TopicRule {
+  id: string;
   name: string;
   color: string;
+  arabicName: string;
+  englishName: string;
   description: string;
-  letters: string;
-  examples: string;
 }
 
-const TAJWEED_RULES: TajweedRule[] = [
+// The 7 topics from the quranpedia tajweed engine corpus.
+// Colour carries the topic; text carries the ruling.
+const TAJWEED_TOPICS: TopicRule[] = [
   {
-    id: 1,
-    name: 'ham_wasl',
-    color: 'text-red-500',
-    description: 'Hamza Wasl - Silent hamza at the beginning of words',
-    letters: 'ٱ',
-    examples: 'ٱللَّهِ'
+    id: 'tafkheem-tarqeeq',
+    name: 'tafkheem-tarqeeq',
+    color: TOPIC_COLORS['tafkheem-tarqeeq'],
+    arabicName: 'التفخيم والترقيق',
+    englishName: 'Heavy & Light Letters',
+    description: 'Tafkheem (heavy/thick) and Tarqeeq (light/thin) pronunciation of letters, including ranks of tafkheem for the letter راء and laam al-jalalah.',
   },
   {
-    id: 2,
-    name: 'laam_shamsiyah',
-    color: 'text-yellow-600',
-    description: 'Laam Shamsiyah - Solar laam (assimilated)',
-    letters: 'ل',
-    examples: 'لرَّحۡمَ'
+    id: 'letter-relations',
+    name: 'letter-relations',
+    color: TOPIC_COLORS['letter-relations'],
+    arabicName: 'علاقات الحروف',
+    englishName: 'Letter Relations',
+    description: 'Idgham (assimilation) between adjacent letters — mutamathilain (identical), mutajanisain (same articulation point), and mutaqaribain (close articulation points).',
   },
   {
-    id: 3,
-    name: 'madda_normal',
-    color: 'text-green-500',
-    description: 'Madda Normal - Natural prolongation',
-    letters: 'ـٰ',
-    examples: 'رَّحۡمَـٰنِ'
+    id: 'noon-tanween',
+    name: 'noon-tanween',
+    color: TOPIC_COLORS['noon-tanween'],
+    arabicName: 'النون والتنوين',
+    englishName: 'Noon Sakinah & Tanween',
+    description: 'Izhar (clear), Idgham (merging), Iqlab (conversion), and Ikhfa (hiding) of noon sakinah and tanween.',
   },
   {
-    id: 4,
-    name: 'madda_permissible',
-    color: 'text-green-500',
-    description: 'Madda Permissible - Can be prolonged for 2-6 counts',
-    letters: 'ِي',
-    examples: 'رَّحِيْمِ'
+    id: 'meem-sakinah',
+    name: 'meem-sakinah',
+    color: TOPIC_COLORS['meem-sakinah'],
+    arabicName: 'الميم الساكنة',
+    englishName: 'Meem Sakinah',
+    description: 'Izhar shafawi (clear), Idgham shafawi (assimilation), and Ikhfa shafawi (hiding) of meem sakinah.',
   },
   {
-    id: 5,
-    name: 'madda_necessary',
-    color: 'text-green-600',
-    description: 'Madda Necessary - Must be prolonged for 4-5 counts',
-    letters: 'لٓ مٓ',
-    examples: 'الٓمٓ'
+    id: 'mushaddadatan',
+    name: 'mushaddadatan',
+    color: TOPIC_COLORS['mushaddadatan'],
+    arabicName: 'المشددتان',
+    englishName: 'Doubled Letters (Ghunnah)',
+    description: 'Ghunnah (nasalization) on doubled noon and meem — held for 2 counts.',
   },
   {
-    id: 6,
-    name: 'slnt',
-    color: 'text-gray-600',
-    description: 'Silent - Letter is not pronounced',
-    letters: 'Various',
-    examples: 'Silent letters'
+    id: 'madd',
+    name: 'madd',
+    color: TOPIC_COLORS['madd'],
+    arabicName: 'المد',
+    englishName: 'Prolongation (Madd)',
+    description: 'Madd tabi\'i (natural, 2 counts), madd muttasil (connected, 4-5 counts), madd munfasil (separated, 2-4-5 counts), and madd lazim (necessary, 6 counts).',
   },
   {
-    id: 7,
-    name: 'ghunnah',
-    color: 'text-indigo-600',
-    description: 'Ghunnah - Nasalization for 2 counts',
-    letters: 'مّ OR نّ',
-    examples: 'مّ OR نّ'
+    id: 'qalqalah',
+    name: 'qalqalah',
+    color: TOPIC_COLORS['qalqalah'],
+    arabicName: 'القلقلة',
+    englishName: 'Qalqalah (Echo)',
+    description: 'Bouncing/echoing sound on the qalqalah letters (ق ط ب ج د) when sakin — sughra (minor), kubra (major).',
   },
-  {
-    id: 8,
-    name: 'qalaqah',
-    color: 'text-orange-600',
-    description: 'Qalaqah - Bouncing sound on qalqalah letters',
-    letters: 'ْق ْط ْب ْج ْد',
-    examples: 'ْق ْط ْب ْج ْد'
-  },
-  {
-    id: 9,
-    name: 'ikhafa',
-    color: 'text-purple-600',
-    description: 'Ikhafa - Partial hiding of noon/tanween',
-    letters: '(ت,ث,ج,د,ذ,ز,س,ش,ص,ض,ط,ظ,ف,ق,ك) < (نْ or ـًـٍـٌ)',
-    examples: 'Partial hiding'
-  },
-  {
-    id: 10,
-    name: 'madda_obligatory_mottasel',
-    color: 'text-green-600',
-    description: 'Madda Obligatory Connected - Must be prolonged for 4-5 counts',
-    letters: 'ـٰٓ',
-    examples: 'يَـٰٓأَيُّهَا'
-  },
-  {
-    id: 11,
-    name: 'madda_obligatory_monfasel',
-    color: 'text-green-600',
-    description: 'Madda Obligatory Separated - Must be prolonged for 4-5 counts',
-    letters: 'Various',
-    examples: 'Separated madda'
-  },
-  {
-    id: 12,
-    name: 'iqlab',
-    color: 'text-teal-600',
-    description: 'Iqlab - Converting noon to meem',
-    letters: '(ب) < (نْ or ـًـٍـٌ)',
-    examples: 'Noon to meem conversion'
-  },
-  {
-    id: 13,
-    name: 'izhar',
-    color: 'text-blue-500',
-    description: 'Izhar - Clear pronunciation',
-    letters: '(ا,ح,خ,ع,غ,ه) < (نْ or ـًـٍـٌ)',
-    examples: 'Clear pronunciation'
-  },
-  {
-    id: 14,
-    name: 'idgham_ghunnah',
-    color: 'text-blue-600',
-    description: 'Idgham with Ghunnah - Assimilation with nasalization',
-    letters: '(ي، ن، م، و) < (نْ or ـًـٍـٌ)',
-    examples: 'Assimilation with nasalization'
-  },
-  {
-    id: 15,
-    name: 'idgham_wo_ghunnah',
-    color: 'text-blue-500',
-    description: 'Idgham without Ghunnah - Assimilation without nasalization',
-    letters: '(ل,ر) < (نْ or ـًـٍـٌ)',
-    examples: 'Assimilation without nasalization'
-  },
-  {
-    id: 16,
-    name: 'ikhafa_shafawi',
-    color: 'text-purple-600',
-    description: 'Ikhafa Shafawi - Partial hiding with labial letters',
-    letters: 'Labial letters',
-    examples: 'Partial hiding with labial'
-  },
-  {
-    id: 17,
-    name: 'idgham_shafawi',
-    color: 'text-blue-600',
-    description: 'Idgham Shafawi - Assimilation with labial letters',
-    letters: 'Labial assimilation',
-    examples: 'Labial assimilation'
-  },
-  {
-    id: 18,
-    name: 'izhar_shafawi',
-    color: 'text-blue-500',
-    description: 'Izhar Shafawi - Clear pronunciation with labial',
-    letters: 'Labial clear pronunciation',
-    examples: 'Labial clear pronunciation'
-  },
-  {
-    id: 19,
-    name: 'madd_al_tamkeen',
-    color: 'text-green-500',
-    description: 'Madd Al Tamkeen - Strengthening prolongation',
-    letters: 'Various',
-    examples: 'Strengthening prolongation'
-  },
-  {
-    id: 20,
-    name: 'tafkheem',
-    color: 'text-red-600',
-    description: 'Tafkheem - Heavy/thick pronunciation',
-    letters: 'Heavy letters',
-    examples: 'Heavy pronunciation'
-  },
-  {
-    id: 21,
-    name: 'tarqeeq',
-    color: 'text-blue-400',
-    description: 'Tarqeeq - Light/thin pronunciation',
-    letters: 'Light letters',
-    examples: 'Light pronunciation'
-  }
 ];
 
 interface TajweedPaletteProps {
@@ -195,68 +86,50 @@ export function TajweedPalette({ className = '', showDetails = true }: TajweedPa
     <Card className={className}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <span className="text-lg">Tajweed Rules Palette</span>
-          <Badge variant="secondary">{TAJWEED_RULES.length} Rules</Badge>
+          <span className="text-lg">Tajweed Rules</span>
+          <Badge variant="secondary">7 Topics · 182 Rules</Badge>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-2 max-h-96 overflow-y-auto">
-          {TAJWEED_RULES.map((rule) => (
-            <div key={rule.id} className="border-b border-gray-200 pb-2 last:border-b-0">
+        <div className="space-y-3 max-h-96 overflow-y-auto">
+          {TAJWEED_TOPICS.map((topic) => (
+            <div key={topic.id} className="border-b border-gray-200 pb-3 last:border-b-0">
               <div className="flex items-center justify-between mb-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-sm font-mono text-gray-500 w-6">{rule.id}</span>
-                  <div 
-                    className={`w-4 h-4 rounded ${rule.color.replace('text-', 'bg-')}`}
-                    title={rule.description}
+                  <div
+                    className="w-4 h-4 rounded"
+                    style={{ backgroundColor: topic.color }}
+                    title={topic.englishName}
                   ></div>
-                  <span className="text-sm font-medium capitalize">
-                    {rule.name.replace(/_/g, ' ')}
+                  <span
+                    className="text-lg font-arabic"
+                    style={{ fontFamily: "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif" }}
+                    lang="ar"
+                  >
+                    {topic.arabicName}
                   </span>
                 </div>
-                {showDetails && (
-                  <Badge variant="outline" className="text-xs">
-                    {rule.letters.length > 10 ? 'Multiple' : rule.letters}
-                  </Badge>
-                )}
+                <Badge variant="outline" className="text-xs">
+                  {topic.englishName}
+                </Badge>
               </div>
-              
+
               {showDetails && (
-                <div className="ml-8 space-y-1">
+                <div className="ml-6 space-y-1">
                   <div className="text-xs text-gray-600">
-                    {rule.description}
+                    {topic.description}
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-gray-500">Letters:</span>
-                    <span 
-                      className="text-xl sm:text-2xl font-arabic"
-                      style={{ fontFamily: "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif" }}
-                    >
-                      {rule.letters}
-                    </span>
-                  </div>
-                  {rule.examples && (
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs text-gray-500">Examples:</span>
-                      <span 
-                        className="text-lg sm:text-xl font-arabic"
-                        style={{ fontFamily: "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif" }}
-                      >
-                        {rule.examples}
-                      </span>
-                    </div>
-                  )}
                 </div>
               )}
             </div>
           ))}
         </div>
-        
+
         <Separator className="my-4" />
-        
+
         <div className="text-xs text-gray-500 text-center">
-          <p>Hover over colored squares to see rule descriptions</p>
-          <p>Click on tajweed text in the Quran to see detailed explanations</p>
+          <p>Colour carries the topic; hover text carries the ruling.</p>
+          <p className="mt-1">Powered by the quranpedia tajweed engine — 182 scholar-authored rules.</p>
         </div>
       </CardContent>
     </Card>
@@ -271,20 +144,26 @@ export function TajweedPaletteCompact({ className = '' }: { className?: string }
         <CardTitle className="text-sm">Tajweed Rules</CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-          {TAJWEED_RULES.slice(0, 12).map((rule) => (
-            <div key={rule.id} className="flex items-center gap-2 text-xs">
-              <div 
-                className={`w-3 h-3 rounded ${rule.color.replace('text-', 'bg-')}`}
-                title={rule.description}
+        <div className="grid grid-cols-1 gap-2">
+          {TAJWEED_TOPICS.map((topic) => (
+            <div key={topic.id} className="flex items-center gap-2 text-xs">
+              <div
+                className="w-3 h-3 rounded"
+                style={{ backgroundColor: topic.color }}
+                title={topic.englishName}
               ></div>
-              <span className="capitalize truncate">
-                {rule.name.replace(/_/g, ' ')}
+              <span
+                className="font-arabic"
+                style={{ fontFamily: "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif" }}
+                lang="ar"
+              >
+                {topic.arabicName}
               </span>
+              <span className="text-gray-500 truncate">— {topic.englishName}</span>
             </div>
           ))}
         </div>
       </CardContent>
     </Card>
   );
-} 
+}

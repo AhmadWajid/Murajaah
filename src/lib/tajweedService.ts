@@ -14,6 +14,17 @@ export interface TajweedRule {
   text: string;
   startIndex: number;
   endIndex: number;
+  // Fields from the quranpedia engine (populated when using the new engine API)
+  ruleId?: string;
+  hukumId?: string;
+  categoryId?: string;
+  topicId?: string;
+  hukumLabel?: string;   // Arabic, e.g. "المد الطبيعي الكلمي"
+  ruleLabel?: string;    // Arabic, e.g. "الألف الساكنة المسبوقة بحرف مفتوح"
+  topicLabel?: string;   // Arabic, e.g. "المد"
+  hukumLabelEn?: string; // English, e.g. "Natural Madd (Madd Tabi'i — 2 counts)"
+  topicLabelEn?: string; // English, e.g. "Prolongation (Madd)"
+  ruleLabelEn?: string;  // English, e.g. "Sukoon alef preceded by a fatha letter"
 }
 
 // Tajweed rule colors for different rule types
@@ -98,7 +109,15 @@ export const TAJWEED_ARABIC_NAMES: Record<string, string> = {
 };
 
 // Builds tooltip text: "الإخفاء — Ikhafa"
+// Handles both old rule-class names and new topic IDs from the quranpedia engine.
 export function getTajweedTooltip(ruleClass: string): string {
+  // New topic-based system (quranpedia engine)
+  if (TOPIC_ARABIC_NAMES[ruleClass]) {
+    const arabic = TOPIC_ARABIC_NAMES[ruleClass];
+    const english = TOPIC_ENGLISH_NAMES[ruleClass] || ruleClass;
+    return `${arabic} — ${english}`;
+  }
+  // Old rule-class system (SQLite DB)
   const english = TAJWEED_DESCRIPTIONS[ruleClass] || ruleClass;
   const arabic = TAJWEED_ARABIC_NAMES[ruleClass];
   // Use short English name (first part before " - ")
@@ -160,6 +179,51 @@ export const TAJWEED_ENGLISH_DETAILS: Record<string, string> = {
   tarqeeq: 'Light/thin pronunciation of the letter',
 };
 
+// --- New quranpedia tajweed engine (7-topic color system) ---
+// The engine uses 7 topics instead of 21+ rule classes. Colour carries the
+// topic; text carries the ruling. See src/lib/tajweed/ for the full integration.
+
+export const TOPIC_COLORS: Record<string, string> = {
+  'tafkheem-tarqeeq': '#c2410c',
+  'letter-relations': '#7e22ce',
+  'noon-tanween': '#0369a1',
+  'meem-sakinah': '#0f766e',
+  mushaddadatan: '#a16207',
+  madd: '#be123c',
+  qalqalah: '#15803d',
+};
+
+// Tailwind class equivalents for the 7 topics (used by TajweedAyahText)
+export const TOPIC_TAILWIND_COLORS: Record<string, string> = {
+  'tafkheem-tarqeeq': 'text-orange-700',
+  'letter-relations': 'text-purple-700',
+  'noon-tanween': 'text-sky-700',
+  'meem-sakinah': 'text-teal-700',
+  mushaddadatan: 'text-amber-700',
+  madd: 'text-rose-700',
+  qalqalah: 'text-green-700',
+};
+
+export const TOPIC_ARABIC_NAMES: Record<string, string> = {
+  'tafkheem-tarqeeq': 'التفخيم والترقيق',
+  'letter-relations': 'علاقات الحروف',
+  'noon-tanween': 'النون والتنوين',
+  'meem-sakinah': 'الميم الساكنة',
+  mushaddadatan: 'المشددتان',
+  madd: 'المد',
+  qalqalah: 'القلقلة',
+};
+
+export const TOPIC_ENGLISH_NAMES: Record<string, string> = {
+  'tafkheem-tarqeeq': 'Heavy & Light Letters',
+  'letter-relations': 'Letter Relations',
+  'noon-tanween': 'Noon Sakinah & Tanween',
+  'meem-sakinah': 'Meem Sakinah',
+  mushaddadatan: 'Doubled Letters (Ghunnah)',
+  madd: 'Prolongation (Madd)',
+  qalqalah: 'Qalqalah (Echo)',
+};
+
 export interface TajweedRuleInfo {
   ruleClass: string;
   arabicName: string;
@@ -168,8 +232,20 @@ export interface TajweedRuleInfo {
   englishDetail: string;
 }
 
-// Full info for a rule class: Arabic name + Arabic detail + English description
+// Full info for a rule class/topic: Arabic name + Arabic detail + English description
+// Handles both old rule-class names and new topic IDs from the quranpedia engine.
 export function getTajweedRuleInfo(ruleClass: string): TajweedRuleInfo {
+  // New topic-based system (quranpedia engine)
+  if (TOPIC_ARABIC_NAMES[ruleClass]) {
+    return {
+      ruleClass,
+      arabicName: TOPIC_ARABIC_NAMES[ruleClass],
+      arabicDetail: '',
+      english: TOPIC_ENGLISH_NAMES[ruleClass] || ruleClass,
+      englishDetail: '',
+    };
+  }
+  // Old rule-class system (SQLite DB)
   return {
     ruleClass,
     arabicName: TAJWEED_ARABIC_NAMES[ruleClass] || ruleClass,
@@ -274,6 +350,42 @@ export async function getTajweedRuleClasses(): Promise<string[]> {
     return data.ruleClasses || [];
   } catch (error) {
     console.error('Error fetching rule classes:', error);
+    return [];
+  }
+}
+
+// --- New quranpedia tajweed engine API functions ---
+
+// Fetch words with tajweed rules from the new engine (7-topic color system).
+// Each word's tajweedRules use topic IDs as the `class` field (e.g. "madd").
+export async function getTajweedWordsFromEngine(surah: number, ayah: number): Promise<TajweedWord[]> {
+  try {
+    const response = await fetch(`/api/tajweed-engine?action=ayah&surah=${surah}&ayah=${ayah}`);
+    if (!response.ok) {
+      throw new Error(`Failed to fetch tajweed engine data: ${response.statusText}`);
+    }
+    const data = await response.json();
+    return (data.words || []).map((w: TajweedWord) => ({
+      ...w,
+      tajweedRules: w.tajweedRules.map((r: TajweedRule) => ({
+        ...r,
+        class: r.class, // topic ID from the engine
+      })),
+    }));
+  } catch (error) {
+    console.error('Error fetching tajweed engine words:', error);
+    return [];
+  }
+}
+
+// Fetch the 7 topics with their labels and colors.
+export async function getTajweedTopics(): Promise<Array<{ id: string; labelAr: string; labelEn: string; color: string }>> {
+  try {
+    const response = await fetch('/api/tajweed-engine?action=topics');
+    if (!response.ok) return [];
+    const data = await response.json();
+    return data.topics || [];
+  } catch {
     return [];
   }
 } 

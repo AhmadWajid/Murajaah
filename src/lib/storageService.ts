@@ -372,6 +372,18 @@ export async function getNextMistakeInVerseOrder(
   );
 }
 
+export async function getPreviousMistakeInVerseOrder(
+  currentSurah: number, 
+  currentAyah: number, 
+  pageAyahs?: Array<{ surah?: { number: number }; numberInSurah: number }>
+): Promise<MistakeData | null> {
+  return withFallback(
+    () => databaseService.getPreviousMistakeInVerseOrder(currentSurah, currentAyah, pageAyahs),
+    () => localStorageService.getPreviousMistakeInVerseOrder(currentSurah, currentAyah, pageAyahs),
+    null
+  );
+}
+
 // =============================================
 // SETTINGS
 // =============================================

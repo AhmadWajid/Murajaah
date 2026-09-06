@@ -108,6 +108,7 @@ function QuranPageContent() {
   
   // Font settings state (will be loaded asynchronously)
   const [layoutMode, setLayoutMode] = useState<'spread' | 'single'>('single');
+  const [isMobile, setIsMobile] = useState(false);
   const [fontSize] = useState(24); // Remove unused setFontSize
   const [arabicFontSize, setArabicFontSize] = useState(24);
   const [translationFontSize, setTranslationFontSize] = useState(20);
@@ -119,7 +120,9 @@ function QuranPageContent() {
   // Load font settings from optimized hook
   useEffect(() => {
     if (fontSettings) {
-      setLayoutMode(fontSettings.layoutMode || 'single');
+      // Don't apply spread layout on mobile screens
+      const savedLayout = fontSettings.layoutMode || 'single';
+      setLayoutMode(isMobile ? 'single' : savedLayout);
       setArabicFontSize(fontSettings.arabicFontSize || 24);
       setTranslationFontSize(fontSettings.translationFontSize || 20);
       setPadding(fontSettings.padding || 16);
@@ -127,7 +130,20 @@ function QuranPageContent() {
       setSelectedLanguage(fontSettings.selectedLanguage || 'en');
       setSelectedTranslation(fontSettings.selectedTranslation || 'en.hilali');
     }
-  }, [fontSettings]);
+  }, [fontSettings, isMobile]);
+
+  // Detect mobile viewport and force single-page layout on small screens
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const checkMobile = () => {
+      const mobile = window.innerWidth <= 640;
+      setIsMobile(mobile);
+      if (mobile) setLayoutMode('single');
+    };
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
 
   // Load reading layout from localStorage on mount
   useEffect(() => {
@@ -1484,6 +1500,8 @@ function QuranPageContent() {
             onToggleTranslation={() => setShowTranslation(!showTranslation)}
             layoutMode={layoutMode}
             onToggleLayout={() => {
+              // Prevent switching to spread on mobile screens
+              if (isMobile && layoutMode === 'single') return;
               setLayoutMode(layoutMode === 'spread' ? 'single' : 'spread');
             }}
             selectedReciter={selectedReciter}

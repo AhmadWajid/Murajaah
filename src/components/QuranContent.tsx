@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { Plus, X } from 'lucide-react';
 import SelectedAyahsModal from './SelectedAyahsModal';
 import { TajweedAyahText } from './TajweedAyahText';
-import { TajweedWord, TAJWEED_COLORS, getTajweedTooltip } from '@/lib/tajweedService';
+import { TajweedWord, TAJWEED_COLORS, TOPIC_COLORS, TOPIC_TAILWIND_COLORS, getTajweedTooltip } from '@/lib/tajweedService';
 import { qpcFontLoader } from '@/lib/qpcFontLoader';
 import { createPortal } from 'react-dom';
 import { Tooltip } from 'react-tooltip';
@@ -707,8 +707,10 @@ export default function QuranContent({
                           };
 
                           sortedRules.forEach((rule, ruleIndex) => {
-                            const ruleColor = TAJWEED_COLORS[rule.class] || 'text-gray-600';
-                            const ruleDescription = getTajweedTooltip(rule.class);
+                            const ruleColor = TOPIC_TAILWIND_COLORS[rule.class] || TAJWEED_COLORS[rule.class] || 'text-gray-600';
+                            const ruleDescription = rule.hukumLabel && rule.ruleLabel
+                              ? [rule.hukumLabel, rule.hukumLabelEn, `— ${rule.ruleLabel}`, rule.ruleLabelEn].filter(Boolean).join('\n')
+                              : getTajweedTooltip(rule.class);
                             const tooltipId = 'tajweed-tooltip-15line';
                             const ruleStartsWithCombining = rule.text.length > 0 && isCombiningOrTatweel(rule.text[0]);
 
@@ -1404,6 +1406,15 @@ function isColorLight(hex: string): boolean {
 }
 
 const ruleColorMap: Record<string, string> = {
+  // New topic-based system (quranpedia engine — 7 topics)
+  'tafkheem-tarqeeq': '#c2410c',
+  'letter-relations': '#7e22ce',
+  'noon-tanween': '#0369a1',
+  'meem-sakinah': '#0f766e',
+  mushaddadatan: '#a16207',
+  madd: '#be123c',
+  qalqalah: '#15803d',
+  // Old rule-class system (backward compatibility)
   ham_wasl: '#ef4444',
   laam_shamsiyah: '#f59e42',
   madda_normal: '#22c55e',

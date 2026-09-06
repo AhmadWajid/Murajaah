@@ -25,7 +25,7 @@ import {
   Keyboard
 } from 'lucide-react';
 import { getLanguagesWithTranslations } from '@/lib/quranService';
-import { getNextMistakeInVerseOrder } from '@/lib/storageService';
+import { getNextMistakeInVerseOrder, getPreviousMistakeInVerseOrder } from '@/lib/storageService';
 import { MistakeData } from '@/lib/supabase/database';
 import TajweedLegend from '@/components/TajweedLegend';
 
@@ -134,6 +134,9 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
   // Audio Settings Modal Tab: 'reciters' or 'info'
   const [audioTab, setAudioTab] = useState<'reciters' | 'info'>('reciters');
 
+  // Mistake navigation dropdown
+  const [showMistakeMenu, setShowMistakeMenu] = useState(false);
+
   // Sync selectedSurahForAyah with currentSurah
   useEffect(() => {
     setSelectedSurahForAyah(currentSurah);
@@ -173,21 +176,28 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
     }
   }, [showSurahSelector, modalViewState]);
 
-  // Get the next mistake in verse order
+  // Get the next/previous mistake in verse order
   const [nextMistake, setNextMistake] = useState<MistakeData | null>(null);
+  const [prevMistake, setPrevMistake] = useState<MistakeData | null>(null);
   const hasNextMistake = nextMistake !== null;
+  const hasPrevMistake = prevMistake !== null;
   
   useEffect(() => {
-    const loadNextMistake = async () => {
+    const loadMistakes = async () => {
       try {
-        const mistake = await getNextMistakeInVerseOrder(currentSurah, currentAyah, pageData?.ayahs);
-        setNextMistake(mistake);
+        const [next, prev] = await Promise.all([
+          getNextMistakeInVerseOrder(currentSurah, currentAyah, pageData?.ayahs),
+          getPreviousMistakeInVerseOrder(currentSurah, currentAyah, pageData?.ayahs),
+        ]);
+        setNextMistake(next);
+        setPrevMistake(prev);
       } catch (error) {
-        console.error('Error loading next mistake:', error);
+        console.error('Error loading mistakes:', error);
         setNextMistake(null);
+        setPrevMistake(null);
       }
     };
-    loadNextMistake();
+    loadMistakes();
   }, [currentSurah, currentAyah, pageData]);
 
   // Load available translations on mount
@@ -336,22 +346,72 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
             </button>
           </div>
 
-          {/* Next Mistake — inline if present */}
-          {hasNextMistake && onNavigateToNextMistake && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (nextMistake) onNavigateToNextMistake(nextMistake.surah, nextMistake.ayah);
-              }}
-              className="h-9 sm:h-10 px-3 sm:px-3.5 rounded-xl bg-red-500/10 dark:bg-red-500/15 border-red-200/30 dark:border-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-500/20 dark:hover:bg-red-500/25 transition-all font-semibold text-xs shadow-sm flex items-center"
-              title={`Go to next mistake: Surah ${nextMistake?.surah} Ayah ${nextMistake?.ayah}`}
-            >
-              <svg className="w-3.5 h-3.5 mr-1.5 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-              </svg>
-              <span className="hidden lg:inline">Next Mistake</span>
-            </Button>
+          {/* Mistake navigation — compact dropdown */}
+          {(hasPrevMistake || hasNextMistake) && onNavigateToNextMistake && (
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowMistakeMenu(!showMistakeMenu)}
+                className="h-9 sm:h-10 px-2.5 sm:px-3 rounded-xl bg-red-500/10 dark:bg-red-500/15 border-red-200/30 dark:border-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-500/20 dark:hover:bg-red-500/25 transition-all font-semibold text-xs shadow-sm flex items-center"
+                title="Mistake navigation"
+              >
+                <svg className="w-3.5 h-3.5 sm:mr-1.5 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                </svg>
+                <span className="hidden lg:inline">Mistakes</span>
+                <svg
+                  className={`w-3 h-3 sm:ml-1 transition-transform duration-200 ${showMistakeMenu ? 'rotate-180' : ''}`}
+                  viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+                >
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </Button>
+
+              {/* Dropdown panel */}
+              {showMistakeMenu && (
+                <>
+                  <div className="fixed inset-0 z-[100]" onClick={() => setShowMistakeMenu(false)} />
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-[101] w-52 rounded-xl bg-white dark:bg-[#1a1f25] border border-red-200/40 dark:border-red-900/30 shadow-2xl overflow-hidden">
+                    {hasNextMistake && nextMistake && (
+                      <button
+                        onClick={() => {
+                          onNavigateToNextMistake(nextMistake.surah, nextMistake.ayah);
+                          setShowMistakeMenu(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors group"
+                        title={`Go to next mistake: Surah ${nextMistake.surah} Ayah ${nextMistake.ayah}`}
+                      >
+                        <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                        </svg>
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-bold text-red-700 dark:text-red-300">Next Mistake</div>
+                          <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">Surah {nextMistake.surah} : Ayah {nextMistake.ayah}</div>
+                        </div>
+                        <ChevronLeft className="w-4 h-4 text-gray-400 group-hover:text-red-500 flex-shrink-0" />
+                      </button>
+                    )}
+                    {hasPrevMistake && prevMistake && (
+                      <button
+                        onClick={() => {
+                          onNavigateToNextMistake(prevMistake.surah, prevMistake.ayah);
+                          setShowMistakeMenu(false);
+                        }}
+                        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors border-t border-red-100/50 dark:border-red-900/20 group"
+                        title={`Go to previous mistake: Surah ${prevMistake.surah} Ayah ${prevMistake.ayah}`}
+                      >
+                        <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-bold text-red-700 dark:text-red-300">Previous Mistake</div>
+                          <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">Surah {prevMistake.surah} : Ayah {prevMistake.ayah}</div>
+                        </div>
+                      </button>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           )}
         </div>
 

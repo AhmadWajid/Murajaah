@@ -609,7 +609,7 @@ export async function getMistakesInVerseOrder(): Promise<MistakeData[]> {
 export async function getNextMistakeInVerseOrder(
   currentSurah: number, 
   currentAyah: number, 
-  pageAyahs?: Array<{ surah?: { number: number }; numberInSurah: number }>
+  _pageAyahs?: Array<{ surah?: { number: number }; numberInSurah: number }>
 ): Promise<MistakeData | null> {
   const mistakesInOrder = await getMistakesInVerseOrder();
   
@@ -617,31 +617,33 @@ export async function getNextMistakeInVerseOrder(
     return null;
   }
   
-  // Same logic as the original function
-  if (pageAyahs && pageAyahs.length > 0) {
-    const currentPageMistakes = mistakesInOrder.filter(mistake => {
-      return pageAyahs.some(ayah => 
-        ayah.surah?.number === mistake.surah && 
-        ayah.numberInSurah === mistake.ayah
-      );
-    });
-    
-    const nextPageMistake = currentPageMistakes.find(mistake => 
-      mistake.surah > currentSurah || 
-      (mistake.surah === currentSurah && mistake.ayah > currentAyah)
-    );
-    
-    if (nextPageMistake) {
-      return nextPageMistake;
-    }
-  }
-  
+  // Find the next mistake in strict ascending verse order (surah, then ayah)
   const nextMistake = mistakesInOrder.find(mistake => 
     mistake.surah > currentSurah || 
     (mistake.surah === currentSurah && mistake.ayah > currentAyah)
   );
   
   return nextMistake || mistakesInOrder[0];
+}
+
+export async function getPreviousMistakeInVerseOrder(
+  currentSurah: number, 
+  currentAyah: number, 
+  _pageAyahs?: Array<{ surah?: { number: number }; numberInSurah: number }>
+): Promise<MistakeData | null> {
+  const mistakesInOrder = await getMistakesInVerseOrder();
+  
+  if (mistakesInOrder.length === 0) {
+    return null;
+  }
+  
+  // Find the previous mistake in strict descending verse order (surah, then ayah)
+  const prevMistake = [...mistakesInOrder].reverse().find(mistake => 
+    mistake.surah < currentSurah || 
+    (mistake.surah === currentSurah && mistake.ayah < currentAyah)
+  );
+  
+  return prevMistake || mistakesInOrder[mistakesInOrder.length - 1];
 }
 
 // =============================================

@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { TajweedWord, TAJWEED_COLORS, getTajweedTooltip } from '@/lib/tajweedService';
+import { TajweedWord, TAJWEED_COLORS, TOPIC_TAILWIND_COLORS, TOPIC_COLORS, getTajweedTooltip } from '@/lib/tajweedService';
 import { qpcFontLoader } from '@/lib/qpcFontLoader';
 import { Tooltip } from 'react-tooltip';
 import { useTajweedCache } from '@/lib/hooks/useTajweedCache';
@@ -505,7 +505,7 @@ export function TajweedAyahText({
     sortedRules.forEach((rule, ruleIndex) => {
       // Add the rule text with tooltip trigger only
       const ruleColor = getTajweedColor(rule.class);
-      const ruleDescription = getTajweedDescription(rule.class);
+      const ruleDescription = getTajweedDescription(rule);
       const tooltipId = `tajweed-tooltip-${word.id}-${ruleIndex}`;
       const bgColor = ruleColorMap[rule.class] || '#222';
       tooltipData.push({ id: tooltipId, content: ruleDescription, bgColor });
@@ -744,16 +744,42 @@ export function TajweedAyahText({
 }
 
 // Helper functions for tajweed colors and descriptions
+// Handles both old rule-class names (SQLite DB) and new topic IDs (quranpedia engine)
 function getTajweedColor(ruleClass: string): string {
+  // New topic-based system (quranpedia engine — 7 topics)
+  if (TOPIC_TAILWIND_COLORS[ruleClass]) return TOPIC_TAILWIND_COLORS[ruleClass];
+  // Old rule-class system (SQLite DB — 21+ classes)
   return TAJWEED_COLORS[ruleClass] || 'text-gray-600';
 }
 
-function getTajweedDescription(ruleClass: string): string {
-  return getTajweedTooltip(ruleClass);
-} 
+// Build a detailed tooltip from the full rule object.
+// Shows the specific hukum (ruling) in Arabic + English, and the rule description in Arabic + English.
+// e.g. "المد الطبيعي الكلمي\nNatural Madd (Madd Tabi'i — 2 counts)\n— الألف الساكنة المسبوقة بحرف مفتوح\nSukoon alef preceded by a fatha letter"
+// Falls back to the generic topic tooltip for old-style rules without labels.
+function getTajweedDescription(rule: { class: string; hukumLabel?: string; ruleLabel?: string; topicLabel?: string; hukumLabelEn?: string; topicLabelEn?: string; ruleLabelEn?: string }): string {
+  // New engine: has specific hukum and rule labels
+  if (rule.hukumLabel && rule.ruleLabel) {
+    const parts = [rule.hukumLabel];
+    if (rule.hukumLabelEn) parts.push(rule.hukumLabelEn);
+    parts.push(`— ${rule.ruleLabel}`);
+    if (rule.ruleLabelEn) parts.push(rule.ruleLabelEn);
+    return parts.join('\n');
+  }
+  // Fallback: generic topic-based tooltip
+  return getTajweedTooltip(rule.class);
+}
 
-// Map tajweed rule class to a hex color for tooltip backgrounds
+// Map tajweed rule class/topic to a hex color for tooltip backgrounds
 const ruleColorMap: Record<string, string> = {
+  // New topic-based system (quranpedia engine — 7 topics)
+  'tafkheem-tarqeeq': '#c2410c',
+  'letter-relations': '#7e22ce',
+  'noon-tanween': '#0369a1',
+  'meem-sakinah': '#0f766e',
+  mushaddadatan: '#a16207',
+  madd: '#be123c',
+  qalqalah: '#15803d',
+  // Old rule-class system (SQLite DB — kept for backward compatibility)
   ham_wasl: '#ef4444', // red-500
   laam_shamsiyah: '#f59e42', // yellow-500
   madda_normal: '#22c55e', // green-500

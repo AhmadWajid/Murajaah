@@ -57,7 +57,7 @@ export function useTajweedCache() {
     setLoadingStates(prev => ({ ...prev, [cacheKey]: true }));
 
     try {
-      const response = await fetch(`/api/tajweed?action=words&surah=${surah}&ayah=${ayah}`, {
+      const response = await fetch(`/api/tajweed-engine?action=ayah&surah=${surah}&ayah=${ayah}`, {
         signal: controller.signal
       });
       

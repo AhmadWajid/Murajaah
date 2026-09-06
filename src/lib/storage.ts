@@ -375,37 +375,15 @@ export const getMistakesInVerseOrder = (): MistakeData[] => {
   });
 };
 
-// Get the next mistake in verse order after the current position, prioritizing current page
-export const getNextMistakeInVerseOrder = (currentSurah: number, currentAyah: number, pageAyahs?: Array<{ surah?: { number: number }; numberInSurah: number }>): MistakeData | null => {
+// Get the next mistake in strict verse order after the current position
+export const getNextMistakeInVerseOrder = (currentSurah: number, currentAyah: number, _pageAyahs?: Array<{ surah?: { number: number }; numberInSurah: number }>): MistakeData | null => {
   const mistakesInOrder = getMistakesInVerseOrder();
   
   if (mistakesInOrder.length === 0) {
     return null;
   }
   
-  // If we have page data, first try to find mistakes on the current page
-  if (pageAyahs && pageAyahs.length > 0) {
-    // Get all ayahs on current page
-    const currentPageMistakes = mistakesInOrder.filter(mistake => {
-      return pageAyahs.some(ayah => 
-        ayah.surah?.number === mistake.surah && 
-        ayah.numberInSurah === mistake.ayah
-      );
-    });
-    
-    // Find next mistake on current page after current position
-    const nextPageMistake = currentPageMistakes.find(mistake => 
-      mistake.surah > currentSurah || 
-      (mistake.surah === currentSurah && mistake.ayah > currentAyah)
-    );
-    
-    // If found a mistake on current page, return it
-    if (nextPageMistake) {
-      return nextPageMistake;
-    }
-  }
-  
-  // No mistakes left on current page, find next mistake in entire Quran
+  // Find the next mistake in strict ascending verse order (surah, then ayah)
   const nextMistake = mistakesInOrder.find(mistake => 
     mistake.surah > currentSurah || 
     (mistake.surah === currentSurah && mistake.ayah > currentAyah)
@@ -413,6 +391,24 @@ export const getNextMistakeInVerseOrder = (currentSurah: number, currentAyah: nu
   
   // If no next mistake found, wrap around to the first mistake
   return nextMistake || mistakesInOrder[0];
+};
+
+// Get the previous mistake in strict verse order before the current position
+export const getPreviousMistakeInVerseOrder = (currentSurah: number, currentAyah: number, _pageAyahs?: Array<{ surah?: { number: number }; numberInSurah: number }>): MistakeData | null => {
+  const mistakesInOrder = getMistakesInVerseOrder();
+  
+  if (mistakesInOrder.length === 0) {
+    return null;
+  }
+  
+  // Find the previous mistake in strict descending verse order (surah, then ayah)
+  const prevMistake = [...mistakesInOrder].reverse().find(mistake => 
+    mistake.surah < currentSurah || 
+    (mistake.surah === currentSurah && mistake.ayah < currentAyah)
+  );
+  
+  // If no previous mistake found, wrap around to the last mistake
+  return prevMistake || mistakesInOrder[mistakesInOrder.length - 1];
 };
 
 // Get review data per day for charting

@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { TAJWEED_COLORS, TAJWEED_ARABIC_NAMES, TAJWEED_ARABIC_DETAILS, TAJWEED_ENGLISH_DETAILS } from '@/lib/tajweedService';
+import { TAJWEED_COLORS, TOPIC_TAILWIND_COLORS, TOPIC_ARABIC_NAMES, TOPIC_ENGLISH_NAMES, TAJWEED_ARABIC_NAMES, TAJWEED_ARABIC_DETAILS, TAJWEED_ENGLISH_DETAILS } from '@/lib/tajweedService';
 
 const RULE_GROUPS: { titleAr: string; titleEn: string; rules: string[] }[] = [
   { titleAr: 'الغُنَّة', titleEn: 'Ghunnah', rules: ['ghunnah'] },
@@ -79,7 +79,7 @@ export default function TajweedLegend() {
                   {/* Rules */}
                   <div className="space-y-3">
                     {group.rules.map((ruleKey) => {
-                      const colorClass = TAJWEED_COLORS[ruleKey];
+                      const colorClass = TOPIC_TAILWIND_COLORS[ruleKey] || TAJWEED_COLORS[ruleKey];
                       const arabicName = TAJWEED_ARABIC_NAMES[ruleKey];
                       const arabicDetail = TAJWEED_ARABIC_DETAILS[ruleKey];
                       const englishDetail = TAJWEED_ENGLISH_DETAILS[ruleKey];

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { TajweedWord, TAJWEED_COLORS, getTajweedTooltip } from '@/lib/tajweedService';
+import { TajweedWord, TAJWEED_COLORS, TOPIC_TAILWIND_COLORS, getTajweedTooltip } from '@/lib/tajweedService';
 import { qpcFontLoader } from '@/lib/qpcFontLoader';
 
 interface TajweedTextProps {
@@ -46,8 +46,10 @@ export function TajweedText({ words, className = '', showTooltips = true }: Tajw
       }
 
       // Add the rule text with styling
-      const ruleColor = TAJWEED_COLORS[rule.class] || 'text-gray-600';
-      const ruleDescription = getTajweedTooltip(rule.class);
+      const ruleColor = TOPIC_TAILWIND_COLORS[rule.class] || TAJWEED_COLORS[rule.class] || 'text-gray-600';
+      const ruleDescription = rule.hukumLabel && rule.ruleLabel
+        ? [rule.hukumLabel, rule.hukumLabelEn, `— ${rule.ruleLabel}`, rule.ruleLabelEn].filter(Boolean).join('\n')
+        : getTajweedTooltip(rule.class);
       
       const ruleElement = (
         <span
