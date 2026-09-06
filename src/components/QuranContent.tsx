@@ -13,6 +13,7 @@ import { TajweedWord, TAJWEED_COLORS, TOPIC_COLORS, TOPIC_TAILWIND_COLORS, getTa
 import { qpcFontLoader } from '@/lib/qpcFontLoader';
 import { createPortal } from 'react-dom';
 import { Tooltip } from 'react-tooltip';
+import { useIsMobile } from '@/lib/hooks/useIsMobile';
 import AyahDetailDrawer from './AyahDetailDrawer';
 
 interface PageLine {
@@ -209,7 +210,7 @@ export default function QuranContent({
   playingAyah = null,
 }: QuranContentProps) {
   const [showSelectedAyahsModal, setShowSelectedAyahsModal] = useState(false);
-  const [isMobile, setIsMobile] = useState(false);
+  const isMobile = useIsMobile();
   const [mounted, setMounted] = useState(false);
   const [hoveredTajweedWordId15, setHoveredTajweedWordId15] = useState<string | null>(null);
   const hoverTimeoutRef15 = useRef<NodeJS.Timeout | null>(null);
@@ -289,19 +290,6 @@ export default function QuranContent({
 
   // Diagnostic log for tooltips
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      setIsMobile(window.innerWidth <= 640);
-      
-      const handleResize = () => {
-        setIsMobile(window.innerWidth <= 640);
-      };
-      
-      window.addEventListener('resize', handleResize);
-      return () => window.removeEventListener('resize', handleResize);
-    }
-  }, []);
-
   // Diagnostic log for tooltips
   useEffect(() => {
     // 15-line mushaf mode removed; no diagnostics needed
@@ -343,7 +331,7 @@ export default function QuranContent({
   const renderMushafPage = (pageObj: any, pageSide: 'left' | 'right' | 'single' = 'single') => {
     if (!pageObj || !pageObj.ayahs || pageObj.ayahs.length === 0) {
       return (
-        <div className="flex-1 flex items-center justify-center p-12 border-2 border-dashed border-amber-500/20 dark:border-border/10 rounded-2xl min-h-[60vh]">
+        <div className="flex-1 flex items-center justify-center p-12 border-2 border-dashed border-accent/20 dark:border-border/10 rounded-2xl min-h-[60vh]">
           <p className="text-gray-500 dark:text-gray-400 font-sans">No page data available</p>
         </div>
       );
@@ -359,17 +347,17 @@ export default function QuranContent({
         : 'rounded-3xl';
     
     return (
-      <Card className={`flex-1 min-h-[75vh] shadow-[0_10px_35px_-5px_rgba(0,0,0,0.05)] dark:shadow-[0_15px_40px_rgba(0,0,0,0.35)] border-4 border-double border-amber-500/40 dark:border-accent/30 bg-[#FAF8F5]/90 dark:bg-[#12161A]/95 backdrop-blur-md overflow-hidden relative p-6 sm:p-8 md:p-10 font-sans transition-all duration-300 ${roundedClass}`}>
+      <Card className={`flex-1 min-h-[75vh] shadow-[0_10px_35px_-5px_rgba(0,0,0,0.05)] dark:shadow-[0_15px_40px_rgba(0,0,0,0.35)] border-4 border-double border-accent/40 dark:border-accent/30 bg-[#FAF8F5]/90 dark:bg-[#12161A]/95 backdrop-blur-md overflow-hidden relative p-6 sm:p-8 md:p-10 font-sans transition-all duration-300 ${roundedClass}`}>
         
         {/* Double Gold nested borders framing the page */}
-        <div className="absolute inset-4 pointer-events-none border border-amber-500/25 dark:border-accent/20 rounded-2xl z-20" />
-        <div className="absolute inset-5 pointer-events-none border border-amber-500/10 dark:border-accent/10 rounded-2xl z-20" />
+        <div className="absolute inset-4 pointer-events-none border border-accent/25 dark:border-accent/20 rounded-2xl z-20" />
+        <div className="absolute inset-5 pointer-events-none border border-accent/10 dark:border-accent/10 rounded-2xl z-20" />
         
         {/* Beautiful Custom SVG corner ornaments */}
-        <CornerOrnament className="absolute top-4 left-4 w-10 h-10 text-amber-500/40 dark:text-accent/30 select-none pointer-events-none z-20" />
-        <CornerOrnament className="absolute top-4 right-4 w-10 h-10 text-amber-500/40 dark:text-accent/30 select-none pointer-events-none z-20 rotate-90" />
-        <CornerOrnament className="absolute bottom-4 right-4 w-10 h-10 text-amber-500/40 dark:text-accent/30 select-none pointer-events-none z-20 rotate-180" />
-        <CornerOrnament className="absolute bottom-4 left-4 w-10 h-10 text-amber-500/40 dark:text-accent/30 select-none pointer-events-none z-20 -rotate-90" />
+        <CornerOrnament className="absolute top-4 left-4 w-10 h-10 text-accent/40 dark:text-accent/30 select-none pointer-events-none z-20" />
+        <CornerOrnament className="absolute top-4 right-4 w-10 h-10 text-accent/40 dark:text-accent/30 select-none pointer-events-none z-20 rotate-90" />
+        <CornerOrnament className="absolute bottom-4 right-4 w-10 h-10 text-accent/40 dark:text-accent/30 select-none pointer-events-none z-20 rotate-180" />
+        <CornerOrnament className="absolute bottom-4 left-4 w-10 h-10 text-accent/40 dark:text-accent/30 select-none pointer-events-none z-20 -rotate-90" />
 
         {/* Page fold shading (inner page curl shadow near spine) */}
         {pageSide === 'left' && (
@@ -380,7 +368,7 @@ export default function QuranContent({
         )}
         
         {/* Page Top Header */}
-        <div className="flex justify-between items-center pb-3 mb-6 border-b border-amber-500/20 dark:border-accent/10 text-xs font-bold text-amber-700/70 dark:text-accent/60 tracking-wider">
+        <div className="flex justify-between items-center pb-3 mb-6 border-b border-accent/20 dark:border-accent/10 text-xs font-bold text-accent/70 dark:text-accent/60 tracking-wider">
           <span>Juz' {ayahs[0]?.juz}</span>
           <span className="font-serif-header text-sm">
             {Array.from(new Set(ayahs.map((a: any) => a?.surah?.englishName).filter(Boolean))).join(' • ')}
@@ -410,17 +398,17 @@ export default function QuranContent({
                   {isFirstOfSurah && (
                     <div className="relative mb-8 w-full flex items-center justify-center py-2 select-none">
                       {/* Background gold/parchment plate */}
-                      <div className="absolute inset-0 bg-gradient-to-r from-[#FAF3E3]/40 via-[#FAF3E3]/95 to-[#FAF3E3]/40 dark:from-[#1A1F26]/40 dark:via-[#1A1F26]/95 dark:to-[#1A1F26]/40 rounded-2xl border border-amber-500/25 dark:border-accent/20" />
+                      <div className="absolute inset-0 bg-gradient-to-r from-[#FAF3E3]/40 via-[#FAF3E3]/95 to-[#FAF3E3]/40 dark:from-[#1A1F26]/40 dark:via-[#1A1F26]/95 dark:to-[#1A1F26]/40 rounded-2xl border border-accent/25 dark:border-accent/20" />
                       
                       {/* Left Wing - hidden on micro screens, block on sm+ */}
-                      <div className="hidden sm:block flex-1 max-w-[120px] md:max-w-[160px] text-amber-500/35 dark:text-accent/30 pr-4">
+                      <div className="hidden sm:block flex-1 max-w-[120px] md:max-w-[160px] text-accent/35 dark:text-accent/30 pr-4">
                         <SurahHeaderWing />
                       </div>
                       
                       {/* Center Medallion */}
-                      <div className="relative z-10 px-8 py-3.5 border-2 border-amber-500/35 dark:border-accent/25 rounded-2xl bg-[#FAF8F4]/90 dark:bg-[#151A20]/90 shadow-[0_0_15px_rgba(212,175,55,0.08)] flex flex-col items-center justify-center min-w-[220px]">
-                        <div className="absolute inset-0.5 border border-dashed border-amber-500/15 dark:border-accent/15 rounded-2xl" />
-                        <span className="text-[9px] font-bold text-amber-700/80 dark:text-accent/80 tracking-widest uppercase block mb-0.5 font-sans">Surah</span>
+                      <div className="relative z-10 px-8 py-3.5 border-2 border-accent/35 dark:border-accent/25 rounded-2xl bg-[#FAF8F4]/90 dark:bg-[#151A20]/90 shadow-[0_0_15px_rgba(212,175,55,0.08)] flex flex-col items-center justify-center min-w-[220px]">
+                        <div className="absolute inset-0.5 border border-dashed border-accent/15 dark:border-accent/15 rounded-2xl" />
+                        <span className="text-[9px] font-bold text-accent/80 dark:text-accent/80 tracking-widest uppercase block mb-0.5 font-sans">Surah</span>
                         <h3 className="text-xl sm:text-2xl font-bold font-serif-header text-gray-900 dark:text-white leading-tight">
                           {surahName}
                         </h3>
@@ -434,7 +422,7 @@ export default function QuranContent({
                       </div>
                       
                       {/* Right Wing - hidden on micro screens, block on sm+ */}
-                      <div className="hidden sm:block flex-1 max-w-[120px] md:max-w-[160px] text-amber-500/35 dark:text-accent/30 pl-4">
+                      <div className="hidden sm:block flex-1 max-w-[120px] md:max-w-[160px] text-accent/35 dark:text-accent/30 pl-4">
                         <SurahHeaderWing reverse />
                       </div>
                     </div>
@@ -443,7 +431,7 @@ export default function QuranContent({
                   {/* Independent Bismillah Line below Surah Heading */}
                   {hasBismillah && (
                     <div className="text-center py-4 mb-4 select-none">
-                      <div className="inline-block px-8 py-2 border-b border-amber-500/10 dark:border-accent/10 text-2xl sm:text-3xl text-amber-950 dark:text-amber-100 font-arabic text-center" style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif", direction: 'rtl' }}>
+                      <div className="inline-block px-8 py-2 border-b border-accent/10 dark:border-accent/10 text-2xl sm:text-3xl text-accent-foreground font-arabic text-center" style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif", direction: 'rtl' }}>
                         بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ
                       </div>
                     </div>
@@ -476,7 +464,7 @@ export default function QuranContent({
                       const isMemorized = isAyahInMemorization(surahNo, ayahNo);
                       const reviewGlowClass = status === 'overdue' ? 'decoration-red-500 underline decoration-2 underline-offset-4' :
                                               status === 'due-today' ? 'decoration-orange-500 underline decoration-2 underline-offset-4' :
-                                              status === 'due-soon' ? 'decoration-amber-500 underline decoration-2 underline-offset-4' :
+                                              status === 'due-soon' ? 'decoration-accent underline decoration-2 underline-offset-4' :
                                               status === 'upcoming' ? 'decoration-emerald-500 underline decoration-2 underline-offset-4' : '';
 
                       const isSelected = Array.from(selectedAyahs).some(sel => sel.surah === surahNo && sel.ayah === ayahNo);
@@ -490,12 +478,12 @@ export default function QuranContent({
                             }}
                             className={`inline cursor-pointer select-text transition-colors duration-200 ${
                               isActive
-                                ? 'bg-amber-500/15 dark:bg-accent/20 rounded-sm'
+                                ? 'bg-accent/15 dark:bg-accent/20 rounded-sm'
                                 : isPlaying
-                                  ? 'bg-amber-500/10 dark:bg-accent/12 rounded-sm ring-1 ring-amber-500/15 dark:ring-accent/15'
+                                  ? 'bg-accent/10 dark:bg-accent/12 rounded-sm ring-1 ring-accent/15 dark:ring-accent/15'
                                   : isSelected
-                                    ? 'bg-amber-500/8 dark:bg-accent/10'
-                                    : 'hover:bg-amber-500/5 dark:hover:bg-accent/10'
+                                    ? 'bg-accent/8 dark:bg-accent/10'
+                                    : 'hover:bg-accent/5 dark:hover:bg-accent/10'
                             } ${isMemorized ? reviewGlowClass : ''}`}>
                             <TajweedAyahText
                               ayahText={arText}
@@ -510,8 +498,7 @@ export default function QuranContent({
                               hideWordsDelay={hideWordsDelay}
                               wordByWordData={wordByWordData}
                               showWordByWordTooltip={showWordByWordTooltip}
-                              disableTajweedColors={isMobile}
-                              isMobile={isMobile}
+                              disableTajweedColors={false}
                               displayMode="inline"
                             />
                           </span>
@@ -544,7 +531,7 @@ export default function QuranContent({
           })()}
         </div>
         
-        <div className="absolute bottom-4 left-6 right-6 border-t border-amber-500/10 dark:border-accent/10 pt-2 flex justify-center text-[10px] font-bold text-amber-700/60 dark:text-accent/50 tracking-widest uppercase">
+        <div className="absolute bottom-4 left-6 right-6 border-t border-accent/10 dark:border-accent/10 pt-2 flex justify-center text-[10px] font-bold text-accent/60 dark:text-accent/50 tracking-widest uppercase">
           Juz' {ayahs[0]?.juz} • Page {pageNum}
         </div>
       </Card>
@@ -565,17 +552,17 @@ export default function QuranContent({
         : 'rounded-3xl';
 
     return (
-      <Card className={`flex-1 min-h-[75vh] shadow-[0_10px_35px_-5px_rgba(0,0,0,0.05)] dark:shadow-[0_15px_40px_rgba(0,0,0,0.35)] border-4 border-double border-amber-500/40 dark:border-accent/30 bg-[#FAF8F5]/90 dark:bg-[#12161A]/95 backdrop-blur-md overflow-hidden relative p-6 sm:p-8 md:p-10 font-sans transition-all duration-300 ${roundedClass}`}>
+      <Card className={`flex-1 min-h-[75vh] shadow-[0_10px_35px_-5px_rgba(0,0,0,0.05)] dark:shadow-[0_15px_40px_rgba(0,0,0,0.35)] border-4 border-double border-accent/40 dark:border-accent/30 bg-[#FAF8F5]/90 dark:bg-[#12161A]/95 backdrop-blur-md overflow-hidden relative p-6 sm:p-8 md:p-10 font-sans transition-all duration-300 ${roundedClass}`}>
         
         {/* Double Gold nested borders framing the page */}
-        <div className="absolute inset-4 pointer-events-none border border-amber-500/25 dark:border-accent/20 rounded-2xl z-20" />
-        <div className="absolute inset-5 pointer-events-none border border-amber-500/10 dark:border-accent/10 rounded-2xl z-20" />
+        <div className="absolute inset-4 pointer-events-none border border-accent/25 dark:border-accent/20 rounded-2xl z-20" />
+        <div className="absolute inset-5 pointer-events-none border border-accent/10 dark:border-accent/10 rounded-2xl z-20" />
         
         {/* Beautiful Custom SVG corner ornaments */}
-        <CornerOrnament className="absolute top-4 left-4 w-10 h-10 text-amber-500/40 dark:text-accent/30 select-none pointer-events-none z-20" />
-        <CornerOrnament className="absolute top-4 right-4 w-10 h-10 text-amber-500/40 dark:text-accent/30 select-none pointer-events-none z-20 rotate-90" />
-        <CornerOrnament className="absolute bottom-4 right-4 w-10 h-10 text-amber-500/40 dark:text-accent/30 select-none pointer-events-none z-20 rotate-180" />
-        <CornerOrnament className="absolute bottom-4 left-4 w-10 h-10 text-amber-500/40 dark:text-accent/30 select-none pointer-events-none z-20 -rotate-90" />
+        <CornerOrnament className="absolute top-4 left-4 w-10 h-10 text-accent/40 dark:text-accent/30 select-none pointer-events-none z-20" />
+        <CornerOrnament className="absolute top-4 right-4 w-10 h-10 text-accent/40 dark:text-accent/30 select-none pointer-events-none z-20 rotate-90" />
+        <CornerOrnament className="absolute bottom-4 right-4 w-10 h-10 text-accent/40 dark:text-accent/30 select-none pointer-events-none z-20 rotate-180" />
+        <CornerOrnament className="absolute bottom-4 left-4 w-10 h-10 text-accent/40 dark:text-accent/30 select-none pointer-events-none z-20 -rotate-90" />
 
         {/* Page fold shading */}
         {pageSide === 'left' && (
@@ -586,7 +573,7 @@ export default function QuranContent({
         )}
         
         {/* Page Top Header */}
-        <div className="flex justify-between items-center pb-3 mb-6 border-b border-amber-500/20 dark:border-accent/10 text-xs font-bold text-amber-700/70 dark:text-accent/60 tracking-wider">
+        <div className="flex justify-between items-center pb-3 mb-6 border-b border-accent/20 dark:border-accent/10 text-xs font-bold text-accent/70 dark:text-accent/60 tracking-wider">
           <span>Juz' {pageObj.ayahs?.[0]?.juz || ''}</span>
           <span className="font-serif-header text-sm">
             {Array.from(new Set(pageObj.ayahs?.map((a: any) => a?.surah?.englishName).filter(Boolean))).join(' • ')}
@@ -597,8 +584,8 @@ export default function QuranContent({
         {/* 15 Lines Layout Container */}
         {loading15 ? (
           <div className="flex-1 flex flex-col items-center justify-center min-h-[50vh]">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-600 mx-auto"></div>
-            <p className="mt-4 text-sm text-amber-700/70 dark:text-accent/70 font-semibold font-sans">Formatting 15-line Quran page...</p>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-accent mx-auto"></div>
+            <p className="mt-4 text-sm text-accent/70 dark:text-accent/70 font-semibold font-sans">Formatting 15-line Quran page...</p>
           </div>
         ) : (
           <div className="flex flex-col justify-between h-[calc(100%-4rem)] min-h-[60vh] space-y-4">
@@ -607,9 +594,9 @@ export default function QuranContent({
                 const surahName = pageObj.ayahs?.find((a: any) => a.surah?.number === line.surah_number)?.surah?.englishName || `Surah ${line.surah_number}`;
                 return (
                   <div key={`line-${line.line_number}`} className="relative my-2 w-full flex items-center justify-center py-1 select-none">
-                    <div className="absolute inset-0 bg-gradient-to-r from-[#FAF3E3]/40 via-[#FAF3E3]/95 to-[#FAF3E3]/40 dark:from-[#1A1F26]/40 dark:via-[#1A1F26]/95 dark:to-[#1A1F26]/40 rounded-xl border border-amber-500/20 dark:border-accent/15" />
-                    <div className="relative z-10 px-6 py-2 border border-amber-500/25 dark:border-accent/20 rounded-xl bg-[#FAF8F4]/90 dark:bg-[#151A20]/90 flex flex-col items-center justify-center min-w-[180px]">
-                      <span className="text-[8px] font-bold text-amber-700/80 dark:text-accent/80 tracking-widest uppercase mb-0.5 font-sans">Surah</span>
+                    <div className="absolute inset-0 bg-gradient-to-r from-[#FAF3E3]/40 via-[#FAF3E3]/95 to-[#FAF3E3]/40 dark:from-[#1A1F26]/40 dark:via-[#1A1F26]/95 dark:to-[#1A1F26]/40 rounded-xl border border-accent/20 dark:border-accent/15" />
+                    <div className="relative z-10 px-6 py-2 border border-accent/25 dark:border-accent/20 rounded-xl bg-[#FAF8F4]/90 dark:bg-[#151A20]/90 flex flex-col items-center justify-center min-w-[180px]">
+                      <span className="text-[8px] font-bold text-accent/80 dark:text-accent/80 tracking-widest uppercase mb-0.5 font-sans">Surah</span>
                       <h3 className="text-sm sm:text-base font-bold font-serif-header text-gray-900 dark:text-white leading-tight">
                         {surahName}
                       </h3>
@@ -621,7 +608,7 @@ export default function QuranContent({
               if (line.line_type === 'basmallah') {
                 return (
                   <div key={`line-${line.line_number}`} className="text-center py-2 select-none">
-                    <div className="inline-block px-6 py-1 border-b border-amber-500/10 dark:border-accent/10 text-xl sm:text-2xl text-amber-950 dark:text-amber-100 font-arabic text-center" style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif", direction: 'rtl' }}>
+                    <div className="inline-block px-6 py-1 border-b border-accent/10 dark:border-accent/10 text-xl sm:text-2xl text-accent-foreground font-arabic text-center" style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif", direction: 'rtl' }}>
                       بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ
                     </div>
                   </div>
@@ -633,7 +620,7 @@ export default function QuranContent({
                 return (
                   <div 
                     key={`line-${line.line_number}`} 
-                    className="flex flex-row items-center w-full leading-[2.5] sm:leading-[3.0] overflow-visible font-arabic arabic-text uthmanic-hafs text-amber-900 dark:text-amber-100"
+                    className="flex flex-row items-center w-full leading-[2.5] sm:leading-[3.0] overflow-visible font-arabic arabic-text uthmanic-hafs text-accent-foreground"
                     dir="rtl"
                     style={{
                       justifyContent: line.is_centered === 1 ? 'center' : 'space-between',
@@ -652,7 +639,7 @@ export default function QuranContent({
                       const isMemorized = isAyahInMemorization(wordSurah, wordAyah);
                       const reviewGlowClass = status === 'overdue' ? 'decoration-red-500 underline decoration-2 underline-offset-4' :
                                                status === 'due-today' ? 'decoration-orange-500 underline decoration-2 underline-offset-4' :
-                                               status === 'due-soon' ? 'decoration-amber-500 underline decoration-2 underline-offset-4' :
+                                               status === 'due-soon' ? 'decoration-accent underline decoration-2 underline-offset-4' :
                                                status === 'upcoming' ? 'decoration-emerald-500 underline decoration-2 underline-offset-4' : '';
 
                       // Find the translation for this word if available and feature is enabled
@@ -823,10 +810,10 @@ export default function QuranContent({
                             data-tooltip-id={showWordByWordTooltip && translation && shouldShowTranslationTooltip ? translationTooltipId : undefined}
                             className={`inline cursor-pointer select-none transition-all duration-200 px-0.5 rounded-sm relative font-arabic arabic-text uthmanic-hafs ${
                               isActive 
-                                ? 'bg-amber-500/15 dark:bg-accent/20' 
+                                ? 'bg-accent/15 dark:bg-accent/20' 
                                 : isSelected
-                                  ? 'bg-amber-500/8 dark:bg-accent/10'
-                                  : 'hover:bg-amber-500/5 dark:hover:bg-accent/10'
+                                  ? 'bg-accent/8 dark:bg-accent/10'
+                                  : 'hover:bg-accent/5 dark:hover:bg-accent/10'
                             } ${isMemorized ? reviewGlowClass : ''}`}
                             style={{
                               fontFamily: fontLoaded15 ? qpcFontLoader.getFontFamily(pageNum) : "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif",
@@ -888,10 +875,10 @@ export default function QuranContent({
                           data-tooltip-id={showWordByWordTooltip && translation && shouldShowTranslationTooltip ? translationTooltipId : undefined}
                           className={`inline cursor-pointer select-none transition-all duration-200 px-0.5 rounded-sm font-arabic arabic-text uthmanic-hafs ${
                             isActive 
-                              ? 'bg-amber-500/15 dark:bg-accent/20' 
+                              ? 'bg-accent/15 dark:bg-accent/20' 
                               : isSelected
-                                ? 'bg-amber-500/8 dark:bg-accent/10'
-                                : 'hover:bg-amber-500/5 dark:hover:bg-accent/10'
+                                ? 'bg-accent/8 dark:bg-accent/10'
+                                : 'hover:bg-accent/5 dark:hover:bg-accent/10'
                           } ${isMemorized ? reviewGlowClass : ''}`}
                           style={{
                             fontFamily: fontLoaded15 ? qpcFontLoader.getFontFamily(pageNum) : "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif",
@@ -953,7 +940,7 @@ export default function QuranContent({
               <Card className="flex-1 min-h-screen border-0 shadow-none bg-transparent">
                 <div className="p-1 sm:p-4">
                   {/* Page Header — English name | divider | Arabic name ... page number */}
-                  <div className="flex items-center justify-between mb-8 pb-3 border-b border-amber-500/15 dark:border-accent/10">
+                  <div className="flex items-center justify-between mb-8 pb-3 border-b border-accent/15 dark:border-accent/10">
                     <div className="flex items-center gap-3 min-w-0">
                       {pageData?.ayahs && pageData.ayahs.length > 0 && (() => {
                         const uniqueSurahs = Array.from(new Set(pageData.ayahs.map((a: any) => a?.surah?.number).filter(Boolean)));
@@ -962,15 +949,15 @@ export default function QuranContent({
                         return (
                           <>
                             {englishNames.length > 0 && (
-                              <span className="text-sm font-semibold text-amber-800/70 dark:text-amber-200/60 font-serif-header tracking-wide truncate">
+                              <span className="text-sm font-semibold text-accent/70 font-serif-header tracking-wide truncate">
                                 {englishNames.join(' • ')}
                               </span>
                             )}
                             {arabicNames.length > 0 && englishNames.length > 0 && (
-                              <span className="text-amber-400/40 dark:text-accent/30 text-xs">|</span>
+                              <span className="text-accent/40 text-xs">|</span>
                             )}
                             {arabicNames.length > 0 && (
-                              <span className="text-base text-amber-900 dark:text-amber-100 font-arabic" dir="rtl">
+                              <span className="text-base text-accent-foreground font-arabic" dir="rtl">
                                 {arabicNames.join(' • ')}
                               </span>
                             )}
@@ -978,7 +965,7 @@ export default function QuranContent({
                         );
                       })()}
                     </div>
-                    <span className="text-xs font-semibold text-amber-700/60 dark:text-amber-300/50 tracking-wide font-sans flex-shrink-0">
+                    <span className="text-xs font-semibold text-accent/60 dark:text-accent/50 tracking-wide font-sans flex-shrink-0">
                       Page {currentPage}
                     </span>
                   </div>
@@ -1055,7 +1042,7 @@ export default function QuranContent({
                 <Card className="flex-1 min-h-screen border-0 shadow-none bg-transparent">
                   <div className="p-1 sm:p-4">
                     {/* Page Header — English name | divider | Arabic name ... page number */}
-                    <div className="flex items-center justify-between mb-8 pb-3 border-b border-amber-500/15 dark:border-accent/10">
+                    <div className="flex items-center justify-between mb-8 pb-3 border-b border-accent/15 dark:border-accent/10">
                       <div className="flex items-center gap-3 min-w-0">
                         {previousPageData?.ayahs && previousPageData.ayahs.length > 0 && (() => {
                           const uniqueSurahs = Array.from(new Set(previousPageData.ayahs.map((a: any) => a?.surah?.number).filter(Boolean)));
@@ -1064,15 +1051,15 @@ export default function QuranContent({
                           return (
                             <>
                               {englishNames.length > 0 && (
-                                <span className="text-sm font-semibold text-amber-800/70 dark:text-amber-200/60 font-serif-header tracking-wide truncate">
+                                <span className="text-sm font-semibold text-accent/70 font-serif-header tracking-wide truncate">
                                   {englishNames.join(' • ')}
                                 </span>
                               )}
                               {arabicNames.length > 0 && englishNames.length > 0 && (
-                                <span className="text-amber-400/40 dark:text-accent/30 text-xs">|</span>
+                                <span className="text-accent/40 text-xs">|</span>
                               )}
                               {arabicNames.length > 0 && (
-                                <span className="text-base text-amber-900 dark:text-amber-100 font-arabic" dir="rtl">
+                                <span className="text-base text-accent-foreground font-arabic" dir="rtl">
                                   {arabicNames.join(' • ')}
                                 </span>
                               )}
@@ -1080,7 +1067,7 @@ export default function QuranContent({
                           );
                         })()}
                       </div>
-                      <span className="text-xs font-semibold text-amber-700/60 dark:text-amber-300/50 tracking-wide font-sans flex-shrink-0">
+                      <span className="text-xs font-semibold text-accent/60 dark:text-accent/50 tracking-wide font-sans flex-shrink-0">
                         Page {previousPageData?.number || (currentPage % 2 === 1 ? currentPage + 1 : currentPage - 1)}
                       </span>
                     </div>
@@ -1163,10 +1150,10 @@ export default function QuranContent({
           ) : (
             <div className="max-w-3xl mx-auto py-2 sm:py-6 relative pr-4 lg:pr-8">
               {/* Vertical timeline line on the right side, acting as a book margin guideline */}
-              <div className="hidden lg:block absolute right-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-amber-500/25 via-amber-500/5 to-transparent pointer-events-none" />
+              <div className="hidden lg:block absolute right-0 top-0 bottom-0 w-0.5 bg-gradient-to-b from-accent/25 via-accent/5 to-transparent pointer-events-none" />
               <div className="p-1 sm:p-4">
                 {/* Page Header — English name | divider | Arabic name ... page number */}
-                <div className="flex items-center justify-between mb-8 pb-3 border-b border-amber-500/15 dark:border-accent/10">
+                <div className="flex items-center justify-between mb-8 pb-3 border-b border-accent/15 dark:border-accent/10">
                   <div className="flex items-center gap-3 min-w-0">
                     {pageData?.ayahs && pageData.ayahs.length > 0 && (() => {
                       const uniqueSurahs = Array.from(new Set(pageData.ayahs.map((a: any) => a?.surah?.number).filter(Boolean)));
@@ -1175,15 +1162,15 @@ export default function QuranContent({
                       return (
                         <>
                           {englishNames.length > 0 && (
-                            <span className="text-sm font-semibold text-amber-800/70 dark:text-amber-200/60 font-serif-header tracking-wide truncate">
+                            <span className="text-sm font-semibold text-accent/70 font-serif-header tracking-wide truncate">
                               {englishNames.join(' • ')}
                             </span>
                           )}
                           {arabicNames.length > 0 && englishNames.length > 0 && (
-                            <span className="text-amber-400/40 dark:text-accent/30 text-xs">|</span>
+                            <span className="text-accent/40 text-xs">|</span>
                           )}
                           {arabicNames.length > 0 && (
-                            <span className="text-base text-amber-900 dark:text-amber-100 font-arabic" dir="rtl">
+                            <span className="text-base text-accent-foreground font-arabic" dir="rtl">
                               {arabicNames.join(' • ')}
                             </span>
                           )}
@@ -1191,7 +1178,7 @@ export default function QuranContent({
                       );
                     })()}
                   </div>
-                  <span className="text-xs font-semibold text-amber-700/60 dark:text-amber-300/50 tracking-wide font-sans flex-shrink-0">
+                  <span className="text-xs font-semibold text-accent/60 dark:text-accent/50 tracking-wide font-sans flex-shrink-0">
                     {pageData?.number ? `Page ${pageData.number}` : ''}
                   </span>
                 </div>
@@ -1267,27 +1254,27 @@ export default function QuranContent({
 
         {/* Selected Ayahs — slim pill toolbar, non-intrusive */}
         {selectedAyahs.size > 0 && (
-          <div className="fixed bottom-6 right-4 md:right-6 z-40 flex items-center gap-1.5 bg-white dark:bg-[#1a1f28] border border-amber-200/50 dark:border-amber-800/30 rounded-full shadow-lg dark:shadow-[0_8px_24px_rgba(0,0,0,0.5)] px-1 py-1 animate-fade-in-up">
+          <div className="fixed bottom-6 right-4 md:right-6 z-40 flex items-center gap-1.5 bg-card border border-border rounded-full shadow-lg px-1 py-1 animate-fade-in-up">
             {/* Count badge — click to see details */}
             <button
               onClick={() => setShowSelectedAyahsModal(true)}
-              className="flex items-center gap-1.5 pl-3 pr-2 h-8 rounded-full hover:bg-amber-500/8 dark:hover:bg-amber-400/8 transition-colors group"
+              className="flex items-center gap-1.5 pl-3 pr-2 h-8 rounded-full hover:bg-accent/8 transition-colors group"
               title="View selected verses"
             >
-              <span className="w-5 h-5 rounded-full bg-amber-500 dark:bg-amber-400 text-white dark:text-gray-950 text-[10px] font-extrabold flex items-center justify-center flex-shrink-0">
+              <span className="w-5 h-5 rounded-full bg-accent text-accent-foreground text-[10px] font-extrabold flex items-center justify-center flex-shrink-0">
                 {selectedAyahs.size}
               </span>
-              <span className="text-[11px] font-semibold text-amber-800 dark:text-amber-300 font-sans whitespace-nowrap group-hover:text-amber-600 dark:group-hover:text-accent transition-colors">
+              <span className="text-[11px] font-semibold text-accent font-sans whitespace-nowrap transition-colors">
                 {selectedAyahs.size === 1 ? 'verse' : 'verses'}
               </span>
             </button>
 
-            <div className="w-px h-5 bg-amber-200/50 dark:bg-amber-800/40" />
+            <div className="w-px h-5 bg-border" />
 
             {/* Add for Review */}
             <button
               onClick={onAddRevision}
-              className="h-8 px-3 rounded-full text-[11px] font-bold font-sans bg-gradient-to-r from-amber-500 to-orange-500 dark:from-amber-400 dark:to-orange-400 text-white dark:text-gray-950 hover:opacity-90 transition-opacity whitespace-nowrap"
+              className="h-8 px-3 rounded-full text-[11px] font-bold font-sans bg-primary text-primary-foreground hover:bg-primary/90 transition-colors whitespace-nowrap"
               title="Add selected verses for review"
             >
               Add Review

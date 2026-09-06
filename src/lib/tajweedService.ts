@@ -256,9 +256,10 @@ export function getTajweedRuleInfo(ruleClass: string): TajweedRuleInfo {
 }
 
 // API functions for fetching tajweed data
+// Uses the new quranpedia tajweed engine (/api/tajweed-engine) for all consumers.
 export async function getTajweedWords(surah: number, ayah: number): Promise<TajweedWord[]> {
   try {
-    const response = await fetch(`/api/tajweed?action=words&surah=${surah}&ayah=${ayah}`);
+    const response = await fetch(`/api/tajweed-engine?action=ayah&surah=${surah}&ayah=${ayah}`);
     if (!response.ok) {
       throw new Error(`Failed to fetch tajweed words: ${response.statusText}`);
     }

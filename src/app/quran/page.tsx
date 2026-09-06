@@ -45,7 +45,7 @@ export default function QuranPage() {
       <div className="reading-surface min-h-screen flex items-center justify-center">
         <div className="text-center">
           <div className="w-12 h-12 mx-auto mb-4 rounded-full loading-shimmer" />
-          <p className="text-sm font-medium text-amber-700/60 dark:text-amber-400/50 font-sans">Loading Quran…</p>
+          <p className="text-sm font-medium text-muted-foreground font-sans">Loading Quran…</p>
         </div>
       </div>
     }>

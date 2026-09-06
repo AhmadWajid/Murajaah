@@ -12,7 +12,7 @@ import { getSurahList, SurahListItem } from '@/lib/quranService';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronRight, Trash2, CheckCircle, Edit, Loader2 } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, CheckCircle, Edit, Loader2, X } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import AppHeader from '@/components/AppHeader';
 import ReviewCard from '@/components/ReviewCard';
@@ -589,8 +589,8 @@ export default function Dashboard() {
       <main className="container mx-auto px-4 py-6">
         {/* Loading indicator for refresh */}
         {isRefreshing && (
-          <div className="fixed top-20 right-4 z-50 bg-background border rounded-lg shadow-lg px-4 py-2 flex items-center space-x-2">
-            <Loader2 className="h-4 w-4 animate-spin" />
+          <div className="fixed top-20 right-4 z-50 bg-card border border-border rounded-[var(--radius)] shadow-lg px-4 py-2 flex items-center space-x-2">
+            <Loader2 className="h-4 w-4 animate-spin text-accent" />
             <span className="text-sm">Refreshing...</span>
           </div>
         )}
@@ -599,8 +599,8 @@ export default function Dashboard() {
         {mistakes.length > 0 && (
           <div className="mb-6">
             <div className="flex items-center space-x-3 mb-3">
-              <div className="w-5 h-5 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center">
-                <span className="text-red-600 dark:text-red-400 text-xs font-bold">!</span>
+              <div className="w-5 h-5 bg-warning/15 rounded-full flex items-center justify-center">
+                <span className="text-warning text-xs font-bold">!</span>
               </div>
               <h2 className="text-lg font-semibold">Mistakes to Review ({mistakes.length})</h2>
             </div>
@@ -643,16 +643,16 @@ export default function Dashboard() {
                     return (
                       <div key={surah} className="border-b last:border-b-0">
                         {/* Surah Header - Always Visible */}
-                        <div 
-                          className="flex items-center justify-between p-4 hover:bg-red-50/30 dark:hover:bg-red-950/10 cursor-pointer"
+                        <div
+                          className="flex items-center justify-between p-4 hover:bg-warning/8 dark:hover:bg-warning/10 cursor-pointer"
                           onClick={() => toggleSurahExpansion(surahNumber)}
                         >
                           <div className="flex items-center space-x-3">
                             <div className="flex items-center space-x-2">
                               {isExpanded ? (
-                                <ChevronDown className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                <ChevronDown className="h-4 w-4 text-warning" />
                               ) : (
-                                <ChevronRight className="h-4 w-4 text-red-600 dark:text-red-400" />
+                                <ChevronRight className="h-4 w-4 text-warning" />
                               )}
                               <div>
                                 <div className="font-medium text-sm">
@@ -681,7 +681,7 @@ export default function Dashboard() {
                                 e.stopPropagation();
                                 setShowMistakeDeleteConfirm({ surah: surahNumber, deleteAll: true });
                               }}
-                              className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/20"
+                              className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
                             >
                               <Trash2 className="h-3 w-3" />
                             </Button>
@@ -690,9 +690,9 @@ export default function Dashboard() {
                         
                         {/* Expanded Content */}
                         {isExpanded && (
-                          <div className="bg-red-50/20 dark:bg-red-950/10 border-t">
+                          <div className="bg-warning/5 dark:bg-warning/8 border-t border-border">
                             <div className="p-4 space-y-3">
-                              <div className="text-xs font-medium text-red-700 dark:text-red-300 uppercase tracking-wide">
+                              <div className="text-xs font-medium text-warning uppercase tracking-wide">
                                 Ayah Ranges
                               </div>
                               {ayahRanges.map((range, rangeIndex) => {
@@ -704,7 +704,7 @@ export default function Dashboard() {
                                 )[0];
                                 
                                 return (
-                                  <div key={rangeIndex} className="flex items-center justify-between py-2 border-b last:border-b-0 border-red-100 dark:border-red-800">
+                                  <div key={rangeIndex} className="flex items-center justify-between py-2 border-b last:border-b-0 border-border">
                                     <div className="flex items-center space-x-3">
                                       <div>
                                         <div className="font-medium text-sm">
@@ -725,7 +725,7 @@ export default function Dashboard() {
                                         size="sm"
                                         variant="outline"
                                         onClick={() => setShowMistakeDeleteConfirm({ surah: surahNumber, ayah: range.start, deleteAll: false })}
-                                        className="h-7 w-7 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/20"
+                                        className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
                                       >
                                         <Trash2 className="h-3 w-3" />
                                       </Button>
@@ -749,7 +749,7 @@ export default function Dashboard() {
         {getCompletedTodayItems.length > 0 && (
           <div className="mb-6">
             <div className="flex items-center space-x-3 mb-3">
-              <CheckCircle className="h-5 w-5 text-green-600" />
+              <CheckCircle className="h-5 w-5 text-success" />
               <h2 className="text-lg font-semibold">
                 Completed Today ({getCompletedTodayItems.length})
               </h2>
@@ -759,20 +759,20 @@ export default function Dashboard() {
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
-                      <tr className="border-b bg-green-50/50 dark:bg-green-950/20">
-                        <th className="text-left p-2 font-medium text-green-700 dark:text-green-300 w-1/3">Surah & Ayahs</th>
-                        <th className="text-left p-2 font-medium text-green-700 dark:text-green-300 w-20">Reviews</th>
-                        <th className="text-left p-2 font-medium text-green-700 dark:text-green-300 w-24">Next Review</th>
-                        <th className="text-left p-2 font-medium text-green-700 dark:text-green-300 w-24">Status</th>
+                      <tr className="border-b bg-success/8">
+                        <th className="text-left p-2 font-medium text-success w-1/3">Surah & Ayahs</th>
+                        <th className="text-left p-2 font-medium text-success w-20">Reviews</th>
+                        <th className="text-left p-2 font-medium text-success w-24">Next Review</th>
+                        <th className="text-left p-2 font-medium text-success w-24">Status</th>
                       </tr>
                     </thead>
                     <tbody>
                       {getCompletedTodayItems.map((item) => {
                         const reviewDate = parseLocalDate(item.nextReview).toLocaleDateString();
                         return (
-                          <tr 
-                            key={item.id} 
-                            className="border-b hover:bg-green-50/30 dark:hover:bg-green-950/10 cursor-pointer"
+                          <tr
+                            key={item.id}
+                            className="border-b hover:bg-success/8 cursor-pointer"
                             onClick={() => router.push(`/quran?review=${encodeURIComponent(item.id)}`)}
                           >
                             <td className="p-2">
@@ -788,7 +788,7 @@ export default function Dashboard() {
                             <td className="p-2 font-medium text-sm">{item.reviewCount}</td>
                             <td className="p-2 font-medium text-sm">{reviewDate}</td>
                             <td className="p-2">
-                              <Badge variant="secondary" className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 text-xs px-2 py-1">
+                              <Badge variant="secondary" className="bg-success/15 text-success text-xs px-2 py-1">
                                 Done
                               </Badge>
                             </td>
@@ -842,7 +842,7 @@ export default function Dashboard() {
                               <Link
                                 key={item.id}
                                 href={`/quran?review=${encodeURIComponent(item.id)}`}
-                                className={`flex items-center justify-between px-3 py-2 border-b last:border-b-0 bg-white dark:bg-black/30 ${isCompletedToday ? 'bg-green-50/50 dark:bg-green-950/20 border-l-4 border-l-green-500' : ''} transition hover:bg-muted/40 cursor-pointer`}
+                                className={`flex items-center justify-between px-3 py-2 border-b last:border-b-0 bg-card ${isCompletedToday ? 'bg-success/8 border-l-4 border-l-success' : ''} transition hover:bg-muted/40 cursor-pointer`}
                                 style={{ textDecoration: 'none' }}
                               >
                                 <div className="flex-1 min-w-0">
@@ -857,10 +857,10 @@ export default function Dashboard() {
                                     getPriorityText(item) === 'Due Today' ? 'destructive' :
                                     getPriorityText(item) === 'Due Soon' ? 'secondary' :
                                     'outline'
-                                  } className={`text-xs px-2 py-1 ${isCompletedToday ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : ''}`}>{isCompletedToday ? 'Completed' : getPriorityText(item)}</Badge>
+                                  } className={`text-xs px-2 py-1 ${isCompletedToday ? 'bg-success/15 text-success' : ''}`}>{isCompletedToday ? 'Completed' : getPriorityText(item)}</Badge>
                                   {!isCompletedToday && (
                                     <button
-                                      className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-green-100 dark:hover:bg-green-900/30 focus:outline-none"
+                                      className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-success/10 focus:outline-none"
                                       onClick={e => {
                                         e.preventDefault();
                                         setReviewingItem(item);
@@ -869,7 +869,7 @@ export default function Dashboard() {
                                       title="Review (Easy/Medium/Hard)"
                                       type="button"
                                     >
-                                      <CheckCircle className="h-5 w-5 text-green-600" />
+                                      <CheckCircle className="h-5 w-5 text-success" />
                                     </button>
                                   )}
                                   <Button
@@ -969,7 +969,7 @@ export default function Dashboard() {
                             <tr
                               key={item.id}
                               className={`border-b cursor-pointer ${
-                                isCompletedToday ? 'bg-green-50/50 dark:bg-green-950/20 border-l-4 border-l-green-500' : ''
+                                isCompletedToday ? 'bg-success/8 border-l-4 border-l-success' : ''
                               } ${hoverClass} ${darkHoverClass}`}
                               onClick={() => {
                                 window.location.href = `/quran?review=${encodeURIComponent(item.id)}`;
@@ -1005,7 +1005,7 @@ export default function Dashboard() {
                                   getPriorityText(item) === 'Due Soon' ? 'secondary' :
                                   'outline'
                                 } className={`text-xs px-2 py-1 ${
-                                  isCompletedToday ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' : ''
+                                  isCompletedToday ? 'bg-success/15 text-success' : ''
                                 }`}>
                                   {isCompletedToday ? 'Completed' : getPriorityText(item)}
                                 </Badge>
@@ -1014,7 +1014,7 @@ export default function Dashboard() {
                                 <div className="flex items-center gap-1">
                                   {!isCompletedToday && (
                                     <button
-                                      className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-green-100 dark:hover:bg-green-900/30 focus:outline-none"
+                                      className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-success/10 focus:outline-none"
                                       onClick={e => {
                                         e.stopPropagation();
                                         e.preventDefault();
@@ -1024,7 +1024,7 @@ export default function Dashboard() {
                                       title="Review (Easy/Medium/Hard)"
                                       type="button"
                                     >
-                                      <CheckCircle className="h-5 w-5 text-green-600" />
+                                      <CheckCircle className="h-5 w-5 text-success" />
                                     </button>
                                   )}
                                   <Button
@@ -1113,12 +1113,12 @@ export default function Dashboard() {
 
         {/* Review Modal */}
         {reviewingItem && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-60 p-4">
-            <div className="bg-card text-card-foreground gap-6 rounded-xl py-6 w-full max-w-lg max-h-[90vh] shadow-2xl border flex flex-col" data-modal="review-rating">
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 animate-overlay" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
+            <div className="bg-card text-card-foreground gap-6 rounded-[var(--radius-2xl)] py-6 w-full max-w-lg max-h-[90vh] shadow-2xl border border-border flex flex-col animate-fade-in-up" data-modal="review-rating">
               {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b">
+              <div className="flex items-center justify-between p-6 border-b border-border">
                 <div className="flex items-center space-x-3">
-                  <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">Complete Review</h3>
+                  <h3 className="text-xl font-bold text-foreground">Complete Review</h3>
                   <span className="inline-flex items-center justify-center rounded-md border px-2 py-0.5 font-medium w-fit whitespace-nowrap shrink-0 border-transparent bg-secondary text-secondary-foreground text-xs">
                     {reviewingItem.surah === 1 ? 'Al-Fatihah' : 
                      reviewingItem.surah === 2 ? 'Al-Baqarah' : 
@@ -1130,14 +1130,14 @@ export default function Dashboard() {
                      `سورة ${reviewingItem.surah}`} {reviewingItem.ayahStart}{reviewingItem.ayahStart !== reviewingItem.ayahEnd ? `-${reviewingItem.ayahEnd}` : ''}
                   </span>
                 </div>
-                <button 
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
                   onClick={() => setReviewingItem(null)}
-                  className="inline-flex items-center justify-center whitespace-nowrap text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 rounded-md gap-1.5 h-8 w-8 p-0"
+                  aria-label="Close"
                 >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
 
               {/* Content */}
@@ -1166,59 +1166,62 @@ export default function Dashboard() {
 
                   {/* Rating buttons */}
                   <div className="space-y-2">
-                    <button 
+                    <Button
+                      variant="outline"
                       onClick={() => {
                         const updatedItem = { ...reviewingItem, rating: 5, completed: true };
                         updateMemorizationItem(updatedItem);
                         loadAllData();
                         setReviewingItem(null);
                       }}
-                      className="inline-flex items-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 w-full justify-between h-auto p-4 text-left"
+                      className="w-full justify-between h-auto p-4 text-left"
                     >
                       <div>
                         <div className="font-medium">Easy</div>
                         <div className="text-sm text-muted-foreground">Perfect recall, no mistakes</div>
                       </div>
-                      <span className="inline-flex items-center justify-center rounded-md border px-2 py-0.5 font-medium w-fit whitespace-nowrap shrink-0 text-foreground text-xs">
+                      <span className="inline-flex items-center justify-center rounded-[var(--radius-sm)] border border-border px-2 py-0.5 font-medium text-xs text-foreground">
                         4 days
                       </span>
-                    </button>
+                    </Button>
 
-                    <button 
+                    <Button
+                      variant="outline"
                       onClick={() => {
                         const updatedItem = { ...reviewingItem, rating: 3, completed: true };
                         updateMemorizationItem(updatedItem);
                         loadAllData();
                         setReviewingItem(null);
                       }}
-                      className="inline-flex items-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 w-full justify-between h-auto p-4 text-left"
+                      className="w-full justify-between h-auto p-4 text-left"
                     >
                       <div>
                         <div className="font-medium">Medium</div>
                         <div className="text-sm text-muted-foreground">Good recall with minor hesitation</div>
                       </div>
-                      <span className="inline-flex items-center justify-center rounded-md border px-2 py-0.5 font-medium w-fit whitespace-nowrap shrink-0 text-foreground text-xs">
+                      <span className="inline-flex items-center justify-center rounded-[var(--radius-sm)] border border-border px-2 py-0.5 font-medium text-xs text-foreground">
                         2 days
                       </span>
-                    </button>
+                    </Button>
 
-                    <button 
+                    <Button
+                      variant="outline"
                       onClick={() => {
                         const updatedItem = { ...reviewingItem, rating: 1, completed: true };
                         updateMemorizationItem(updatedItem);
                         loadAllData();
                         setReviewingItem(null);
                       }}
-                      className="inline-flex items-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-all disabled:pointer-events-none disabled:opacity-50 outline-none focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:ring-[3px] border bg-background shadow-xs hover:bg-accent hover:text-accent-foreground dark:bg-input/30 dark:border-input dark:hover:bg-input/50 w-full justify-between h-auto p-4 text-left"
+                      className="w-full justify-between h-auto p-4 text-left"
                     >
                       <div>
                         <div className="font-medium">Hard</div>
                         <div className="text-sm text-muted-foreground">Difficult recall, needed help</div>
                       </div>
-                      <span className="inline-flex items-center justify-center rounded-md border px-2 py-0.5 font-medium w-fit whitespace-nowrap shrink-0 text-foreground text-xs">
+                      <span className="inline-flex items-center justify-center rounded-[var(--radius-sm)] border border-border px-2 py-0.5 font-medium text-xs text-foreground">
                         1 day
                       </span>
-                    </button>
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -1239,7 +1242,7 @@ export default function Dashboard() {
               <AlertDialogCancel>Cancel</AlertDialogCancel>
               <AlertDialogAction
                 onClick={() => showDeleteConfirm && handleDelete(showDeleteConfirm)}
-                className="bg-red-600 text-white hover:bg-red-700 focus:ring-red-500"
+                className="bg-destructive text-white hover:bg-destructive/90"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 Delete
@@ -1279,7 +1282,7 @@ export default function Dashboard() {
                     }
                   }
                 }}
-                className="bg-red-600 text-white hover:bg-red-700 focus:ring-red-500"
+                className="bg-destructive text-white hover:bg-destructive/90"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
                 {showMistakeDeleteConfirm?.deleteAll ? 'Remove All Mistakes' : 'Remove Mistake'}

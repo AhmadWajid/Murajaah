@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Tooltip } from '@/components/ui/tooltip';
+import { ControlGroup } from '@/components/ui/control-group';
 import { RECITER_GROUPS, getReciterById } from '@/lib/recitations';
 import {
   ChevronLeft,
@@ -22,7 +23,7 @@ import {
   Target,
   X,
   Info,
-  Keyboard
+  Keyboard,
 } from 'lucide-react';
 import { getLanguagesWithTranslations } from '@/lib/quranService';
 import { getNextMistakeInVerseOrder, getPreviousMistakeInVerseOrder } from '@/lib/storageService';
@@ -99,16 +100,8 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
     currentAyah = 1,
     onNavigateToNextMistake,
     pageData,
-    selectedLanguage,
-    selectedTranslation,
     onLanguageChange,
     onTranslationChange,
-    hideWords,
-    onToggleHideWords,
-    hideWordsDelay,
-    onHideWordsDelayChange,
-    readingLayout,
-    onReadingLayoutChange,
   } = props;
 
   const [showViewSettings, setShowViewSettings] = useState(false);
@@ -116,33 +109,26 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
   const [showSurahSelector, setShowSurahSelector] = useState(false);
   const [surahSearchTerm, setSurahSearchTerm] = useState('');
   const [selectedSurahForAyah, setSelectedSurahForAyah] = useState(currentSurah);
-  const [selectedAyahNumber, setSelectedAyahNumber] = useState(1);
-  
-  // Navigation Modal View State: 'chapters' or 'verses'
   const [modalViewState, setModalViewState] = useState<'chapters' | 'verses'>('chapters');
-  // Direct verse number jump input
   const [verseJumpInput, setVerseJumpInput] = useState('');
-  // Ref for the surah list scroll container
   const surahListRef = useRef<HTMLDivElement>(null);
-  // Refs for auto-scrolling to selected reciter in the audio modal
   const reciterListRef = useRef<HTMLDivElement>(null);
   const selectedReciterRef = useRef<HTMLDivElement>(null);
-  // Keyboard navigation for surah index
   const [keyboardIndex, setKeyboardIndex] = useState(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Audio Settings Modal Tab: 'reciters' or 'info'
   const [audioTab, setAudioTab] = useState<'reciters' | 'info'>('reciters');
-
-  // Mistake navigation dropdown
   const [showMistakeMenu, setShowMistakeMenu] = useState(false);
+  const [showOverflow, setShowOverflow] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const mistakeBtnRef = useRef<HTMLDivElement>(null);
+  const [mistakeMenuPos, setMistakeMenuPos] = useState<{ top: number; left: number } | null>(null);
 
-  // Sync selectedSurahForAyah with currentSurah
+  useEffect(() => setMounted(true), []);
+
   useEffect(() => {
     setSelectedSurahForAyah(currentSurah);
   }, [currentSurah]);
 
-  // Auto-scroll to current surah when navigation drawer opens
   useEffect(() => {
     if (showSurahSelector && modalViewState === 'chapters') {
       const t = setTimeout(() => {
@@ -153,7 +139,6 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
     }
   }, [showSurahSelector, modalViewState, currentSurah]);
 
-  // Auto-scroll to the selected reciter when the audio modal opens on the reciters tab
   useEffect(() => {
     if (showReciterSelector && audioTab === 'reciters') {
       const t = setTimeout(() => {
@@ -163,12 +148,10 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
     }
   }, [showReciterSelector, audioTab]);
 
-  // Reset keyboard index when modal opens/closes or search changes
   useEffect(() => {
     setKeyboardIndex(-1);
   }, [showSurahSelector, surahSearchTerm, modalViewState]);
 
-  // Focus search input when modal opens
   useEffect(() => {
     if (showSurahSelector && modalViewState === 'chapters') {
       const t = setTimeout(() => searchInputRef.current?.focus(), 100);
@@ -176,12 +159,11 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
     }
   }, [showSurahSelector, modalViewState]);
 
-  // Get the next/previous mistake in verse order
   const [nextMistake, setNextMistake] = useState<MistakeData | null>(null);
   const [prevMistake, setPrevMistake] = useState<MistakeData | null>(null);
   const hasNextMistake = nextMistake !== null;
   const hasPrevMistake = prevMistake !== null;
-  
+
   useEffect(() => {
     const loadMistakes = async () => {
       try {
@@ -200,7 +182,6 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
     loadMistakes();
   }, [currentSurah, currentAyah, pageData]);
 
-  // Load available translations on mount
   useEffect(() => {
     const loadTranslations = async () => {
       try {
@@ -209,23 +190,16 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
         console.error('Error loading translations:', error);
       }
     };
-    
     loadTranslations();
   }, []);
 
-  // Reciter options grouped by playback mode (verse / full-surah)
   const reciterGroups = RECITER_GROUPS;
-
   const currentSurahData = surahList.find(s => s.number === currentSurah);
   const surahName = currentSurahData ? currentSurahData.name : 'Unknown Surah';
-  const maxAyahs = surahList.find(s => s.number === selectedSurahForAyah)?.numberOfAyahs || 1;
 
-  // Parse search term for direct Surah:Ayah match
   const parseDirectSearch = () => {
     const query = surahSearchTerm.trim().toLowerCase();
     if (!query) return null;
-
-    // Pattern 1: Chapter:Verse (e.g. "2:255" or "2 255" or "2-255" or "2/255")
     const numericMatch = query.match(/^(\d+)(?:[:\s\-\/]+)(\d+)$/);
     if (numericMatch) {
       const surahNum = parseInt(numericMatch[1]);
@@ -235,19 +209,16 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
         return { surah, ayah: ayahNum };
       }
     }
-
-    // Pattern 2: ChapterName Verse (e.g. "Al-Fatiha 5" or "Fatiha 5" or "Al-Baqarah 255")
     const textMatch = query.match(/^([a-z\s\-']+?)(?:[:\s\-\/]+)(\d+)$/);
     if (textMatch) {
       const namePart = textMatch[1].trim();
       const ayahNum = parseInt(textMatch[2]);
-      // First try exact match, then substring match
-      let surah = surahList.find(s => 
+      let surah = surahList.find(s =>
         s.englishName?.toLowerCase() === namePart ||
         s.name?.toLowerCase() === namePart
       );
       if (!surah) {
-        surah = surahList.find(s => 
+        surah = surahList.find(s =>
           s.englishName?.toLowerCase().includes(namePart) ||
           s.name?.toLowerCase().includes(namePart)
         );
@@ -256,23 +227,28 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
         return { surah, ayah: ayahNum };
       }
     }
-
     return null;
   };
 
   const directSearchResult = parseDirectSearch();
 
+  const closeSurahSelector = () => {
+    setShowSurahSelector(false);
+    setSurahSearchTerm('');
+    setVerseJumpInput('');
+  };
+
   return (
     <>
-      {/* ─── Unified Toolbar (all screen sizes) ─── */}
-      {/* ─── Unified Toolbar — 3 stacked rows on mobile, 1 centered row on desktop ─── */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-center gap-2 sm:gap-2 sm:flex-wrap font-sans py-2 px-2">
-
-            {/* ── Row 1 / Group 1: Navigation (surah + page) ── */}
-            <div className="flex items-center justify-center gap-2">
-              {/* Surah selector pill */}
-              <Button
-                variant="ghost"
+      {/* ─── Unified Toolbar ───
+          Two logical groups: Navigation (primary context) and Tools (display/audio/review).
+          Add Review is the single primary action. Everything else is secondary/tertiary. */}
+      <div className="flex flex-wrap items-center justify-center gap-2 font-sans">
+        {/* ── Group 1: Navigation ── */}
+        <ControlGroup separated className="rounded-[var(--radius)]">
+          {/* Surah / verse selector */}
+          <Button
+            variant="ghost"
             size="sm"
             onClick={() => {
               setModalViewState('chapters');
@@ -280,46 +256,31 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
               setSelectedSurahForAyah(currentSurah);
               setShowSurahSelector(true);
             }}
-            className="h-9 px-3 sm:h-10 sm:px-4 rounded-xl hover:bg-amber-50/60 dark:hover:bg-[#181D23] text-amber-850 dark:text-accent font-semibold text-sm transition-all flex items-center gap-2"
-            style={{
-              background: 'rgba(255, 255, 255, 0.72)',
-              backdropFilter: 'blur(20px) saturate(140%)',
-              WebkitBackdropFilter: 'blur(20px) saturate(140%)',
-              border: '1px solid rgba(212, 175, 55, 0.12)',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03), 0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-            }}
+            className="h-9 px-3 font-semibold gap-2 rounded-l-[var(--radius)] rounded-r-none"
             title="Select Surah and Verse"
           >
-            <BookOpen className="h-4 w-4 text-amber-600 dark:text-accent opacity-80" />
-            <span className="truncate max-w-[100px] sm:max-w-[120px] xl:max-w-[200px] font-bold">
+            <BookOpen className="h-4 w-4 text-muted-foreground" />
+            <span className="truncate max-w-[90px] sm:max-w-[140px] xl:max-w-[200px]">
               {currentSurah}. {surahName}
             </span>
-            {currentAyah ? <span className="text-amber-600 dark:text-accent/80 font-bold">:{currentAyah}</span> : null}
+            {currentAyah ? <span className="text-accent">:{currentAyah}</span> : null}
             <ChevronLeft className="h-3.5 w-3.5 opacity-40 rotate-90" />
           </Button>
 
           {/* Page navigator */}
-          <div
-            className="flex items-center gap-0.5 rounded-xl px-1 h-9 sm:h-10"
-            style={{
-              background: 'rgba(255, 255, 255, 0.72)',
-              backdropFilter: 'blur(20px) saturate(140%)',
-              WebkitBackdropFilter: 'blur(20px) saturate(140%)',
-              border: '1px solid rgba(212, 175, 55, 0.12)',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03), 0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-            }}
-          >
+          <div className="flex items-center gap-0.5 px-1">
             <button
               onClick={() => onPageChange(layoutMode === 'spread' ? currentPage + 2 : currentPage + 1)}
               disabled={layoutMode === 'spread' ? currentPage >= totalPages - 1 : currentPage >= totalPages}
-              className="h-7 w-7 sm:h-8 sm:w-8 flex items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:text-amber-600 dark:hover:text-accent hover:bg-amber-500/8 dark:hover:bg-amber-400/8 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              className="size-7 flex items-center justify-center rounded-[var(--radius-sm)] text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               title="Next Page"
+              aria-label="Next page"
             >
               <ChevronLeft className="h-4 w-4" />
             </button>
 
-            <div className="flex items-center justify-center gap-1.5 px-2 sm:px-3 h-7 sm:h-8">
-              <span className="text-[11px] sm:text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider select-none">Pg</span>
+            <div className="flex items-center justify-center gap-1.5 px-1.5">
+              <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider select-none">Pg</span>
               <input
                 type="number"
                 value={currentPage}
@@ -330,163 +291,161 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                 onFocus={(e: React.FocusEvent<HTMLInputElement>) => e.target.select()}
                 min="1"
                 max={totalPages}
-                className="w-11 sm:w-12 h-6 sm:h-7 text-center text-sm font-bold rounded-md bg-amber-500/10 dark:bg-amber-400/10 text-amber-800 dark:text-accent border-0 outline-none focus:ring-1 focus:ring-amber-400/30 transition-all"
-                style={{ MozAppearance: 'textfield', padding: 0, margin: 0, lineHeight: '1.75rem', WebkitAppearance: 'none' } as React.CSSProperties}
+                className="w-11 h-7 text-center text-sm font-semibold rounded-[var(--radius-sm)] bg-secondary text-foreground border border-border outline-none focus:ring-2 focus:ring-ring/30 transition-all"
+                aria-label={`Page ${currentPage} of ${totalPages}`}
               />
-              <span className="text-[11px] sm:text-xs font-medium text-gray-500 dark:text-gray-400 select-none whitespace-nowrap">/ {totalPages}</span>
+              <span className="text-[11px] font-medium text-muted-foreground select-none whitespace-nowrap">/ {totalPages}</span>
             </div>
 
             <button
               onClick={() => onPageChange(layoutMode === 'spread' ? currentPage - 2 : currentPage - 1)}
               disabled={layoutMode === 'spread' ? currentPage <= 2 : currentPage <= 1}
-              className="h-7 w-7 sm:h-8 sm:w-8 flex items-center justify-center rounded-lg text-gray-500 dark:text-gray-400 hover:text-amber-600 dark:hover:text-accent hover:bg-amber-500/8 dark:hover:bg-amber-400/8 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
+              className="size-7 flex items-center justify-center rounded-[var(--radius-sm)] text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
               title="Previous Page"
+              aria-label="Previous page"
             >
               <ChevronRight className="h-4 w-4" />
             </button>
           </div>
+        </ControlGroup>
 
-          {/* Mistake navigation — compact dropdown */}
-          {(hasPrevMistake || hasNextMistake) && onNavigateToNextMistake && (
-            <div className="relative">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowMistakeMenu(!showMistakeMenu)}
-                className="h-9 sm:h-10 px-2.5 sm:px-3 rounded-xl bg-red-500/10 dark:bg-red-500/15 border-red-200/30 dark:border-red-900/30 text-red-700 dark:text-red-300 hover:bg-red-500/20 dark:hover:bg-red-500/25 transition-all font-semibold text-xs shadow-sm flex items-center"
-                title="Mistake navigation"
-              >
-                <svg className="w-3.5 h-3.5 sm:mr-1.5 animate-pulse" fill="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                <span className="hidden lg:inline">Mistakes</span>
-                <svg
-                  className={`w-3 h-3 sm:ml-1 transition-transform duration-200 ${showMistakeMenu ? 'rotate-180' : ''}`}
-                  viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+        {/* Mistake navigation — warning semantic, compact dropdown */}
+        {(hasPrevMistake || hasNextMistake) && onNavigateToNextMistake && (
+          <div ref={mistakeBtnRef} className="relative">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (!showMistakeMenu && mistakeBtnRef.current) {
+                  const rect = mistakeBtnRef.current.getBoundingClientRect();
+                  setMistakeMenuPos({ top: rect.bottom + 8, left: rect.left + rect.width / 2 });
+                }
+                setShowMistakeMenu(!showMistakeMenu);
+              }}
+              className="h-9 px-2.5 border-warning/30 bg-warning/10 text-warning hover:bg-warning/15 hover:text-warning font-semibold text-xs"
+              title="Mistake navigation"
+              aria-expanded={showMistakeMenu}
+              aria-haspopup="menu"
+            >
+              <svg className="w-3.5 h-3.5 sm:mr-1.5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+              <span className="hidden lg:inline">Mistakes</span>
+              <ChevronLeft className={`h-3 w-3 sm:ml-1 transition-transform duration-200 ${showMistakeMenu ? '-rotate-90' : 'rotate-90'}`} />
+            </Button>
+
+            {showMistakeMenu && mounted && mistakeMenuPos && createPortal(
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setShowMistakeMenu(false)} />
+                <div
+                  className="fixed z-50 w-56 panel-surface rounded-[var(--radius-lg)] p-1 animate-popover overflow-hidden"
+                  style={{
+                    top: `${mistakeMenuPos.top}px`,
+                    left: `${mistakeMenuPos.left}px`,
+                    transform: 'translateX(-50%)',
+                  }}
                 >
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              </Button>
+                  {hasNextMistake && nextMistake && (
+                    <button
+                      onClick={() => {
+                        onNavigateToNextMistake(nextMistake.surah, nextMistake.ayah);
+                        setShowMistakeMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left rounded-[var(--radius-sm)] hover:bg-warning/10 transition-colors group"
+                      title={`Go to next mistake: Surah ${nextMistake.surah} Ayah ${nextMistake.ayah}`}
+                    >
+                      <svg className="w-4 h-4 text-warning flex-shrink-0" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold text-warning">Next Mistake</div>
+                        <div className="text-[11px] text-muted-foreground truncate">Surah {nextMistake.surah} : Ayah {nextMistake.ayah}</div>
+                      </div>
+                      <ChevronLeft className="w-4 h-4 text-muted-foreground group-hover:text-warning flex-shrink-0" />
+                    </button>
+                  )}
+                  {hasPrevMistake && prevMistake && (
+                    <button
+                      onClick={() => {
+                        onNavigateToNextMistake(prevMistake.surah, prevMistake.ayah);
+                        setShowMistakeMenu(false);
+                      }}
+                      className="w-full flex items-center gap-2.5 px-3 py-2.5 text-left rounded-[var(--radius-sm)] hover:bg-warning/10 transition-colors border-t border-border group"
+                      title={`Go to previous mistake: Surah ${prevMistake.surah} Ayah ${prevMistake.ayah}`}
+                    >
+                      <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-semibold text-warning">Previous Mistake</div>
+                        <div className="text-[11px] text-muted-foreground truncate">Surah {prevMistake.surah} : Ayah {prevMistake.ayah}</div>
+                      </div>
+                    </button>
+                  )}
+                </div>
+              </>,
+              document.body
+            )}
+          </div>
+        )}
 
-              {/* Dropdown panel */}
-              {showMistakeMenu && (
-                <>
-                  <div className="fixed inset-0 z-[100]" onClick={() => setShowMistakeMenu(false)} />
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 z-[101] w-52 rounded-xl bg-white dark:bg-[#1a1f25] border border-red-200/40 dark:border-red-900/30 shadow-2xl overflow-hidden">
-                    {hasNextMistake && nextMistake && (
-                      <button
-                        onClick={() => {
-                          onNavigateToNextMistake(nextMistake.surah, nextMistake.ayah);
-                          setShowMistakeMenu(false);
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors group"
-                        title={`Go to next mistake: Surah ${nextMistake.surah} Ayah ${nextMistake.ayah}`}
-                      >
-                        <svg className="w-4 h-4 text-red-500 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                        </svg>
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-bold text-red-700 dark:text-red-300">Next Mistake</div>
-                          <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">Surah {nextMistake.surah} : Ayah {nextMistake.ayah}</div>
-                        </div>
-                        <ChevronLeft className="w-4 h-4 text-gray-400 group-hover:text-red-500 flex-shrink-0" />
-                      </button>
-                    )}
-                    {hasPrevMistake && prevMistake && (
-                      <button
-                        onClick={() => {
-                          onNavigateToNextMistake(prevMistake.surah, prevMistake.ayah);
-                          setShowMistakeMenu(false);
-                        }}
-                        className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left hover:bg-red-50 dark:hover:bg-red-500/10 transition-colors border-t border-red-100/50 dark:border-red-900/20 group"
-                        title={`Go to previous mistake: Surah ${prevMistake.surah} Ayah ${prevMistake.ayah}`}
-                      >
-                        <ChevronRight className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                        <div className="flex-1 min-w-0">
-                          <div className="text-xs font-bold text-red-700 dark:text-red-300">Previous Mistake</div>
-                          <div className="text-[11px] text-gray-500 dark:text-gray-400 truncate">Surah {prevMistake.surah} : Ayah {prevMistake.ayah}</div>
-                        </div>
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* ── Row 2 / Group 2: Tools (display + tajweed + audio + review) ── */}
-        <div className="flex items-center justify-center gap-2">
+        {/* ── Group 2: Tools (display / tajweed / audio) ── */}
+        <ControlGroup separated className="rounded-[var(--radius)]">
           {/* Display settings */}
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setShowViewSettings(true)}
-            className="h-9 w-9 sm:h-10 sm:w-10 p-0 rounded-xl hover:bg-amber-50/60 dark:hover:bg-[#181D23] text-gray-600 dark:text-gray-300 flex items-center justify-center"
-            style={{
-              background: 'rgba(255, 255, 255, 0.72)',
-              backdropFilter: 'blur(20px) saturate(140%)',
-              WebkitBackdropFilter: 'blur(20px) saturate(140%)',
-              border: '1px solid rgba(212, 175, 55, 0.12)',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03), 0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-            }}
-            title="Display Settings"
-          >
-            <Settings className="h-4 w-4" />
-          </Button>
+          <Tooltip label="Display settings" side="bottom">
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              onClick={() => setShowViewSettings(true)}
+              className="rounded-l-[var(--radius)] rounded-r-none"
+              aria-label="Display settings"
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          </Tooltip>
 
           {/* Tajweed legend */}
           <TajweedLegend />
 
           {/* Audio reciter */}
           <Button
-            variant="outline"
+            variant="ghost"
             size="sm"
             onClick={() => {
               setAudioTab('reciters');
               setShowReciterSelector(true);
             }}
-            className="h-9 sm:h-10 px-3 rounded-xl hover:bg-amber-50/60 dark:hover:bg-[#181D23] text-gray-600 dark:text-gray-300 flex items-center gap-2"
-            style={{
-              background: 'rgba(255, 255, 255, 0.72)',
-              backdropFilter: 'blur(20px) saturate(140%)',
-              WebkitBackdropFilter: 'blur(20px) saturate(140%)',
-              border: '1px solid rgba(212, 175, 55, 0.12)',
-              boxShadow: '0 1px 2px rgba(0, 0, 0, 0.03), 0 2px 8px -2px rgba(0, 0, 0, 0.04)',
-            }}
+            className="h-9 px-3 gap-2 rounded-r-[var(--radius)] rounded-l-none"
             title="Change Reciter"
           >
-            <Volume2 className="h-4 w-4 text-amber-600 dark:text-accent flex-shrink-0" />
-            <span className="text-xs font-semibold truncate max-w-[80px] sm:max-w-[100px] xl:max-w-[160px]">
+            <Volume2 className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+            <span className="text-xs font-semibold truncate max-w-[70px] sm:max-w-[100px] xl:max-w-[150px]">
               {getReciterById(selectedReciter)?.englishName || 'Reciter'}
             </span>
             <ChevronLeft className="h-3 w-3 opacity-40 rotate-90 flex-shrink-0" />
           </Button>
+        </ControlGroup>
 
-          {/* Add Review — primary CTA */}
-          {onEnhancedMemorization && (
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={onEnhancedMemorization}
-              className="h-9 sm:h-10 px-3 sm:px-4 rounded-xl btn-primary font-bold text-xs shadow-md flex items-center gap-2"
-            >
-              <Target className="h-4 w-4" />
-              <span className="hidden sm:inline">Add Review</span>
-            </Button>
-          )}
-        </div>
+        {/* ── Primary action: Add Review ── */}
+        {onEnhancedMemorization && (
+          <Button
+            size="sm"
+            onClick={onEnhancedMemorization}
+            className="h-9 px-3 sm:px-4 font-semibold text-xs gap-2"
+          >
+            <Target className="h-4 w-4" />
+            <span className="hidden sm:inline">Add Review</span>
+          </Button>
+        )}
       </div>
 
-      {/* ─── Quran Index Modal — full-screen centered (inspired by Apple Music / Spotify) ─── */}
-      {showSurahSelector && (
+      {/* ─── Quran Index Modal ─── (portal to escape header's backdrop-filter containing block) */}
+      {showSurahSelector && mounted && createPortal(
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-6 index-overlay"
-          onClick={(e) => { if (e.target === e.currentTarget) { setShowSurahSelector(false); setSurahSearchTerm(''); } }}
-          style={{ background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)' }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-0 md:p-6 animate-overlay"
+          onClick={(e) => { if (e.target === e.currentTarget) closeSurahSelector(); }}
+          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
         >
           <div
-            className="index-modal relative w-full h-full md:max-w-2xl md:max-h-[85vh] flex flex-col bg-white dark:bg-[#0f1318] md:rounded-2xl overflow-hidden shadow-2xl font-sans"
+            className="relative w-full h-full md:max-w-2xl md:max-h-[85vh] flex flex-col bg-card md:rounded-[var(--radius-2xl)] overflow-hidden shadow-2xl font-sans animate-fade-in-up border border-border"
             onKeyDown={(e) => {
               if (modalViewState !== 'chapters') return;
               const filtered = surahSearchTerm
@@ -519,67 +478,39 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                 setModalViewState('verses');
               } else if (e.key === 'Escape') {
                 e.preventDefault();
-                setShowSurahSelector(false);
-                setSurahSearchTerm('');
+                closeSurahSelector();
               }
             }}
           >
-
             {modalViewState === 'chapters' ? (
               <>
-                {/* ── Premium header with Quran calligraphy watermark ── */}
-                <div
-                  className="relative px-6 pt-6 pb-5 flex-shrink-0"
-                  style={{
-                    background: 'radial-gradient(ellipse 80% 100% at top right, rgba(212, 175, 55, 0.1), transparent 70%), linear-gradient(160deg, #1c1f26 0%, #15181e 60%, #0f1216 100%)',
-                  }}
-                >
-                  {/* Decorative Arabic text watermark */}
-                  <div
-                    className="absolute right-6 top-2 text-[72px] text-amber-400/[0.08] select-none pointer-events-none leading-none"
-                    style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif" }}
-                  >
-                    القرآن
-                  </div>
+                {/* Header */}
+                <div className="relative px-6 pt-6 pb-5 flex-shrink-0 border-b border-border">
                   <div className="relative z-10">
                     <div className="flex items-start justify-between mb-4">
                       <div>
-                        <p className="text-[10px] font-bold text-amber-400/70 tracking-[0.2em] uppercase mb-1.5">Navigation</p>
-                        <h2 className="text-2xl md:text-3xl font-bold text-white font-serif-header leading-tight">Quran Index</h2>
-                        <p className="text-xs text-amber-400/50 mt-1.5">{surahList.length} chapters · 6,236 verses</p>
+                        <p className="text-[10px] font-semibold text-muted-foreground tracking-[0.2em] uppercase mb-1.5">Navigation</p>
+                        <h2 className="text-2xl md:text-3xl font-bold text-foreground font-serif-header leading-tight">Quran Index</h2>
+                        <p className="text-xs text-muted-foreground mt-1.5">{surahList.length} chapters · 6,236 verses</p>
                       </div>
                       <button
-                        onClick={() => { setShowSurahSelector(false); setSurahSearchTerm(''); }}
-                        className="w-9 h-9 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all flex-shrink-0"
+                        onClick={closeSurahSelector}
+                        className="size-9 rounded-[var(--radius-sm)] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors flex-shrink-0"
+                        aria-label="Close"
                       >
                         <X className="w-5 h-5" />
                       </button>
                     </div>
 
-                    {/* Search — large, prominent */}
                     <div className="relative">
-                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-amber-400/50 pointer-events-none" />
+                      <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
                       <input
                         ref={searchInputRef}
                         type="text"
                         placeholder="Search surah or jump to verse (e.g. 2:255)…"
                         value={surahSearchTerm}
                         onChange={(e) => setSurahSearchTerm(e.target.value)}
-                        className="w-full h-11 pl-11 pr-4 rounded-xl text-white placeholder-white/30 text-sm outline-none transition-all"
-                        style={{
-                          background: 'rgba(255, 255, 255, 0.06)',
-                          border: '1px solid rgba(255, 255, 255, 0.08)',
-                        }}
-                        onFocus={(e) => {
-                          e.target.style.background = 'rgba(255, 255, 255, 0.1)';
-                          e.target.style.borderColor = 'rgba(212, 175, 55, 0.35)';
-                          e.target.style.boxShadow = '0 0 0 3px rgba(212, 175, 55, 0.1)';
-                        }}
-                        onBlur={(e) => {
-                          e.target.style.background = 'rgba(255, 255, 255, 0.06)';
-                          e.target.style.borderColor = 'rgba(255, 255, 255, 0.08)';
-                          e.target.style.boxShadow = 'none';
-                        }}
+                        className="w-full h-11 pl-11 pr-4 rounded-[var(--radius)] bg-input border border-border text-foreground placeholder-muted-foreground text-sm outline-none transition-all focus:border-ring/50 focus:ring-2 focus:ring-ring/20"
                       />
                     </div>
                   </div>
@@ -591,33 +522,26 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                     <button
                       onClick={() => {
                         onNavigateToAyah(directSearchResult.surah.number, directSearchResult.ayah);
-                        setShowSurahSelector(false);
-                        setSurahSearchTerm('');
+                        closeSurahSelector();
                       }}
-                      className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-amber-500/8 dark:bg-amber-400/6 border border-amber-500/15 dark:border-amber-400/12 hover:bg-amber-500/12 transition-colors text-left"
+                      className="w-full flex items-center gap-3 px-4 py-3 rounded-[var(--radius)] bg-accent/8 border border-accent/20 hover:bg-accent/12 transition-colors text-left"
                     >
-                      <div
-                        className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
-                        style={{
-                          background: 'linear-gradient(135deg, #E0BC40 0%, #D4AF37 50%, #C69A1A 100%)',
-                          boxShadow: '0 1px 3px rgba(180, 140, 30, 0.25), inset 0 0.5px 0 rgba(255, 255, 255, 0.2)',
-                        }}
-                      >
-                        <Search className="w-4 h-4 text-white" />
+                      <div className="size-9 rounded-[var(--radius-sm)] flex items-center justify-center flex-shrink-0 bg-accent text-accent-foreground">
+                        <Search className="w-4 h-4" />
                       </div>
                       <div className="min-w-0">
-                        <p className="text-[10px] font-bold text-amber-600 dark:text-amber-400 uppercase tracking-wider">Jump to verse</p>
-                        <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                        <p className="text-[10px] font-semibold text-accent uppercase tracking-wider">Jump to verse</p>
+                        <p className="text-sm font-semibold text-foreground truncate">
                           {directSearchResult.surah.englishName} · Verse {directSearchResult.ayah}
                         </p>
                       </div>
-                      <ChevronRight className="w-4 h-4 text-amber-500 ml-auto flex-shrink-0" />
+                      <ChevronRight className="w-4 h-4 text-accent ml-auto flex-shrink-0" />
                     </button>
-                    <div className="h-px bg-black/[0.06] dark:bg-white/[0.05] mt-3" />
+                    <div className="h-px bg-border mt-3" />
                   </div>
                 )}
 
-                {/* ── Surah list — rich, spacious ── */}
+                {/* Surah list */}
                 <div ref={surahListRef} className="flex-1 overflow-y-auto">
                   {(() => {
                     const surahsToShow = surahSearchTerm
@@ -630,7 +554,7 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
 
                     if (surahsToShow.length === 0) {
                       return (
-                        <div className="text-center py-20 text-gray-400 dark:text-gray-600 text-sm">
+                        <div className="text-center py-20 text-muted-foreground text-sm">
                           <Search className="w-8 h-8 mx-auto mb-3 opacity-30" />
                           No chapters found
                         </div>
@@ -650,41 +574,34 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                             setSelectedSurahForAyah(surah.number);
                             setModalViewState('verses');
                           }}
-                          className={`w-full flex items-center gap-4 px-6 py-3.5 group text-left border-b border-black/[0.04] dark:border-white/[0.03] last:border-0 transition-all duration-150 ${
+                          className={`w-full flex items-center gap-4 px-6 py-3.5 group text-left border-b border-border last:border-0 transition-colors duration-100 ${
                             isActive
-                              ? 'bg-amber-500/[0.06] dark:bg-amber-400/[0.06]'
+                              ? 'bg-accent/8'
                               : isKeyboardSelected
-                                ? 'bg-amber-500/[0.1] dark:bg-amber-400/[0.08]'
-                                : 'hover:bg-amber-500/[0.04] dark:hover:bg-white/[0.025]'
+                                ? 'bg-accent/10'
+                                : 'hover:bg-secondary'
                           }`}
                           data-current-surah={isActive ? 'true' : undefined}
-                          style={isKeyboardSelected ? { boxShadow: 'inset 0 0 0 1px rgba(212, 175, 55, 0.2)' } : undefined}
                         >
-                          {/* Number badge */}
                           <div
-                            className="w-10 h-10 rounded-xl flex items-center justify-center text-xs font-extrabold flex-shrink-0 transition-all"
-                            style={isActive ? {
-                              background: 'linear-gradient(135deg, #E0BC40 0%, #D4AF37 50%, #C69A1A 100%)',
-                              boxShadow: '0 1px 3px rgba(180, 140, 30, 0.25), inset 0 0.5px 0 rgba(255, 255, 255, 0.2)',
-                              color: '#fff',
-                            } : {
-                              background: 'rgba(0, 0, 0, 0.04)',
-                              color: 'rgba(0, 0, 0, 0.45)',
-                            }}
+                            className={`size-10 rounded-[var(--radius-sm)] flex items-center justify-center text-xs font-bold flex-shrink-0 transition-colors ${
+                              isActive
+                                ? 'bg-accent text-accent-foreground'
+                                : 'bg-muted text-muted-foreground'
+                            }`}
                           >
                             {surah.number}
                           </div>
 
-                          {/* Name block */}
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-3 mb-0.5">
                               <span className={`font-semibold text-sm truncate ${
-                                isActive ? 'text-amber-800 dark:text-amber-300' : 'text-gray-900 dark:text-gray-100'
+                                isActive ? 'text-accent-foreground' : 'text-foreground'
                               }`}>
                                 {surah.englishName}
                               </span>
                               <span
-                                className={`text-lg flex-shrink-0 transition-colors ${isActive ? 'text-amber-700 dark:text-amber-300' : 'text-gray-500 dark:text-gray-400'}`}
+                                className={`text-lg flex-shrink-0 ${isActive ? 'text-accent' : 'text-muted-foreground'}`}
                                 style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif" }}
                               >
                                 {surah.name}
@@ -692,21 +609,19 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                             </div>
                             <div className="flex items-center gap-2.5">
                               {revType && (
-                                <span className={`inline-flex items-center gap-1 text-[10px] font-semibold`}>
-                                  <span className={`w-1.5 h-1.5 rounded-full flex-shrink-0 ${isMeccan ? 'bg-emerald-500' : 'bg-blue-500'}`} />
-                                  <span className={isMeccan ? 'text-emerald-600 dark:text-emerald-400' : 'text-blue-600 dark:text-blue-400'}>
+                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold">
+                                  <span className={`size-1.5 rounded-full flex-shrink-0 ${isMeccan ? 'bg-success' : 'bg-info'}`} />
+                                  <span className={isMeccan ? 'text-success' : 'text-info'}>
                                     {revType === 'Makkah' ? 'Meccan' : revType === 'Madinah' ? 'Medinan' : revType}
                                   </span>
                                 </span>
                               )}
-                              <span className="text-[10px] text-gray-400 dark:text-gray-600">{surah.numberOfAyahs} verses</span>
+                              <span className="text-[10px] text-muted-foreground">{surah.numberOfAyahs} verses</span>
                             </div>
                           </div>
 
-                          <ChevronRight className={`w-4 h-4 flex-shrink-0 transition-all ${
-                            isActive
-                              ? 'text-amber-500'
-                              : 'text-gray-300 dark:text-gray-700 group-hover:text-amber-500 group-hover:translate-x-0.5'
+                          <ChevronRight className={`w-4 h-4 flex-shrink-0 transition-colors ${
+                            isActive ? 'text-accent' : 'text-muted-foreground/50 group-hover:text-accent'
                           }`} />
                         </button>
                       );
@@ -714,64 +629,53 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                   })()}
                 </div>
 
-                {/* ── Footer hint ── */}
-                <div className="hidden md:flex items-center justify-center gap-4 px-6 py-2.5 border-t border-black/[0.04] dark:border-white/[0.04] text-[10px] text-gray-400 dark:text-gray-600 font-medium flex-shrink-0">
+                {/* Footer hint */}
+                <div className="hidden md:flex items-center justify-center gap-4 px-6 py-2.5 border-t border-border text-[10px] text-muted-foreground font-medium flex-shrink-0">
                   <span className="flex items-center gap-1.5">
-                    <kbd className="px-1.5 py-0.5 rounded bg-black/[0.05] dark:bg-white/[0.06] font-mono text-[9px]">↑↓</kbd>
+                    <kbd className="px-1.5 py-0.5 rounded-[var(--radius-xs)] bg-secondary font-mono text-[9px]">↑↓</kbd>
                     Navigate
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <kbd className="px-1.5 py-0.5 rounded bg-black/[0.05] dark:bg-white/[0.06] font-mono text-[9px]">↵</kbd>
+                    <kbd className="px-1.5 py-0.5 rounded-[var(--radius-xs)] bg-secondary font-mono text-[9px]">↵</kbd>
                     Select
                   </span>
                   <span className="flex items-center gap-1.5">
-                    <kbd className="px-1.5 py-0.5 rounded bg-black/[0.05] dark:bg-white/[0.06] font-mono text-[9px]">Esc</kbd>
+                    <kbd className="px-1.5 py-0.5 rounded-[var(--radius-xs)] bg-secondary font-mono text-[9px]">Esc</kbd>
                     Close
                   </span>
                 </div>
               </>
             ) : (
               <>
-                {/* ── Verse picker header ── */}
                 {(() => {
                   const activeSurah = surahList.find(s => s.number === selectedSurahForAyah);
                   const revType = activeSurah?.revelationType || '';
                   const isMeccan = revType === 'Meccan' || revType === 'Makkah';
                   return (
-                    <div
-                      className="relative px-6 pt-5 pb-5 flex-shrink-0"
-                      style={{
-                        background: 'radial-gradient(ellipse 80% 100% at top right, rgba(212, 175, 55, 0.1), transparent 70%), linear-gradient(160deg, #1c1f26 0%, #15181e 60%, #0f1216 100%)',
-                      }}
-                    >
-                      <div
-                        className="absolute right-6 top-0 text-[88px] text-amber-400/[0.08] select-none pointer-events-none leading-none"
-                        style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif" }}
-                      >
-                        {activeSurah?.name}
-                      </div>
+                    <div className="relative px-6 pt-5 pb-5 flex-shrink-0 border-b border-border">
                       <div className="relative z-10">
                         <div className="flex items-center gap-3 mb-4">
                           <button
                             onClick={() => setModalViewState('chapters')}
-                            className="w-9 h-9 rounded-full flex items-center justify-center text-white/50 hover:text-white hover:bg-white/10 transition-all flex-shrink-0"
+                            className="size-9 rounded-[var(--radius-sm)] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors flex-shrink-0"
+                            aria-label="Back to chapters"
                           >
                             <ChevronLeft className="w-5 h-5" />
                           </button>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-3">
                               <div className="min-w-0">
-                                <p className="text-[10px] font-bold text-amber-400/70 tracking-[0.15em] uppercase mb-1">Surah {selectedSurahForAyah}</p>
-                                <h2 className="text-xl md:text-2xl font-bold text-white font-serif-header truncate leading-tight">
+                                <p className="text-[10px] font-semibold text-muted-foreground tracking-[0.15em] uppercase mb-1">Surah {selectedSurahForAyah}</p>
+                                <h2 className="text-xl md:text-2xl font-bold text-foreground font-serif-header truncate leading-tight">
                                   {activeSurah?.englishName}
                                 </h2>
                               </div>
                               <div className="text-right flex-shrink-0">
-                                <p className="text-xl md:text-2xl text-amber-300" style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif" }}>{activeSurah?.name}</p>
+                                <p className="text-xl md:text-2xl text-accent" style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif" }}>{activeSurah?.name}</p>
                                 {revType && (
                                   <span className="flex items-center gap-1 justify-end mt-1">
-                                    <span className={`w-1.5 h-1.5 rounded-full ${isMeccan ? 'bg-emerald-400' : 'bg-blue-400'}`} />
-                                    <span className={`text-[10px] font-semibold ${isMeccan ? 'text-emerald-400' : 'text-blue-400'}`}>
+                                    <span className={`size-1.5 rounded-full ${isMeccan ? 'bg-success' : 'bg-info'}`} />
+                                    <span className={`text-[10px] font-semibold ${isMeccan ? 'text-success' : 'text-info'}`}>
                                       {revType === 'Makkah' ? 'Meccan' : revType === 'Madinah' ? 'Medinan' : revType}
                                     </span>
                                   </span>
@@ -780,19 +684,19 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                             </div>
                           </div>
                           <button
-                            onClick={() => { setShowSurahSelector(false); setSurahSearchTerm(''); }}
-                            className="w-9 h-9 rounded-full flex items-center justify-center text-white/40 hover:text-white hover:bg-white/10 transition-all flex-shrink-0"
+                            onClick={closeSurahSelector}
+                            className="size-9 rounded-[var(--radius-sm)] flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors flex-shrink-0"
+                            aria-label="Close"
                           >
                             <X className="w-5 h-5" />
                           </button>
                         </div>
 
-                        {/* Read from start CTA */}
                         <button
-                          onClick={() => { onSurahSelect(selectedSurahForAyah); setShowSurahSelector(false); }}
-                          className="w-full h-11 rounded-xl bg-white/[0.06] border border-white/[0.1] text-white/80 hover:bg-amber-400/10 hover:border-amber-400/25 hover:text-amber-200 transition-all text-xs font-semibold flex items-center justify-center gap-2"
+                          onClick={() => { onSurahSelect(selectedSurahForAyah); closeSurahSelector(); }}
+                          className="w-full h-11 rounded-[var(--radius)] bg-secondary border border-border text-foreground hover:bg-accent/10 hover:border-accent/30 hover:text-accent transition-colors text-xs font-semibold flex items-center justify-center gap-2"
                         >
-                          <BookOpen className="w-4 h-4 text-amber-400" />
+                          <BookOpen className="w-4 h-4 text-accent" />
                           Read from beginning · Verse 1
                         </button>
                       </div>
@@ -800,12 +704,11 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                   );
                 })()}
 
-                {/* ── Verse picker ── */}
+                {/* Verse picker */}
                 <div className="flex-1 overflow-y-auto p-5">
-                  {/* Direct jump input */}
                   <div className="flex items-center gap-2.5 mb-5">
                     <div className="relative flex-1">
-                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-gray-400 dark:text-gray-500 text-xs font-bold select-none">#</span>
+                      <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground text-xs font-bold select-none">#</span>
                       <input
                         type="number"
                         min="1"
@@ -819,12 +722,11 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                             const max = surahList.find(s => s.number === selectedSurahForAyah)?.numberOfAyahs || 1;
                             if (!isNaN(n) && n >= 1 && n <= max) {
                               onNavigateToAyah(selectedSurahForAyah, n);
-                              setShowSurahSelector(false);
-                              setVerseJumpInput('');
+                              closeSurahSelector();
                             }
                           }
                         }}
-                        className="w-full h-10 pl-8 pr-3 rounded-lg bg-gray-100 dark:bg-white/[0.06] border border-transparent focus:border-amber-400/40 focus:ring-2 focus:ring-amber-400/10 text-sm font-semibold text-gray-700 dark:text-gray-200 outline-none transition-all placeholder-gray-400 dark:placeholder-gray-600"
+                        className="w-full h-10 pl-8 pr-3 rounded-[var(--radius-sm)] bg-input border border-border focus:border-ring/50 focus:ring-2 focus:ring-ring/20 text-sm font-semibold text-foreground outline-none transition-all placeholder-muted-foreground"
                       />
                     </div>
                     <button
@@ -833,18 +735,16 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                         const max = surahList.find(s => s.number === selectedSurahForAyah)?.numberOfAyahs || 1;
                         if (!isNaN(n) && n >= 1 && n <= max) {
                           onNavigateToAyah(selectedSurahForAyah, n);
-                          setShowSurahSelector(false);
-                          setVerseJumpInput('');
+                          closeSurahSelector();
                         }
                       }}
-                      className="h-10 px-5 rounded-lg btn-primary text-white text-xs font-bold transition-all flex-shrink-0"
+                      className="h-10 px-5 rounded-[var(--radius-sm)] btn-primary text-xs font-bold transition-colors flex-shrink-0"
                     >
                       Go
                     </button>
                   </div>
 
-                  {/* Compact grid */}
-                  <p className="text-[10px] font-bold text-gray-400 dark:text-gray-600 uppercase tracking-[0.15em] mb-2.5">All verses</p>
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-[0.15em] mb-2.5">All verses</p>
                   <div className="grid grid-cols-8 md:grid-cols-10 gap-1.5">
                     {Array.from(
                       { length: surahList.find(s => s.number === selectedSurahForAyah)?.numberOfAyahs || 1 },
@@ -854,16 +754,12 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                       return (
                         <button
                           key={verseNum}
-                          onClick={() => { onNavigateToAyah(selectedSurahForAyah, verseNum); setShowSurahSelector(false); setVerseJumpInput(''); }}
-                          className={`h-8 w-full rounded-lg text-[11px] font-bold transition-all ${
+                          onClick={() => { onNavigateToAyah(selectedSurahForAyah, verseNum); closeSurahSelector(); }}
+                          className={`h-8 w-full rounded-[var(--radius-sm)] text-[11px] font-bold transition-colors ${
                             isCurrent
-                              ? 'text-gray-900'
-                              : 'bg-gray-100 dark:bg-white/[0.05] text-gray-600 dark:text-gray-400 hover:bg-amber-100 dark:hover:bg-amber-400/10 hover:text-amber-700 dark:hover:text-amber-300'
+                              ? 'verse-grid-active'
+                              : 'bg-secondary text-muted-foreground hover:bg-accent/10 hover:text-accent'
                           }`}
-                          style={isCurrent ? {
-                            background: 'linear-gradient(135deg, #E0BC40 0%, #D4AF37 100%)',
-                            boxShadow: '0 1px 4px rgba(180, 140, 30, 0.3), inset 0 0.5px 0 rgba(255, 255, 255, 0.2)',
-                          } : undefined}
                         >
                           {verseNum}
                         </button>
@@ -875,69 +771,72 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
             )}
           </div>
         </div>
-      )}
+      , document.body)}
 
-      {/* View Settings Modal */}
-      {showViewSettings && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md bg-[#FAF8F5]/95 dark:bg-[#12161A]/95 border border-amber-200/30 dark:border-border/30 rounded-2xl shadow-2xl p-6 animate-fade-in-up font-sans">
-            <div className="flex items-center justify-between mb-6 border-b border-amber-200/10 dark:border-border/10 pb-3">
+      {/* ─── View Settings Modal ─── (portal) */}
+      {showViewSettings && mounted && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-overlay"
+          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowViewSettings(false); }}
+        >
+          <Card className="w-full max-w-md bg-card border border-border rounded-[var(--radius-2xl)] shadow-2xl p-6 animate-fade-in-up font-sans">
+            <div className="flex items-center justify-between mb-6 border-b border-border pb-3">
               <div>
-                <span className="text-[10px] font-bold text-amber-700/80 dark:text-accent/80 tracking-widest uppercase block mb-0.5">Configuration</span>
-                <h3 className="text-xl font-bold font-serif-header text-gray-900 dark:text-white">Display Settings</h3>
+                <span className="text-[10px] font-semibold text-muted-foreground tracking-widest uppercase block mb-0.5">Configuration</span>
+                <h3 className="text-xl font-bold font-serif-header text-foreground">Display Settings</h3>
               </div>
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon-sm"
                 onClick={() => setShowViewSettings(false)}
-                className="h-9 w-9 rounded-full p-0 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                aria-label="Close"
               >
                 <X className="h-5 w-5" />
               </Button>
             </div>
 
             <div className="space-y-5">
-              {/* Layout & Structure Section */}
+              {/* Layout & Structure */}
               <div className="space-y-3">
-                <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest border-b border-gray-100/50 dark:border-border/10 pb-1">
-                  Layout & Structure
+                <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest border-b border-border pb-1">
+                  Layout &amp; Structure
                 </div>
-
-                {/* Layout toggle only for desktop */}
                 <div className="hidden lg:flex items-center justify-between py-1">
-                  <Label className="text-xs font-bold text-gray-550 dark:text-gray-400 uppercase tracking-wide">Spread Layout Mode</Label>
-                  <Button variant="outline" size="sm" onClick={onToggleLayout} className="h-8.5 rounded-lg border-amber-200/40 dark:border-[#2C3440] font-sans text-xs">
-                    {layoutMode === 'spread' ? <Minimize2 className="h-4 w-4 mr-1.5" /> : <Maximize2 className="h-4 w-4 mr-1.5" />}
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Spread Layout Mode</Label>
+                  <Button variant="outline" size="sm" onClick={onToggleLayout} className="text-xs">
+                    {layoutMode === 'spread' ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                     <span className="font-semibold">{layoutMode === 'spread' ? 'Single Page' : 'Two-Page Spread'}</span>
                   </Button>
                 </div>
               </div>
 
-              {/* Typography Section */}
+              {/* Typography & Spacing */}
               <div className="space-y-3.5">
-                <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest border-b border-gray-100/50 dark:border-border/10 pb-1">
-                  Typography & Spacing
+                <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest border-b border-border pb-1">
+                  Typography &amp; Spacing
                 </div>
-                
+
                 <div className="flex items-center justify-between py-1">
-                  <Label className="text-xs font-bold text-gray-550 dark:text-gray-400 uppercase tracking-wide">Font Adjust Target</Label>
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Font Adjust Target</Label>
                   <Button
                     variant="outline"
+                    size="sm"
                     onClick={onToggleFontTarget}
-                    className={`h-8.5 rounded-lg text-xs font-semibold font-sans ${
-                      fontTargetArabic 
-                        ? 'bg-amber-500/10 text-amber-850 dark:bg-accent/15 dark:text-accent border-amber-400/40 dark:border-accent/40' 
-                        : 'bg-blue-500/10 text-blue-800 dark:bg-blue-900/20 dark:text-blue-300 border-blue-400/30 dark:border-blue-800/30'
+                    className={`text-xs font-semibold ${
+                      fontTargetArabic
+                        ? 'bg-accent/10 text-accent border-accent/30'
+                        : 'bg-info/10 text-info border-info/30'
                     }`}
                   >
-                    {fontTargetArabic ? 'Arabic Text' : <><Languages className="h-3.5 w-3.5 mr-1.5" />Translation</>}
+                    {fontTargetArabic ? 'Arabic Text' : <><Languages className="h-3.5 w-3.5" />Translation</>}
                   </Button>
                 </div>
 
                 <div className="space-y-2 py-1">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-bold text-gray-550 dark:text-gray-400 uppercase tracking-wide">Font Size</Label>
-                    <span className="text-xs font-bold text-amber-700 dark:text-accent bg-amber-500/5 dark:bg-accent/10 px-2 py-0.5 rounded-full">{fontSize}px</span>
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Font Size</Label>
+                    <span className="text-xs font-semibold text-accent bg-accent/10 px-2 py-0.5 rounded-full">{fontSize}px</span>
                   </div>
                   <Slider
                     min={16}
@@ -951,8 +850,8 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
 
                 <div className="space-y-2 py-1">
                   <div className="flex items-center justify-between">
-                    <Label className="text-xs font-bold text-gray-555 dark:text-gray-400 uppercase tracking-wide">Reading Side Margins</Label>
-                    <span className="text-xs font-bold text-amber-700 dark:text-accent bg-amber-500/5 dark:bg-accent/10 px-2 py-0.5 rounded-full">{padding}px</span>
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Reading Side Margins</Label>
+                    <span className="text-xs font-semibold text-accent bg-accent/10 px-2 py-0.5 rounded-full">{padding}px</span>
                   </div>
                   <Slider
                     min={0}
@@ -965,73 +864,68 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                 </div>
               </div>
 
-              {/* Display Options Section */}
+              {/* Content Filters */}
               <div className="space-y-3">
-                <div className="text-[10px] font-bold text-gray-400 dark:text-gray-500 uppercase tracking-widest border-b border-gray-100/50 dark:border-border/10 pb-1">
+                <div className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest border-b border-border pb-1">
                   Content Filters
                 </div>
 
                 <div className="flex items-center justify-between py-1">
-                  <Label className="text-xs font-bold text-gray-550 dark:text-gray-400 uppercase tracking-wide">Show Translations</Label>
-                  <Switch
-                    checked={showTranslation}
-                    onCheckedChange={onToggleTranslation}
-                  />
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Show Translations</Label>
+                  <Switch checked={showTranslation} onCheckedChange={onToggleTranslation} />
                 </div>
 
                 {onToggleHideMistakes && (
                   <div className="flex items-center justify-between py-1">
-                    <Label className="text-xs font-bold text-gray-550 dark:text-gray-400 uppercase tracking-wide">Hide Mistakes (Self-Test)</Label>
-                    <Switch
-                      checked={hideMistakes}
-                      onCheckedChange={onToggleHideMistakes}
-                    />
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Hide Mistakes (Self-Test)</Label>
+                    <Switch checked={hideMistakes} onCheckedChange={onToggleHideMistakes} />
                   </div>
                 )}
 
                 {onToggleWordByWordTooltip && (
                   <div className="flex items-center justify-between py-1">
-                    <Label className="text-xs font-bold text-gray-550 dark:text-gray-400 uppercase tracking-wide">Word Translation Tooltips</Label>
-                    <Switch
-                      checked={showWordByWordTooltip}
-                      onCheckedChange={onToggleWordByWordTooltip}
-                    />
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Word Translation Tooltips</Label>
+                    <Switch checked={showWordByWordTooltip} onCheckedChange={onToggleWordByWordTooltip} />
                   </div>
                 )}
               </div>
             </div>
           </Card>
         </div>
-      )}
+      , document.body)}
 
-      {/* Audio Settings Modal */}
-      {showReciterSelector && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-md bg-[#FAF8F5]/95 dark:bg-[#12161A]/95 border border-amber-200/30 dark:border-border/30 rounded-2xl shadow-2xl p-6 animate-fade-in-up font-sans">
-            <div className="flex items-center justify-between mb-4 border-b border-amber-200/10 dark:border-border/10 pb-3">
+      {/* ─── Audio Settings Modal ─── (portal) */}
+      {showReciterSelector && mounted && createPortal(
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-overlay"
+          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowReciterSelector(false); }}
+        >
+          <Card className="w-full max-w-md bg-card border border-border rounded-[var(--radius-2xl)] shadow-2xl p-6 animate-fade-in-up font-sans">
+            <div className="flex items-center justify-between mb-4 border-b border-border pb-3">
               <div>
-                <span className="text-[10px] font-bold text-amber-700/80 dark:text-accent/80 tracking-widest uppercase block mb-0.5">Audio Settings</span>
-                <h3 className="text-xl font-bold font-serif-header text-gray-900 dark:text-white">Audio Selection</h3>
+                <span className="text-[10px] font-semibold text-muted-foreground tracking-widest uppercase block mb-0.5">Audio Settings</span>
+                <h3 className="text-xl font-bold font-serif-header text-foreground">Audio Selection</h3>
               </div>
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon-sm"
                 onClick={() => setShowReciterSelector(false)}
-                className="h-9 w-9 rounded-full p-0 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                aria-label="Close"
               >
                 <X className="h-5 w-5" />
               </Button>
             </div>
 
-            {/* Tab Selector */}
-            <div className="flex bg-amber-500/5 dark:bg-gray-855/80 p-0.5 rounded-xl border border-amber-200/25 dark:border-[#2C3440] mb-4 shadow-inner">
+            {/* Tab selector */}
+            <div className="flex bg-secondary p-0.5 rounded-[var(--radius)] border border-border mb-4">
               <button
                 type="button"
                 onClick={() => setAudioTab('reciters')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-[var(--radius-sm)] transition-colors ${
                   audioTab === 'reciters'
-                    ? 'bg-white dark:bg-[#12161A] text-amber-850 dark:text-accent shadow-sm border border-amber-200/10'
-                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 Reciters
@@ -1039,23 +933,23 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
               <button
                 type="button"
                 onClick={() => setAudioTab('info')}
-                className={`flex-1 py-1.5 text-xs font-bold rounded-lg transition-all ${
+                className={`flex-1 py-1.5 text-xs font-semibold rounded-[var(--radius-sm)] transition-colors ${
                   audioTab === 'info'
-                    ? 'bg-white dark:bg-[#12161A] text-amber-850 dark:text-accent shadow-sm border border-amber-200/10'
-                    : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300'
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
-                Shortcuts & Info
+                Shortcuts &amp; Info
               </button>
             </div>
 
             {audioTab === 'reciters' ? (
-              <div ref={reciterListRef} className="space-y-3 max-h-80 overflow-y-auto scrollbar-thin pr-1">
+              <div ref={reciterListRef} className="space-y-3 max-h-80 overflow-y-auto pr-1">
                 {reciterGroups.map((group) => (
                   <div key={group.label} className="space-y-1">
-                    <div className="px-2 pt-1 pb-1 flex items-baseline gap-2 border-b border-amber-200/15 dark:border-border/15">
-                      <span className="text-[10px] font-bold tracking-wider uppercase text-amber-700/70 dark:text-accent/70">{group.labelEn}</span>
-                      <span className="text-[9px] text-gray-400 dark:text-gray-500 font-medium" style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif" }}>{group.label}</span>
+                    <div className="px-2 pt-1 pb-1 flex items-baseline gap-2 border-b border-border">
+                      <span className="text-[10px] font-semibold tracking-wider uppercase text-muted-foreground">{group.labelEn}</span>
+                      <span className="text-[9px] text-muted-foreground/70 font-medium" style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif" }}>{group.label}</span>
                     </div>
                     {group.reciters.map((reciter) => (
                       <div
@@ -1064,10 +958,10 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                       >
                         <Button
                           variant="ghost"
-                          className={`w-full justify-start h-auto py-2.5 rounded-xl px-4 text-left transition-all ${
+                          className={`w-full justify-start h-auto py-2.5 rounded-[var(--radius-sm)] px-4 text-left transition-colors ${
                             selectedReciter === reciter.id
-                              ? 'bg-amber-500/10 dark:bg-accent/10 border border-amber-500/20 dark:border-accent/20 text-amber-900 dark:text-accent font-semibold'
-                              : 'hover:bg-amber-500/5 dark:hover:bg-[#181D23] text-gray-700 dark:text-gray-300'
+                              ? 'bg-accent/10 border border-accent/20 text-accent font-semibold'
+                              : 'hover:bg-secondary text-foreground'
                           }`}
                           onClick={() => {
                             onReciterChange(reciter.id);
@@ -1075,15 +969,15 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                           }}
                         >
                           <div className="flex flex-col items-start min-w-0 flex-1">
-                            <span className="truncate text-sm font-semibold text-gray-900 dark:text-gray-100" title={reciter.englishName}>
+                            <span className="truncate text-sm font-semibold text-foreground" title={reciter.englishName}>
                               {reciter.englishName}
                             </span>
-                            <span className="truncate text-xs text-gray-500 dark:text-gray-400 mt-0.5" title={reciter.name} style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif" }}>
+                            <span className="truncate text-xs text-muted-foreground mt-0.5" title={reciter.name} style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif" }}>
                               {reciter.name}
                             </span>
                           </div>
                           {selectedReciter === reciter.id && (
-                            <div className="ml-auto w-2 h-2 bg-amber-500 dark:bg-accent rounded-full flex-shrink-0" />
+                            <div className="ml-auto size-2 bg-accent rounded-full flex-shrink-0" />
                           )}
                         </Button>
                       </div>
@@ -1092,44 +986,45 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                 ))}
               </div>
             ) : (
-              /* Audio Playback Info & Shortcuts Pane */
               <div className="space-y-4 text-xs">
-                <div className="space-y-2 bg-amber-500/5 dark:bg-gray-800/30 p-3.5 rounded-xl border border-amber-200/20 dark:border-border/20">
-                  <h4 className="font-semibold text-amber-900 dark:text-accent flex items-center">
+                <div className="space-y-2 bg-secondary p-3.5 rounded-[var(--radius)] border border-border">
+                  <h4 className="font-semibold text-foreground flex items-center">
                     <Info className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" /> Playback Controls
                   </h4>
-                  <p className="text-gray-600 dark:text-gray-400 leading-relaxed font-medium">
+                  <p className="text-muted-foreground leading-relaxed font-medium">
                     When you play a verse, the bottom audio panel will appear. Use it to:
                   </p>
-                  <ul className="list-disc pl-4 space-y-1 text-gray-500 dark:text-gray-400 mt-1">
+                  <ul className="list-disc pl-4 space-y-1 text-muted-foreground mt-1">
                     <li>Toggle <span className="font-semibold">Infinite Loop</span> to repeat the verse.</li>
                     <li>Set a <span className="font-semibold">Custom Loop Range</span> to repeat a specific duration segment.</li>
                     <li>Adjust <span className="font-semibold">Playback Speed</span> (0.5x to 2x) for slower/faster recitation.</li>
                   </ul>
                 </div>
 
-                <div className="space-y-2 border border-gray-100 dark:border-border/20 p-3.5 rounded-xl">
-                  <h4 className="font-semibold text-gray-800 dark:text-gray-200 flex items-center">
+                <div className="space-y-2 border border-border p-3.5 rounded-[var(--radius)]">
+                  <h4 className="font-semibold text-foreground flex items-center">
                     <Keyboard className="h-3.5 w-3.5 mr-1.5 flex-shrink-0" /> Keyboard Shortcuts
                   </h4>
-                  <div className="grid grid-cols-2 gap-x-2 gap-y-2 mt-1 text-gray-600 dark:text-gray-400">
-                    <div className="flex items-center"><kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 border dark:border-border/30 rounded text-[10px] font-sans mr-2">Space</kbd> Play/Pause</div>
-                    <div className="flex items-center"><kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 border dark:border-border/30 rounded text-[10px] font-sans mr-2">Esc</kbd> Stop Audio</div>
-                    <div className="flex items-center"><kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 border dark:border-border/30 rounded text-[10px] font-sans mr-2">←</kbd> Rewind 10s</div>
-                    <div className="flex items-center"><kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 border dark:border-border/30 rounded text-[10px] font-sans mr-2">→</kbd> Forward 10s</div>
-                    <div className="flex items-center"><kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 border dark:border-border/30 rounded text-[10px] font-sans mr-2">↑</kbd> Vol Up</div>
-                    <div className="flex items-center"><kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 border dark:border-border/30 rounded text-[10px] font-sans mr-2">↓</kbd> Vol Down</div>
-                    <div className="flex items-center"><kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 border dark:border-border/30 rounded text-[10px] font-sans mr-2">M</kbd> Mark Start/End</div>
-                    <div className="flex items-center"><kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 border dark:border-border/30 rounded text-[10px] font-sans mr-2">[</kbd> Mark Start</div>
-                    <div className="flex items-center"><kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 border dark:border-border/30 rounded text-[10px] font-sans mr-2">]</kbd> Mark End</div>
-                    <div className="flex items-center"><kbd className="px-1.5 py-0.5 bg-gray-100 dark:bg-gray-800 border dark:border-border/30 rounded text-[10px] font-sans mr-2">C</kbd> Clear Markers</div>
+                  <div className="grid grid-cols-2 gap-x-2 gap-y-2 mt-1 text-muted-foreground">
+                    {[
+                      ['Space', 'Play/Pause'], ['Esc', 'Stop Audio'],
+                      ['←', 'Rewind 10s'], ['→', 'Forward 10s'],
+                      ['↑', 'Vol Up'], ['↓', 'Vol Down'],
+                      ['M', 'Mark Start/End'], ['[', 'Mark Start'],
+                      [']', 'Mark End'], ['C', 'Clear Markers'],
+                    ].map(([key, action]) => (
+                      <div key={key} className="flex items-center">
+                        <kbd className="px-1.5 py-0.5 bg-secondary border border-border rounded-[var(--radius-xs)] text-[10px] font-sans mr-2">{key}</kbd>
+                        {action}
+                      </div>
+                    ))}
                   </div>
                 </div>
               </div>
             )}
           </Card>
         </div>
-      )}
+      , document.body)}
     </>
   );
 }

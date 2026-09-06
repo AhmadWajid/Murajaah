@@ -46,7 +46,7 @@ export function TafsirContent({ content }: TafsirContentProps) {
                   <div className="text-gray-700 dark:text-gray-300 leading-relaxed space-y-2">
                     {translations.map((translation, transIndex) => (
                       <div key={transIndex} className="flex items-start gap-2">
-                        <span className={`text-amber-600 dark:text-amber-400 font-medium ${isTitle ? 'text-xl font-bold' : 'text-base'}`}>
+                        <span className={`text-accent font-medium ${isTitle ? 'text-xl font-bold' : 'text-base'}`}>
                           {translation}
                         </span>
                       </div>
@@ -60,7 +60,7 @@ export function TafsirContent({ content }: TafsirContentProps) {
                     {uniqueArabicVerses.map((verse, verseIndex) => (
                       <div key={verseIndex} className="text-right">
                         <p 
-                          className={`leading-loose font-arabic text-amber-900 dark:text-amber-100 ${isTitle ? 'text-2xl font-bold' : 'text-xl'}`}
+                          className={`leading-loose font-arabic text-accent-foreground ${isTitle ? 'text-2xl font-bold' : 'text-xl'}`}
                           dir="rtl"
                           style={{
                             fontFamily: "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif",
@@ -129,7 +129,7 @@ export function TafsirContent({ content }: TafsirContentProps) {
                   <div className="flex-1">
                     <div className="text-right">
                       <p 
-                        className={`leading-loose font-arabic text-amber-900 dark:text-amber-100 ${isTitle ? 'text-2xl font-bold' : 'text-xl'}`}
+                        className={`leading-loose font-arabic text-accent-foreground ${isTitle ? 'text-2xl font-bold' : 'text-xl'}`}
                         dir="rtl"
                         style={{
                           fontFamily: "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif",

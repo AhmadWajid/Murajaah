@@ -526,7 +526,7 @@ export default function EnhancedMemorizationModal({
                       
                       {/* Show info about multi-surah selections */}
                       {selections.length > 1 && (
-                        <div className="text-sm text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg">
+                        <div className="text-sm text-accent bg-accent/10 p-3 rounded-[var(--radius-sm)]">
                           <div className="font-medium mb-1">Multi-Surah Selection</div>
                           <div>You have selected ayahs from {selections.length} different surahs. Each surah will be created as a separate memorization item.</div>
                         </div>

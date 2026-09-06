@@ -6,6 +6,7 @@ import { TajweedWord, TAJWEED_COLORS, TOPIC_TAILWIND_COLORS, TOPIC_COLORS, getTa
 import { qpcFontLoader } from '@/lib/qpcFontLoader';
 import { Tooltip } from 'react-tooltip';
 import { useTajweedCache } from '@/lib/hooks/useTajweedCache';
+import { useIsMobile } from '@/lib/hooks/useIsMobile';
 
 interface TajweedAyahTextProps {
   ayahText: string;
@@ -16,39 +17,38 @@ interface TajweedAyahTextProps {
   arabicFontSize?: number;
   translationFontSize?: number;
   fontTargetArabic?: boolean;
-  pageNumber?: number; // Add page number prop
+  pageNumber?: number;
   hideWords?: boolean;
-  hideWordsDelay?: number; // Add delay prop in milliseconds
+  hideWordsDelay?: number;
   showWordTranslation?: boolean;
   wordByWordData?: any[];
   showWordByWordTooltip?: boolean;
-  disableTajweedColors?: boolean; // NEW PROP
-  isMobile?: boolean; // Add mobile detection prop
-  displayMode?: 'block' | 'inline'; // NEW PROP
-  useV4Tajweed?: boolean; // Use V4 COLRv1 color fonts (1441H print)
+  disableTajweedColors?: boolean;
+  displayMode?: 'block' | 'inline';
+  useV4Tajweed?: boolean;
 }
 
-export function TajweedAyahText({ 
-  ayahText, 
-  surahNumber, 
-  ayahNumber, 
-  className = '', 
+export function TajweedAyahText({
+  ayahText,
+  surahNumber,
+  ayahNumber,
+  className = '',
   fontSize = 24,
   arabicFontSize = 24,
   translationFontSize = 20,
   fontTargetArabic = false,
   pageNumber,
   hideWords = false,
-  hideWordsDelay = 500, // Default to 500ms
+  hideWordsDelay = 500,
   showWordTranslation = false,
   wordByWordData = [],
   showWordByWordTooltip = true,
-  disableTajweedColors = false, // NEW DEFAULT
-  isMobile = false, // NEW DEFAULT
+  disableTajweedColors = false,
   displayMode = 'block',
   useV4Tajweed = false,
 }: TajweedAyahTextProps) {
   const Tag = displayMode === 'inline' ? 'span' : 'div';
+  const isMobile = useIsMobile();
   const { getTajweedWords, isTajweedLoading } = useTajweedCache();
   const [tajweedWords, setTajweedWords] = useState<TajweedWord[]>([]);
   const [fontLoaded, setFontLoaded] = useState(false);
@@ -62,14 +62,10 @@ export function TajweedAyahText({
   // State for mobile click-to-show tooltips
   const [clickedWordId, setClickedWordId] = useState<string | null>(null);
 
-  // Detect Safari (Mac or iOS) and track mounted state
-  const [isSafari, setIsSafari] = useState(false);
+  // Track mounted state for portal rendering
   const [mounted, setMounted] = useState(false);
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      const ua = window.navigator.userAgent;
-      const isSafariBrowser = /Safari/.test(ua) && !/Chrome/.test(ua);
-      setIsSafari(isSafariBrowser);
       setMounted(true);
     }
   }, []);
@@ -454,13 +450,6 @@ export function TajweedAyahText({
       );
     }
 
-    // Safari: render plain word
-    if (isSafari) {
-      return (
-        <span key={word.id} className="inline" style={{ fontSize: `${currentFontSize}px` }}>{word.text}</span>
-      );
-    }
-
     // Non-Safari: render per-segment coloring
     if (word.tajweedRules.length === 0) {
       // No tajweed rules, just render the word (with translation tooltip if enabled)
@@ -505,7 +494,7 @@ export function TajweedAyahText({
     sortedRules.forEach((rule, ruleIndex) => {
       // Add the rule text with tooltip trigger only
       const ruleColor = getTajweedColor(rule.class);
-      const ruleDescription = getTajweedDescription(rule);
+      const ruleDescription = getTajweedDescriptionHtml(rule);
       const tooltipId = `tajweed-tooltip-${word.id}-${ruleIndex}`;
       const bgColor = ruleColorMap[rule.class] || '#222';
       tooltipData.push({ id: tooltipId, content: ruleDescription, bgColor });
@@ -524,7 +513,7 @@ export function TajweedAyahText({
               key={`text-${word.id}-${ruleIndex}`}
               className="cursor-help tajweed-rule"
               data-tooltip-id={tooltipId}
-              data-tooltip-content={ruleDescription}
+              data-tooltip-html={ruleDescription}
               style={{ fontSize: `${currentFontSize}px` }}
               onMouseEnter={handleTajweedMouseEnter}
               onMouseLeave={handleTajweedMouseLeave}
@@ -550,7 +539,7 @@ export function TajweedAyahText({
               key={`rule-${word.id}-${ruleIndex}`}
               className={`${ruleColor} cursor-help tajweed-rule`}
               data-tooltip-id={tooltipId}
-              data-tooltip-content={ruleDescription}
+              data-tooltip-html={ruleDescription}
               style={{ fontSize: `${currentFontSize}px` }}
               onMouseEnter={handleTajweedMouseEnter}
               onMouseLeave={handleTajweedMouseLeave}
@@ -572,7 +561,7 @@ export function TajweedAyahText({
               key={`rule-${word.id}-${ruleIndex}`}
               className={`${ruleColor} cursor-help tajweed-rule`}
               data-tooltip-id={tooltipId}
-              data-tooltip-content={ruleDescription}
+              data-tooltip-html={ruleDescription}
               style={{ fontSize: `${currentFontSize}px` }}
               onMouseEnter={handleTajweedMouseEnter}
               onMouseLeave={handleTajweedMouseLeave}
@@ -587,7 +576,7 @@ export function TajweedAyahText({
             key={`rule-${word.id}-${ruleIndex}`}
             className={`${ruleColor} cursor-help tajweed-rule`}
             data-tooltip-id={tooltipId}
-            data-tooltip-content={ruleDescription}
+            data-tooltip-html={ruleDescription}
             style={{ fontSize: `${currentFontSize}px` }}
             onMouseEnter={handleTajweedMouseEnter}
             onMouseLeave={handleTajweedMouseLeave}
@@ -649,7 +638,7 @@ export function TajweedAyahText({
   return (
     <>
       <Tag 
-         className={`leading-relaxed sm:leading-loose text-amber-900 dark:text-amber-100 font-arabic arabic-text uthmanic-hafs ${className}`} 
+         className={`leading-relaxed sm:leading-loose text-accent-foreground font-arabic arabic-text uthmanic-hafs ${className}`} 
         dir="rtl"
         style={{
           fontFamily: fontLoaded ? qpcFontLoader.getFontFamily(pageNumber || 1) : "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif",
@@ -676,13 +665,13 @@ export function TajweedAyahText({
       >
         {!hideWords && isTajweedLoading(surahNumber, ayahNumber) ? (
           displayMode === 'inline' ? (
-            <span className="inline-flex items-center mx-1 text-xs text-amber-600/40 animate-pulse font-sans">
+            <span className="inline-flex items-center mx-1 text-xs text-accent/40 animate-pulse font-sans">
               ...
             </span>
           ) : (
             <div className="text-center py-4">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-600 mx-auto"></div>
-              <p className="mt-2 text-sm text-amber-600">Loading tajweed...</p>
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent mx-auto"></div>
+              <p className="mt-2 text-sm text-accent">Loading tajweed...</p>
             </div>
           )
         ) : (
@@ -705,11 +694,12 @@ export function TajweedAyahText({
               style={{
                 backgroundColor: bgColor,
                 color: isColorLight(bgColor) ? '#222' : '#fff',
-                borderRadius: '0.375rem',
-                padding: '0.25rem 0.5rem',
+                borderRadius: '0.5rem',
+                padding: '0.625rem 0.75rem',
                 fontSize: '0.875rem',
                 zIndex: 9999,
                 position: 'absolute',
+                boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
               }}
             >
               {content}
@@ -752,20 +742,28 @@ function getTajweedColor(ruleClass: string): string {
   return TAJWEED_COLORS[ruleClass] || 'text-gray-600';
 }
 
-// Build a detailed tooltip from the full rule object.
-// Shows the specific hukum (ruling) in Arabic + English, and the rule description in Arabic + English.
-// e.g. "المد الطبيعي الكلمي\nNatural Madd (Madd Tabi'i — 2 counts)\n— الألف الساكنة المسبوقة بحرف مفتوح\nSukoon alef preceded by a fatha letter"
+// Build a detailed tooltip from the full rule object as structured HTML.
+// Layout: English name + description on top, divider, Arabic name + description on bottom.
 // Falls back to the generic topic tooltip for old-style rules without labels.
-function getTajweedDescription(rule: { class: string; hukumLabel?: string; ruleLabel?: string; topicLabel?: string; hukumLabelEn?: string; topicLabelEn?: string; ruleLabelEn?: string }): string {
-  // New engine: has specific hukum and rule labels
+function getTajweedDescriptionHtml(rule: { class: string; hukumLabel?: string; ruleLabel?: string; topicLabel?: string; hukumLabelEn?: string; topicLabelEn?: string; ruleLabelEn?: string }): string {
   if (rule.hukumLabel && rule.ruleLabel) {
-    const parts = [rule.hukumLabel];
-    if (rule.hukumLabelEn) parts.push(rule.hukumLabelEn);
-    parts.push(`— ${rule.ruleLabel}`);
-    if (rule.ruleLabelEn) parts.push(rule.ruleLabelEn);
-    return parts.join('\n');
+    const enName = rule.hukumLabelEn || '';
+    const enDetail = rule.ruleLabelEn || '';
+    const arName = rule.hukumLabel;
+    const arDetail = rule.ruleLabel;
+    return [
+      '<div style="text-align:left;max-width:240px">',
+      `  <div style="font-weight:600;font-size:12px">${enName}</div>`,
+      enDetail ? `  <div style="font-size:11px;opacity:0.85;line-height:1.4;margin-top:2px">${enDetail}</div>` : '',
+      '  <div style="height:1px;background:currentColor;opacity:0.25;margin:6px 0"></div>',
+      `  <div style="text-align:right" dir="rtl">`,
+      `    <div style="font-weight:600;font-size:14px">${arName}</div>`,
+      arDetail ? `    <div style="font-size:11px;opacity:0.85;line-height:1.6;margin-top:2px">${arDetail}</div>` : '',
+      `  </div>`,
+      '</div>',
+    ].filter(Boolean).join('');
   }
-  // Fallback: generic topic-based tooltip
+  // Fallback: generic topic-based tooltip (plain text)
   return getTajweedTooltip(rule.class);
 }
 

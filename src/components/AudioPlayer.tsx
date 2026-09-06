@@ -428,7 +428,7 @@ export default function AudioPlayer({
           {/* Loop region highlight — rendered on the track itself */}
           {hasLoopMarkers && duration > 0 && (
             <div
-              className="absolute inset-y-0 rounded-full bg-amber-500/20 dark:bg-amber-400/15 transition-all duration-75"
+              className="absolute inset-y-0 rounded-full bg-accent/20 transition-all duration-75"
               style={{ left: `${startPct}%`, width: `${endPct - startPct}%` }}
             />
           )}
@@ -450,10 +450,10 @@ export default function AudioPlayer({
             style={{ left: `${startPct}%` }}
           >
             {/* Vertical tick */}
-            <div className={`absolute left-1/2 -translate-x-1/2 w-[3px] rounded-full bg-amber-500 dark:bg-amber-400 shadow-sm transition-all duration-150 ${isMobile ? 'h-3.5 -top-[7px]' : isExpanded ? 'h-3 -top-[6px]' : 'h-2.5 -top-[5px]'}`} />
+            <div className={`absolute left-1/2 -translate-x-1/2 w-[3px] rounded-full bg-accent shadow-sm transition-all duration-150 ${isMobile ? 'h-3.5 -top-[7px]' : isExpanded ? 'h-3 -top-[6px]' : 'h-2.5 -top-[5px]'}`} />
             {/* Time label — only on hover/scrub */}
             {(isExpanded || isMobile) && (
-              <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-amber-500 dark:bg-amber-400 text-white dark:text-gray-950 text-[7px] font-bold font-sans tabular-nums px-1 py-px rounded-full whitespace-nowrap pointer-events-none">
+              <div className="absolute -top-5 left-1/2 -translate-x-1/2 bg-accent text-accent-foreground text-[7px] font-bold font-sans tabular-nums px-1 py-px rounded-full whitespace-nowrap pointer-events-none">
                 {formatTime(customLoop.start)}
               </div>
             )}
@@ -576,7 +576,7 @@ export default function AudioPlayer({
                 onClick={cycleSpeed}
                 className={`h-7 px-2 flex items-center justify-center rounded-md text-[11px] font-bold font-sans tabular-nums transition-all duration-150
                   ${playbackSpeed !== 1
-                    ? 'bg-amber-500/12 dark:bg-amber-400/12 text-amber-600 dark:text-amber-400'
+                    ? 'bg-accent/12 text-accent'
                     : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
                   }`}
                 aria-label="Playback Speed"
@@ -590,7 +590,7 @@ export default function AudioPlayer({
                 onClick={() => setLoopMode(prev => prev === 'none' ? 'custom' : 'none')}
                 className={`w-7 h-7 md:w-8 md:h-8 flex items-center justify-center rounded-lg transition-all duration-150 ${
                   loopMode === 'custom'
-                    ? 'bg-amber-500/12 dark:bg-amber-400/12 text-amber-600 dark:text-amber-400'
+                    ? 'bg-accent/12 text-accent'
                     : 'text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-black/[0.04] dark:hover:bg-white/[0.06]'
                 }`}
               >
@@ -623,12 +623,12 @@ export default function AudioPlayer({
                   onClick={() => handleSetStart(currentTime)}
                   className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold font-sans transition-all active:scale-95 ${
                     isStartSet
-                      ? 'bg-amber-500/15 dark:bg-amber-400/12 text-amber-600 dark:text-amber-400 border border-amber-500/20 dark:border-amber-400/15'
+                      ? 'bg-accent/15 text-accent border border-accent/20'
                       : 'bg-black/[0.04] dark:bg-white/[0.06] text-gray-500 dark:text-gray-400 border border-black/[0.06] dark:border-white/[0.08]'
                   }`}
                   aria-label="Set loop start at current time"
                 >
-                  <span className="w-4 h-4 flex items-center justify-center rounded-full bg-amber-500 dark:bg-amber-400 text-white dark:text-gray-950 text-[8px] font-bold flex-shrink-0">S</span>
+                  <span className="w-4 h-4 flex items-center justify-center rounded-full bg-accent text-accent-foreground text-[8px] font-bold flex-shrink-0">S</span>
                   {isStartSet ? formatTime(customLoop.start) : 'Start'}
                 </button>
 

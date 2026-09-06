@@ -109,7 +109,7 @@ export function TajweedBreakdownModal({ surah, ayah, onClose }: TajweedBreakdown
             <h3 className="text-lg font-bold text-gray-900 dark:text-gray-100 font-sans">
               Tajweed Rules
             </h3>
-            <span className="text-lg font-bold font-arabic text-amber-700 dark:text-amber-400">
+            <span className="text-lg font-bold font-arabic text-accent">
               أحكام التجويد
             </span>
             <span className="text-xs text-muted-foreground font-sans">
@@ -127,7 +127,7 @@ export function TajweedBreakdownModal({ surah, ayah, onClose }: TajweedBreakdown
         <div className="flex-1 overflow-y-auto p-4 sm:p-5">
           {loading ? (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-amber-600 mx-auto" />
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-accent mx-auto" />
               <p className="mt-3 text-sm text-muted-foreground font-sans">Analyzing ayah…</p>
             </div>
           ) : !rules || rules.length === 0 ? (
@@ -155,7 +155,7 @@ export function TajweedBreakdownModal({ surah, ayah, onClose }: TajweedBreakdown
                           {displayName}
                         </span>
                         <div className="flex items-center gap-2 flex-shrink-0">
-                          <span className="font-arabic text-sm text-amber-700 dark:text-amber-400" dir="rtl">
+                          <span className="font-arabic text-sm text-accent" dir="rtl">
                             {rule.hukumLabel || info.arabicName}
                           </span>
                           <span className="text-[10px] font-semibold text-muted-foreground font-sans">

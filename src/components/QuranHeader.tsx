@@ -807,16 +807,16 @@ export default function QuranHeader({
                       </SelectContent>
                     </Select>
                     {/* --- New Audio Features --- */}
-                    <div className="pt-2 border-t border-amber-200 dark:border-amber-700 space-y-3">
+                    <div className="pt-2 border-t border-border space-y-3">
                       {/* Loop Mode */}
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium text-amber-700 dark:text-amber-200">Loop</span>
+                        <span className="text-xs font-medium text-accent">Loop</span>
                         <LoopSettings />
                       </div>
                       {/* Playback Speed */}
                       <div className="flex items-center gap-2">
-                        <FastForward className="w-4 h-4 text-amber-700 dark:text-amber-200" />
-                        <span className="text-xs font-medium text-amber-700 dark:text-amber-200">Speed</span>
+                        <FastForward className="w-4 h-4 text-accent" />
+                        <span className="text-xs font-medium text-accent">Speed</span>
                         <SpeedSettings />
                       </div>
                     </div>
@@ -1046,8 +1046,8 @@ function LoopSettings() {
             ? 'Custom Loop Enabled'
             : 'Loop Off'
         }
-        className={`p-1 rounded-full border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900 hover:bg-amber-100 dark:hover:bg-amber-800 transition-colors ${
-          loopMode === 'infinite' || loopMode === 'custom' ? 'text-amber-700 dark:text-amber-200' : 'text-gray-400'
+        className={`p-1 rounded-full border border-accent/30 bg-accent/10 hover:bg-accent/15 transition-colors ${
+          loopMode === 'infinite' || loopMode === 'custom' ? 'text-accent' : 'text-muted-foreground'
         }`}
         tabIndex={0}
         onClick={() => {
@@ -1073,7 +1073,7 @@ function LoopSettings() {
           <Repeat className="w-4 h-4 opacity-40" />
         )}
       </button>
-      <span className="absolute left-1/2 -bottom-7 -translate-x-1/2 text-xs bg-amber-700 text-white px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
+      <span className="absolute left-1/2 -bottom-7 -translate-x-1/2 text-xs bg-accent text-accent-foreground px-2 py-0.5 rounded opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-10">
         {loopMode === 'infinite'
           ? 'Infinite Loop'
           : loopMode === 'custom'
@@ -1083,14 +1083,14 @@ function LoopSettings() {
       {loopMode === 'custom' && (
         <button
           aria-label="Set Custom Loop Range"
-          className="ml-1 px-2 py-1 text-xs rounded bg-amber-200 dark:bg-amber-800 border border-amber-400 dark:border-amber-700 hover:bg-amber-300 dark:hover:bg-amber-700"
+          className="ml-1 px-2 py-1 text-xs rounded bg-accent/15 border border-accent/30 hover:bg-accent/25"
           onClick={() => setShowCustomLoopInputs(v => !v)}
         >
           Set Range
         </button>
       )}
       {showCustomLoopInputs && (
-        <div className="flex flex-wrap sm:flex-nowrap items-center gap-1 text-xs bg-amber-50 dark:bg-amber-900 border border-amber-300 dark:border-amber-700 rounded px-2 py-1 ml-2 max-w-full overflow-x-auto">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-1 text-xs bg-accent/8 border border-accent/25 rounded px-2 py-1 ml-2 max-w-full overflow-x-auto">
           <span>Start:</span>
           <input
             type="number"
@@ -1099,7 +1099,7 @@ function LoopSettings() {
             value={customLoop.start}
             aria-label="Custom Loop Start (seconds)"
             onChange={e => setCustomLoop({ ...customLoop, start: Number(e.target.value) })}
-            className="w-10 rounded px-1 py-0.5 border border-amber-300 dark:border-amber-700 bg-white dark:bg-amber-900"
+            className="w-10 rounded px-1 py-0.5 border border-border bg-input"
           />
           <span>End:</span>
           <input
@@ -1109,7 +1109,7 @@ function LoopSettings() {
             value={customLoop.end}
             aria-label="Custom Loop End (seconds)"
             onChange={e => setCustomLoop({ ...customLoop, end: Number(e.target.value) })}
-            className="w-10 rounded px-1 py-0.5 border border-amber-300 dark:border-amber-700 bg-white dark:bg-amber-900"
+            className="w-10 rounded px-1 py-0.5 border border-border bg-input"
           />
           <button
             aria-label="Reset Custom Loop"
@@ -1124,12 +1124,12 @@ function LoopSettings() {
           </button>
           <button
             aria-label="Done Setting Custom Loop"
-            className="ml-1 px-2 py-0.5 rounded bg-amber-300 dark:bg-amber-700 text-xs hover:bg-amber-400 dark:hover:bg-amber-600"
+            className="ml-1 px-2 py-0.5 rounded bg-accent/20 text-xs hover:bg-accent/30"
             onClick={() => setShowCustomLoopInputs(false)}
           >
             Done
           </button>
-          <span className="ml-2 text-amber-600 dark:text-amber-300" title="Set start and end in seconds"> <Info className="inline w-3 h-3" /> </span>
+          <span className="ml-2 text-accent" title="Set start and end in seconds"> <Info className="inline w-3 h-3" /> </span>
         </div>
       )}
     </div>
@@ -1150,7 +1150,7 @@ function SpeedSettings() {
   }, [playbackSpeed]);
   return (
     <select
-      className="rounded px-2 py-1 text-xs bg-amber-100 dark:bg-amber-900 border border-amber-300 dark:border-amber-700 focus:outline-none focus:ring-2 focus:ring-amber-400"
+      className="rounded px-2 py-1 text-xs bg-accent/10 border border-accent/25 focus:outline-none focus:ring-2 focus:ring-ring/30"
       value={playbackSpeed}
       aria-label="Playback Speed"
       onChange={e => setPlaybackSpeed(Number(e.target.value))}

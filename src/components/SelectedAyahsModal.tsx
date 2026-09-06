@@ -80,11 +80,11 @@ export default function SelectedAyahsModal({
             group.ayahs.map((ayah) => (
               <div
                 key={`${ayah.surah}-${ayah.ayah}`}
-                className="flex items-center justify-between px-5 py-3 hover:bg-amber-50/50 dark:hover:bg-white/[0.02] transition-colors"
+                className="flex items-center justify-between px-5 py-3 hover:bg-secondary transition-colors"
               >
                 <div className="flex items-center gap-3 min-w-0">
                   {/* Surah number dot */}
-                  <span className="w-6 h-6 rounded-lg bg-amber-100 dark:bg-amber-900/30 text-amber-800 dark:text-amber-300 text-[10px] font-bold flex items-center justify-center flex-shrink-0">
+                  <span className="w-6 h-6 rounded-[var(--radius-sm)] bg-accent/15 text-accent text-[10px] font-bold flex items-center justify-center flex-shrink-0">
                     {ayah.surah}
                   </span>
                   <div className="min-w-0">

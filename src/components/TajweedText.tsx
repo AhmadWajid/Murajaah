@@ -127,17 +127,17 @@ export function TajweedStats({ words, className = '' }: TajweedStatsProps) {
   return (
     <div className={`space-y-4 ${className}`}>
       <div className="grid grid-cols-3 gap-4 text-center">
-        <div className="bg-blue-50 p-3 rounded-lg">
-          <div className="text-2xl font-bold text-blue-600">{totalWords}</div>
-          <div className="text-xs text-gray-600">Total Words</div>
+        <div className="bg-info/10 p-3 rounded-[var(--radius-sm)]">
+          <div className="text-2xl font-bold text-info">{totalWords}</div>
+          <div className="text-xs text-muted-foreground">Total Words</div>
         </div>
-        <div className="bg-green-50 p-3 rounded-lg">
-          <div className="text-2xl font-bold text-green-600">{wordsWithRules}</div>
-          <div className="text-xs text-gray-600">With Rules</div>
+        <div className="bg-success/10 p-3 rounded-[var(--radius-sm)]">
+          <div className="text-2xl font-bold text-success">{wordsWithRules}</div>
+          <div className="text-xs text-muted-foreground">With Rules</div>
         </div>
-        <div className="bg-purple-50 p-3 rounded-lg">
-          <div className="text-2xl font-bold text-purple-600">{totalRules}</div>
-          <div className="text-xs text-gray-600">Total Rules</div>
+        <div className="bg-accent/10 p-3 rounded-[var(--radius-sm)]">
+          <div className="text-2xl font-bold text-accent">{totalRules}</div>
+          <div className="text-xs text-muted-foreground">Total Rules</div>
         </div>
       </div>
       

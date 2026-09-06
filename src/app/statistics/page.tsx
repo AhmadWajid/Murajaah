@@ -228,10 +228,10 @@ export default function StatisticsPage() {
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center space-x-2">
-                  <BarChart3 className="h-4 w-4 text-blue-500" />
+                  <BarChart3 className="h-4 w-4 text-info" />
                   <div>
                     <p className="text-sm font-medium">Total Reviews</p>
-                    <p className="text-2xl font-bold text-blue-600">
+                    <p className="text-2xl font-bold text-info">
                       {chartData.reduce((sum, day) => sum + day.reviews, 0)}
                     </p>
                   </div>
@@ -242,10 +242,10 @@ export default function StatisticsPage() {
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center space-x-2">
-                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  <CheckCircle className="h-4 w-4 text-success" />
                   <div>
                     <p className="text-sm font-medium">Total Completed</p>
-                    <p className="text-2xl font-bold text-green-600">
+                    <p className="text-2xl font-bold text-success">
                       {chartData.reduce((sum, day) => sum + day.completedItems, 0)}
                     </p>
                   </div>
@@ -256,10 +256,10 @@ export default function StatisticsPage() {
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center space-x-2">
-                  <BookOpen className="h-4 w-4 text-amber-500" />
+                  <BookOpen className="h-4 w-4 text-accent" />
                   <div>
                     <p className="text-sm font-medium">New Items</p>
-                    <p className="text-2xl font-bold text-amber-600">
+                    <p className="text-2xl font-bold text-accent">
                       {chartData.reduce((sum, day) => sum + day.newItems, 0)}
                     </p>
                   </div>
@@ -270,10 +270,10 @@ export default function StatisticsPage() {
             <Card>
               <CardContent className="p-4">
                 <div className="flex items-center space-x-2">
-                  <TrendingUp className="h-4 w-4 text-purple-500" />
+                  <TrendingUp className="h-4 w-4 text-info" />
                   <div>
                     <p className="text-sm font-medium">Active Days</p>
-                    <p className="text-2xl font-bold text-purple-600">
+                    <p className="text-2xl font-bold text-info">
                       {chartData.filter(day => day.reviews > 0 || day.completedItems > 0 || day.newItems > 0).length}
                     </p>
                   </div>

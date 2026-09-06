@@ -101,19 +101,19 @@ export default function AyahDetailDrawer({
 
       {/* Slide-over container */}
       <div
-        className={`fixed z-50 bg-[#FAF8F5]/98 dark:bg-[#12161A]/98 backdrop-blur shadow-[0_-8px_30px_rgba(0,0,0,0.1),_0_8px_30px_rgba(0,0,0,0.1)] transition-transform duration-300 ease-in-out flex flex-col border-amber-500/20 dark:border-accent/15 pointer-events-auto
+        className={`fixed z-50 bg-[#FAF8F5]/98 dark:bg-[#12161A]/98 backdrop-blur shadow-[0_-8px_30px_rgba(0,0,0,0.1),_0_8px_30px_rgba(0,0,0,0.1)] transition-transform duration-300 ease-in-out flex flex-col border-accent/20 pointer-events-auto
           bottom-0 left-0 right-0 h-[75vh] max-h-[85vh] rounded-t-3xl border-t
           md:top-0 md:bottom-0 md:right-0 md:left-auto md:w-[460px] md:h-full md:max-h-none md:rounded-none md:border-t-0 md:border-l ${
             isOpen ? 'translate-y-0 md:translate-x-0' : 'translate-y-full md:translate-x-full'
           }`}
       >
         {/* Drag handle for mobile */}
-        <div className="w-12 h-1 bg-amber-500/20 dark:bg-accent/20 rounded-full mx-auto my-2.5 md:hidden" />
+        <div className="w-12 h-1 bg-accent/20 rounded-full mx-auto my-2.5 md:hidden" />
 
         {/* Ornate Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-amber-500/15 dark:border-accent/10 bg-[#FAF8F5]/95 dark:bg-[#12161A]/95 sticky top-0 z-10">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-accent/15 bg-[#FAF8F5]/95 dark:bg-[#12161A]/95 sticky top-0 z-10">
           <div className="flex flex-col">
-            <span className="text-[10px] font-bold text-amber-700/80 dark:text-accent/80 tracking-widest uppercase font-sans">
+            <span className="text-[10px] font-bold text-accent/80 tracking-widest uppercase font-sans">
               Selected Verse Details
             </span>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white font-serif-header">
@@ -122,7 +122,7 @@ export default function AyahDetailDrawer({
           </div>
           <button
             onClick={onClose}
-            className="p-2 rounded-full hover:bg-amber-500/10 dark:hover:bg-accent/10 text-gray-500 hover:text-amber-800 dark:text-gray-400 dark:hover:text-white transition-colors"
+            className="p-2 rounded-full hover:bg-accent/10 text-muted-foreground hover:text-accent transition-colors"
             aria-label="Close details"
           >
             <X className="w-5 h-5" />
@@ -131,7 +131,7 @@ export default function AyahDetailDrawer({
 
         {/* Content Wrapper */}
         <div className="flex-1 overflow-y-auto p-5 select-text custom-scrollbar">
-          <div className="relative overflow-hidden rounded-2xl border border-amber-500/10 dark:border-accent/10 bg-gradient-to-br from-[#FCFAF2]/50 to-[#F5EEDC]/30 dark:from-[#1D222B]/40 dark:to-[#171B22]/30 p-4 sm:p-5 shadow-sm">
+          <div className="relative overflow-hidden rounded-2xl border border-accent/10 bg-gradient-to-br from-[#FCFAF2]/50 to-[#F5EEDC]/30 dark:from-[#1D222B]/40 dark:to-[#171B22]/30 p-4 sm:p-5 shadow-sm">
             {/* Subtle parchment paper texture overlay */}
             <div
               className="absolute inset-0 opacity-[0.02] dark:opacity-[0.04] pointer-events-none"

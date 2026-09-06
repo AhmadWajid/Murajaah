@@ -4,25 +4,6 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* Trapezoid tab for header collapse/expand — wide base on the border, narrow point below */
-.header-tab {
-  width: 64px;
-  height: 26px;
-  clip-path: polygon(0% 0%, 100% 0%, 78% 100%, 22% 100%);
-  background: #d4b04a;
-  box-shadow: 0 3px 6px -2px rgba(0,0,0,0.15);
-  transition: background 0.2s;
-}
-.header-tab:hover {
-  background: #c9a23a;
-}
-.dark .header-tab {
-  background: #b8941e;
-}
-.dark .header-tab:hover {
-  background: #a68415;
-}
-
 /* QPC V2 Font - High-quality Arabic font for Quran text */
 /* We'll dynamically load page-specific fonts, but here's a fallback */
 @font-face {
@@ -42,61 +23,70 @@
   font-style: normal;
 }
 
-/* Custom Animations & Micro-Interactions */
+/* ─── Design-system surface & control tokens ───
+   One coherent surface language. No per-component glassmorphism. */
+
+/* Quiet control surface — used by grouped controls in toolbars.
+   Subtle, no shadow, no glass. Lets hierarchy come from grouping, not decoration. */
+.control-surface {
+  background: var(--secondary);
+  border: 1px solid var(--border);
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.control-surface:hover {
+  border-color: color-mix(in oklch, var(--accent) 30%, var(--border));
+}
+.dark .control-surface {
+  background: color-mix(in oklch, var(--secondary) 60%, transparent);
+  border: 1px solid var(--border);
+}
+
+/* Popover / dropdown panel — clean elevated surface */
+.panel-surface {
+  background: var(--popover);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+.dark .panel-surface {
+  background: var(--popover);
+  border: 1px solid var(--border);
+  box-shadow: 0 4px 24px -8px rgba(0, 0, 0, 0.5), 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* Subtle motion — fast, smooth, restrained */
 @keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(12px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes goldPulse {
-  0%, 100% {
-    box-shadow: 0 0 4px rgba(212, 175, 55, 0.2);
-  }
-  50% {
-    box-shadow: 0 0 16px rgba(212, 175, 55, 0.45);
-  }
+@keyframes popoverIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
 }
 
-@keyframes slowGlow {
-  0%, 100% {
-    filter: drop-shadow(0 0 2px rgba(197, 168, 128, 0.15));
-  }
-  50% {
-    filter: drop-shadow(0 0 8px rgba(197, 168, 128, 0.4));
-  }
+@keyframes overlayIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 .animate-fade-in-up {
-  animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: fadeInUp 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.animate-popover {
+  animation: popoverIn 0.16s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.animate-overlay {
+  animation: overlayIn 0.15s ease-out forwards;
 }
 
-.animate-gold-pulse {
-  animation: goldPulse 2s infinite ease-in-out;
-}
-
-.animate-slow-glow {
-  animation: slowGlow 3s infinite ease-in-out;
-}
-
-/* Glassmorphism Classes */
-.glassmorphic {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(16px) saturate(120%);
-  -webkit-backdrop-filter: blur(16px) saturate(120%);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-}
-
-.dark .glassmorphic {
-  background: rgba(18, 22, 26, 0.75);
-  backdrop-filter: blur(16px) saturate(120%);
-  -webkit-backdrop-filter: blur(16px) saturate(120%);
-  border: 1px solid rgba(255, 255, 255, 0.05);
+/* Respect reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Force font size for translation text */
@@ -286,37 +276,43 @@
 }
 
 .dark {
-  --background: oklch(0.12 0.005 240); /* deep slate-black #0B0D0E */
-  --foreground: oklch(0.92 0.01 80);   /* soft warm grey #E8E6E3 */
-  --card: oklch(0.16 0.01 240);       /* charcoal black #121519 */
+  --background: oklch(0.13 0.005 240);  /* deep slate-black */
+  --foreground: oklch(0.92 0.01 80);    /* soft warm grey */
+  --card: oklch(0.17 0.008 240);        /* charcoal */
   --card-foreground: oklch(0.92 0.01 80);
-  --popover: oklch(0.16 0.01 240);
+  --popover: oklch(0.17 0.008 240);
   --popover-foreground: oklch(0.92 0.01 80);
-  --primary: oklch(0.85 0.08 75);      /* champagne/gold #C5A880 */
-  --primary-foreground: oklch(0.12 0.005 240);
-  --secondary: oklch(0.22 0.02 240);   /* soft indigo charcoal */
+  --primary: oklch(0.78 0.1 75);        /* refined gold — primary action */
+  --primary-foreground: oklch(0.13 0.005 240);
+  --secondary: oklch(0.22 0.012 240);
   --secondary-foreground: oklch(0.85 0.08 75);
-  --muted: oklch(0.22 0.02 240);
-  --muted-foreground: oklch(0.65 0.02 240);
-  --accent: oklch(0.82 0.14 75);       /* premium gold #D4AF37 */
-  --accent-foreground: oklch(0.12 0.005 240);
-  --destructive: oklch(0.55 0.18 25);
-  --border: oklch(0.24 0.015 240);     /* elegant charcoal-grey border */
-  --input: oklch(0.24 0.015 240);
-  --ring: oklch(0.82 0.14 75);
+  --muted: oklch(0.22 0.012 240);
+  --muted-foreground: oklch(0.66 0.02 240);
+  --accent: oklch(0.82 0.13 75);        /* gold — selected/current state only */
+  --accent-foreground: oklch(0.13 0.005 240);
+  --destructive: oklch(0.62 0.2 25);
+  --warning: oklch(0.7 0.16 45);
+  --warning-foreground: oklch(0.16 0.03 45);
+  --success: oklch(0.68 0.14 155);
+  --success-foreground: oklch(0.16 0.03 155);
+  --info: oklch(0.65 0.14 240);
+  --info-foreground: oklch(0.16 0.03 240);
+  --border: oklch(0.25 0.01 240);       /* subtle charcoal border */
+  --input: oklch(0.25 0.01 240);
+  --ring: oklch(0.78 0.1 75);
   --chart-1: oklch(0.488 0.243 264.376);
   --chart-2: oklch(0.696 0.17 162.48);
   --chart-3: oklch(0.769 0.188 70.08);
   --chart-4: oklch(0.627 0.265 303.9);
   --chart-5: oklch(0.645 0.246 16.439);
-  --sidebar: oklch(0.16 0.01 240);
+  --sidebar: oklch(0.17 0.008 240);
   --sidebar-foreground: oklch(0.92 0.01 80);
-  --sidebar-primary: oklch(0.82 0.14 75);
-  --sidebar-primary-foreground: oklch(0.12 0.005 240);
-  --sidebar-accent: oklch(0.22 0.02 240);
-  --sidebar-accent-foreground: oklch(0.82 0.14 75);
-  --sidebar-border: oklch(0.24 0.015 240);
-  --sidebar-ring: oklch(0.82 0.14 75);
+  --sidebar-primary: oklch(0.82 0.13 75);
+  --sidebar-primary-foreground: oklch(0.13 0.005 240);
+  --sidebar-accent: oklch(0.22 0.012 240);
+  --sidebar-accent-foreground: oklch(0.82 0.13 75);
+  --sidebar-border: oklch(0.25 0.01 240);
+  --sidebar-ring: oklch(0.82 0.13 75);
 }
 
 body {
@@ -366,17 +362,16 @@ body {
 .quran-card {
   background-color: var(--card);
   color: var(--card-foreground);
-  border-radius: 1.25rem;
-  box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+  border-radius: var(--radius-xl);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   padding: 1.5rem;
   border: 1px solid var(--border);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 
 .quran-card:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 10px 30px -4px rgba(197, 168, 128, 0.15);
-  border-color: rgba(197, 168, 128, 0.35);
+  box-shadow: 0 2px 12px -4px rgba(0, 0, 0, 0.06);
+  border-color: color-mix(in oklch, var(--accent) 25%, var(--border));
 }
 
 /* Verse action buttons: fade slightly on desktop mice, but never fully hide.
@@ -394,195 +389,119 @@ body {
   }
 }
 
+/* ─── Primary action button — solid, restrained, no gradient flashiness ─── */
 .btn-primary {
-  background: linear-gradient(135deg, #D4AF37 0%, #B8860B 50%, #9B7B1E 100%);
-  color: #fff;
+  background: var(--primary);
+  color: var(--primary-foreground);
   font-weight: 600;
-  padding: 0.625rem 1.25rem;
-  border-radius: 0.75rem;
-  transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
-  box-shadow:
-    0 1px 2px rgba(180, 140, 30, 0.25),
-    0 4px 12px -2px rgba(180, 140, 30, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(212, 175, 55, 0.3);
+  padding: 0.5rem 1rem;
+  border-radius: var(--radius);
+  transition: background 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
+  border: 1px solid transparent;
 }
-
 .btn-primary:hover {
-  transform: translateY(-1px);
-  background: linear-gradient(135deg, #E0BC40 0%, #C69A1A 50%, #A98826 100%);
-  box-shadow:
-    0 2px 4px rgba(180, 140, 30, 0.3),
-    0 8px 20px -2px rgba(180, 140, 30, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  background: color-mix(in oklch, var(--primary) 88%, white);
+  box-shadow: 0 2px 8px -2px color-mix(in oklch, var(--primary) 40%, transparent);
 }
-
 .btn-primary:active {
-  transform: translateY(0);
-  box-shadow:
-    0 1px 2px rgba(180, 140, 30, 0.2),
-    inset 0 1px 2px rgba(0, 0, 0, 0.1);
+  background: color-mix(in oklch, var(--primary) 92%, black);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
-
-/* Dark mode refinement for primary button */
 .dark .btn-primary {
-  background: linear-gradient(135deg, #E8C547 0%, #D4AF37 50%, #B8941F 100%);
-  color: #1a1a1a;
-  box-shadow:
-    0 1px 2px rgba(212, 175, 55, 0.2),
-    0 4px 14px -2px rgba(212, 175, 55, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
-  border: 1px solid rgba(212, 175, 55, 0.35);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
-
 .dark .btn-primary:hover {
-  background: linear-gradient(135deg, #F0D050 0%, #E0BC40 50%, #C6A028 100%);
-  box-shadow:
-    0 2px 4px rgba(212, 175, 55, 0.25),
-    0 8px 22px -2px rgba(212, 175, 55, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  background: color-mix(in oklch, var(--primary) 88%, white);
 }
 
-/* ─── Modern surface pill — used by top bar controls ─── */
-.surface-pill {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(20px) saturate(140%);
-  -webkit-backdrop-filter: blur(20px) saturate(140%);
-  border: 1px solid rgba(212, 175, 55, 0.12);
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.03),
-    0 2px 8px -2px rgba(0, 0, 0, 0.04);
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-
-.surface-pill:hover {
-  border-color: rgba(212, 175, 55, 0.25);
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.04),
-    0 4px 12px -2px rgba(180, 140, 30, 0.08);
-}
-
-.dark .surface-pill {
-  background: rgba(20, 24, 30, 0.72);
-  border: 1px solid rgba(212, 175, 55, 0.08);
-  box-shadow:
-    0 1px 2px rgba(0, 0, 0, 0.15),
-    0 2px 8px -2px rgba(0, 0, 0, 0.2);
-}
-
-.dark .surface-pill:hover {
-  border-color: rgba(212, 175, 55, 0.2);
-  box-shadow:
-    0 1px 3px rgba(0, 0, 0, 0.2),
-    0 4px 14px -2px rgba(212, 175, 55, 0.1);
-}
-
-/* ─── Play button gradient — rich, warm gold with depth ─── */
+/* ─── Play button — solid primary, no gradient ─── */
 .play-btn-gradient {
-  background: linear-gradient(135deg, #E0A82E 0%, #C68A1A 100%);
-  box-shadow:
-    0 2px 6px -1px rgba(180, 140, 30, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  background: var(--primary);
+  color: var(--primary-foreground);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
-
 .play-btn-gradient:hover {
-  background: linear-gradient(135deg, #ECB53A 0%, #D09822 100%);
-  box-shadow:
-    0 4px 10px -1px rgba(180, 140, 30, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  background: color-mix(in oklch, var(--primary) 88%, white);
 }
-
 .dark .play-btn-gradient {
-  background: linear-gradient(135deg, #E8C547 0%, #D4AF37 100%);
-  box-shadow:
-    0 2px 8px -1px rgba(212, 175, 55, 0.25),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  background: var(--primary);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
 }
-
 .dark .play-btn-gradient:hover {
-  background: linear-gradient(135deg, #F0D050 0%, #E0BC40 100%);
-  box-shadow:
-    0 4px 12px -1px rgba(212, 175, 55, 0.3),
-    inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  background: color-mix(in oklch, var(--primary) 88%, white);
 }
 
-/* ─── Progress bar fill — smooth, premium gold ─── */
+/* ─── Progress bar fill — solid accent ─── */
 .progress-fill-gradient {
-  background: linear-gradient(90deg, #D4AF37 0%, #E0BC40 50%, #D4AF37 100%);
+  background: var(--accent);
 }
-
 .dark .progress-fill-gradient {
-  background: linear-gradient(90deg, #E8C547 0%, #F0D050 50%, #E8C547 100%);
+  background: var(--accent);
 }
 
-/* ─── Segmented control active state — refined ─── */
+/* ─── Segmented control active state — subtle accent tint ─── */
 .segmented-active {
-  background: linear-gradient(135deg, rgba(212, 175, 55, 0.12), rgba(212, 175, 55, 0.06));
-  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.15), 0 1px 2px rgba(180, 140, 30, 0.08);
+  background: color-mix(in oklch, var(--accent) 14%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--accent) 25%, transparent);
 }
-
 .dark .segmented-active {
-  background: linear-gradient(135deg, rgba(212, 175, 55, 0.15), rgba(212, 175, 55, 0.08));
-  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.08), 0 1px 2px rgba(212, 175, 55, 0.1);
+  background: color-mix(in oklch, var(--accent) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--accent) 25%, transparent);
 }
 
-/* ─── Drawer header — deep premium gradient ─── */
+/* ─── Drawer header — clean dark surface, subtle accent wash ─── */
 .drawer-header-gradient {
-  background:
-    radial-gradient(ellipse at top right, rgba(212, 175, 55, 0.08), transparent 60%),
-    linear-gradient(135deg, #1a1d24 0%, #14171c 50%, #0f1216 100%);
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
 }
 
-/* ─── Number badge — refined gold ─── */
+/* ─── Number badge — solid accent for active ─── */
 .badge-gold {
-  background: linear-gradient(135deg, #E0BC40 0%, #D4AF37 50%, #C69A1A 100%);
-  box-shadow: 0 1px 3px rgba(180, 140, 30, 0.25), inset 0 0.5px 0 rgba(255, 255, 255, 0.2);
+  background: var(--accent);
+  color: var(--accent-foreground);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
 }
-
 .badge-gold:hover {
-  background: linear-gradient(135deg, #ECC84A 0%, #E0BC40 50%, #D4AF37 100%);
+  background: color-mix(in oklch, var(--accent) 90%, white);
 }
 
 /* ─── Number badge — subtle (inactive) ─── */
 .badge-subtle {
-  background: rgba(0, 0, 0, 0.04);
-  color: rgba(0, 0, 0, 0.45);
-  transition: all 0.2s ease;
+  background: var(--muted);
+  color: var(--muted-foreground);
+  transition: background 0.15s ease, color 0.15s ease;
 }
-
 .badge-subtle:hover {
-  background: rgba(212, 175, 55, 0.1);
-  color: rgba(180, 140, 30, 0.8);
+  background: color-mix(in oklch, var(--accent) 12%, var(--muted));
+  color: var(--accent-foreground);
 }
-
 .dark .badge-subtle {
-  background: rgba(255, 255, 255, 0.05);
-  color: rgba(255, 255, 255, 0.4);
+  background: color-mix(in oklch, var(--muted) 60%, transparent);
+  color: var(--muted-foreground);
 }
-
 .dark .badge-subtle:hover {
-  background: rgba(212, 175, 55, 0.12);
-  color: rgba(212, 175, 55, 0.9);
+  background: color-mix(in oklch, var(--accent) 14%, var(--muted));
 }
 
 /* ─── Verse grid button — active state ─── */
 .verse-grid-active {
-  background: linear-gradient(135deg, #E0BC40 0%, #D4AF37 100%);
-  box-shadow: 0 1px 4px rgba(180, 140, 30, 0.3), inset 0 0.5px 0 rgba(255, 255, 255, 0.2);
-  color: #1a1a1a;
+  background: var(--accent);
+  color: var(--accent-foreground);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
 /* ─── Drawer search input ─── */
 .drawer-search {
-  background: rgba(255, 255, 255, 0.06);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  transition: all 0.2s ease;
+  background: var(--input);
+  border: 1px solid var(--border);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-
 .drawer-search:focus {
-  background: rgba(255, 255, 255, 0.1);
-  border-color: rgba(212, 175, 55, 0.35);
-  box-shadow: 0 0 0 3px rgba(212, 175, 55, 0.1);
+  border-color: color-mix(in oklch, var(--accent) 50%, var(--border));
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--accent) 18%, transparent);
 }
 
 /* ─── Index modal — full-screen centered ─── */
@@ -610,38 +529,33 @@ body {
   animation: indexModalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
-/* ─── Index modal header — deep premium gradient ─── */
+/* ─── Index modal header — clean surface with subtle accent wash ─── */
 .index-header-gradient {
-  background:
-    radial-gradient(ellipse 80% 100% at top right, rgba(212, 175, 55, 0.1), transparent 70%),
-    linear-gradient(160deg, #1c1f26 0%, #15181e 60%, #0f1216 100%);
+  background: var(--card);
+  border-bottom: 1px solid var(--border);
 }
 
 /* ─── Surah list item hover ─── */
 .surah-item {
-  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: background 0.12s ease;
 }
-
 .surah-item:hover {
-  background: rgba(212, 175, 55, 0.06);
+  background: color-mix(in oklch, var(--accent) 6%, transparent);
 }
-
 .surah-item-active {
-  background: rgba(212, 175, 55, 0.08);
+  background: color-mix(in oklch, var(--accent) 8%, transparent);
 }
-
 .dark .surah-item:hover {
-  background: rgba(212, 175, 55, 0.04);
+  background: color-mix(in oklch, var(--accent) 5%, transparent);
 }
-
 .dark .surah-item-active {
-  background: rgba(212, 175, 55, 0.06);
+  background: color-mix(in oklch, var(--accent) 7%, transparent);
 }
 
 /* ─── Keyboard-selected item ─── */
 .surah-item-keyboard {
-  background: rgba(212, 175, 55, 0.1);
-  box-shadow: inset 0 0 0 1px rgba(212, 175, 55, 0.2);
+  background: color-mix(in oklch, var(--accent) 10%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in oklch, var(--accent) 25%, transparent);
 }
 
 .btn-secondary {
@@ -704,11 +618,12 @@ body {
 }
 
 @theme inline {
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
-  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-xs: var(--radius-xs);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+  --radius-2xl: var(--radius-2xl);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -724,6 +639,12 @@ body {
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-info: var(--info);
+  --color-info-foreground: var(--info-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -747,25 +668,46 @@ body {
 }
 
 :root {
-  --radius: 0.75rem;
-  --background: oklch(0.985 0.004 80);   /* alabaster warm sand background #FAF9F5 */
-  --foreground: oklch(0.24 0.015 60);    /* deep slate-charcoal text #383B3E */
-  --card: oklch(1 0 0);                  /* soft pure white #FFFFFF */
+  /* ── Radius scale (deliberate hierarchy) ── */
+  --radius-xs: 6px;   /* small controls, chips */
+  --radius-sm: 8px;   /* standard controls */
+  --radius: 10px;     /* default — standard controls, inputs */
+  --radius-md: 10px;
+  --radius-lg: 12px;  /* larger surfaces, popovers */
+  --radius-xl: 16px;  /* cards, panels */
+  --radius-2xl: 20px; /* major surfaces, modals */
+
+  /* ── Control height scale ── */
+  --control-sm: 32px;
+  --control-md: 36px;
+  --control-lg: 40px;
+  --control-xl: 44px; /* mobile tap target */
+
+  /* ── Semantic colors ── */
+  --background: oklch(0.985 0.004 80);   /* alabaster warm sand #FAF9F5 */
+  --foreground: oklch(0.24 0.015 60);    /* deep slate-charcoal #383B3E */
+  --card: oklch(1 0 0);                  /* pure white */
   --card-foreground: oklch(0.24 0.015 60);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.24 0.015 60);
-  --primary: oklch(0.35 0.05 60);        /* rich slate gold-grey */
+  --primary: oklch(0.42 0.06 65);        /* refined deep gold-brown — primary action */
   --primary-foreground: oklch(0.985 0.004 80);
-  --secondary: oklch(0.96 0.015 75);     /* soft cream secondary #F4F1E9 */
+  --secondary: oklch(0.96 0.015 75);     /* soft cream */
   --secondary-foreground: oklch(0.35 0.05 60);
-  --muted: oklch(0.96 0.015 75);
-  --muted-foreground: oklch(0.55 0.02 60);
-  --accent: oklch(0.78 0.11 75);        /* warm antique gold #C5A880 */
+  --muted: oklch(0.965 0.012 75);
+  --muted-foreground: oklch(0.52 0.02 60);
+  --accent: oklch(0.78 0.11 75);         /* antique gold — selected/current state only */
   --accent-foreground: oklch(0.18 0.02 60);
-  --destructive: oklch(0.577 0.245 27.325);
-  --border: oklch(0.92 0.01 75);         /* light gold-tinted grey border */
-  --input: oklch(0.92 0.01 75);
-  --ring: oklch(0.78 0.11 75);
+  --destructive: oklch(0.55 0.2 25);     /* destructive action */
+  --warning: oklch(0.62 0.16 45);        /* mistakes / attention */
+  --warning-foreground: oklch(0.16 0.03 45);
+  --success: oklch(0.6 0.13 155);        /* completed / reviewed */
+  --success-foreground: oklch(0.16 0.03 155);
+  --info: oklch(0.55 0.14 240);          /* informational */
+  --info-foreground: oklch(0.16 0.03 240);
+  --border: oklch(0.91 0.008 75);        /* subtle warm grey border */
+  --input: oklch(0.91 0.008 75);
+  --ring: oklch(0.42 0.06 65);
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);
@@ -801,91 +743,73 @@ input[type="number"] {
   appearance: textfield;
 }
 
-/* ─── Premium reading surface — warm paper-like background ─── */
+/* ─── Reading surface — calm, flat background ─── */
 .reading-surface {
   background-color: var(--background);
-  background-image:
-    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(212, 175, 55, 0.03), transparent 70%);
 }
-
 .dark .reading-surface {
   background-color: var(--background);
-  background-image:
-    radial-gradient(ellipse 60% 50% at 50% 0%, rgba(212, 175, 55, 0.02), transparent 70%);
 }
 
-/* ─── Premium ayah card surface ─── */
+/* ─── Ayah card surface — clean, no glassmorphism ─── */
 .ayah-card-surface {
-  background: rgba(255, 255, 255, 0.6);
-  backdrop-filter: blur(12px) saturate(130%);
-  -webkit-backdrop-filter: blur(12px) saturate(130%);
-  border: 1px solid rgba(212, 175, 55, 0.1);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02), 0 4px 16px -4px rgba(0, 0, 0, 0.03);
-  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-
 .ayah-card-surface:hover {
-  border-color: rgba(212, 175, 55, 0.2);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03), 0 8px 24px -4px rgba(180, 140, 30, 0.06);
+  border-color: color-mix(in oklch, var(--accent) 25%, var(--border));
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.05);
 }
-
 .dark .ayah-card-surface {
-  background: rgba(18, 22, 26, 0.6);
-  border: 1px solid rgba(212, 175, 55, 0.06);
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1), 0 4px 16px -4px rgba(0, 0, 0, 0.15);
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
 }
-
 .dark .ayah-card-surface:hover {
-  border-color: rgba(212, 175, 55, 0.12);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12), 0 8px 24px -4px rgba(212, 175, 55, 0.04);
+  border-color: color-mix(in oklch, var(--accent) 22%, var(--border));
+  box-shadow: 0 2px 8px -2px rgba(0, 0, 0, 0.3);
 }
 
 /* ─── Ayah card selected state ─── */
 .ayah-card-selected {
-  border-color: rgba(212, 175, 55, 0.35) !important;
-  background: linear-gradient(135deg, rgba(212, 175, 55, 0.04), rgba(212, 175, 55, 0.01)) !important;
-  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.1), 0 4px 20px -4px rgba(180, 140, 30, 0.1) !important;
+  border-color: color-mix(in oklch, var(--accent) 40%, var(--border)) !important;
+  background: color-mix(in oklch, var(--accent) 5%, var(--card)) !important;
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--accent) 15%, transparent), 0 2px 12px -4px color-mix(in oklch, var(--accent) 25%, transparent) !important;
 }
-
 .dark .ayah-card-selected {
-  border-color: rgba(212, 175, 55, 0.25) !important;
-  background: linear-gradient(135deg, rgba(212, 175, 55, 0.06), rgba(212, 175, 55, 0.02)) !important;
-  box-shadow: 0 0 0 1px rgba(212, 175, 55, 0.08), 0 4px 24px -4px rgba(212, 175, 55, 0.06) !important;
+  border-color: color-mix(in oklch, var(--accent) 30%, var(--border)) !important;
+  background: color-mix(in oklch, var(--accent) 7%, var(--card)) !important;
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--accent) 12%, transparent), 0 2px 12px -4px color-mix(in oklch, var(--accent) 20%, transparent) !important;
 }
 
-/* ─── Action button — refined pill ─── */
+/* ─── Action button — quiet, no scale bounce ─── */
 .ayah-action-btn {
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 9999px;
-  transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+  border-radius: var(--radius-sm);
+  transition: background 0.15s ease, color 0.15s ease;
   cursor: pointer;
 }
-
 .ayah-action-btn:hover {
-  transform: scale(1.08);
+  background: color-mix(in oklch, var(--accent) 12%, transparent);
 }
-
 .ayah-action-btn:active {
-  transform: scale(0.95);
+  background: color-mix(in oklch, var(--accent) 18%, transparent);
 }
 
-/* ─── Surah header — premium gradient card ─── */
+/* ─── Surah header — clean card ─── */
 .surah-header-card {
-  background:
-    radial-gradient(ellipse 70% 80% at 50% 0%, rgba(212, 175, 55, 0.06), transparent 70%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.5) 0%, rgba(248, 245, 237, 0.3) 100%);
-  border: 1px solid rgba(212, 175, 55, 0.12);
-  box-shadow: 0 4px 30px -5px rgba(0, 0, 0, 0.02);
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
 }
-
 .dark .surah-header-card {
-  background:
-    radial-gradient(ellipse 70% 80% at 50% 0%, rgba(212, 175, 55, 0.04), transparent 70%),
-    linear-gradient(180deg, rgba(24, 29, 35, 0.5) 0%, rgba(18, 22, 26, 0.3) 100%);
-  border: 1px solid rgba(212, 175, 55, 0.08);
-  box-shadow: 0 4px 30px -5px rgba(0, 0, 0, 0.15);
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 /* ─── Loading skeleton — branded shimmer ─── */
@@ -895,7 +819,7 @@ input[type="number"] {
 }
 
 .loading-shimmer {
-  background: linear-gradient(90deg, rgba(212, 175, 55, 0.04) 25%, rgba(212, 175, 55, 0.08) 50%, rgba(212, 175, 55, 0.04) 75%);
+  background: linear-gradient(90deg, var(--muted) 25%, color-mix(in oklch, var(--muted) 70%, var(--accent) 8%) 50%, var(--muted) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s infinite;
 }
