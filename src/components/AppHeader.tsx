@@ -190,8 +190,8 @@ export default function AppHeader({ pageType, onRefresh, quranHeaderComponent }:
         <div className="relative">
           {/* Toolbar elements row */}
           <div
-            className={`overflow-hidden transition-all duration-200 ${
-              quranToolbarOpen ? 'max-h-40 opacity-100 border-t border-border' : 'max-h-0 opacity-0'
+            className={`transition-all duration-200 ${
+              quranToolbarOpen ? 'max-h-40 opacity-100 border-t border-border overflow-visible' : 'max-h-0 opacity-0 overflow-hidden'
             }`}
           >
             <div className="mx-auto max-w-7xl px-4">
