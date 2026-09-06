@@ -218,7 +218,9 @@ export default function QuranContent({
   const [visibleWordIds15, setVisibleWordIds15] = useState<Set<string>>(new Set());
   const wordTimeoutsRef15 = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
-  const pageTooltips15Map = new Map<string, string>();
+  // Single shared tooltip ID for word translations (react-tooltip v5 best practice
+  // for dynamic content — avoids issues with dynamically registered <Tooltip> components)
+  const WORD_TRANSLATION_TOOLTIP_ID_15 = 'word-translation-tooltip-15';
 
   const [layout15Data, setLayout15Data] = useState<{
     pageLayout: PageLine[];
@@ -665,7 +667,6 @@ export default function QuranContent({
                         }
                       }
 
-                      const translationTooltipId = `translation-tooltip-15line-${wordId}`;
                       const shouldShowTranslationTooltip = hoveredTajweedWordId15 !== String(wordId);
 
                       const isWordVisible = visibleWordIds15.has(String(wordId));
@@ -795,9 +796,6 @@ export default function QuranContent({
                       };
 
                       if (hideWords) {
-                        if (showWordByWordTooltip && translation && shouldShowTranslationTooltip) {
-                          pageTooltips15Map.set(translationTooltipId, translation);
-                        }
                         return (
                           <span
                             key={`word-${wordId}`}
@@ -807,7 +805,8 @@ export default function QuranContent({
                             }}
                             onMouseEnter={() => handleWordMouseEnter15(String(wordId), wordSurah, wordAyah, word)}
                             onMouseLeave={() => handleWordMouseLeave15(String(wordId))}
-                            data-tooltip-id={showWordByWordTooltip && translation && shouldShowTranslationTooltip ? translationTooltipId : undefined}
+                            data-tooltip-id={showWordByWordTooltip && translation && shouldShowTranslationTooltip ? WORD_TRANSLATION_TOOLTIP_ID_15 : undefined}
+                            data-tooltip-content={showWordByWordTooltip && translation && shouldShowTranslationTooltip ? translation : undefined}
                             className={`inline cursor-pointer select-none transition-all duration-200 px-0.5 rounded-sm relative font-arabic arabic-text uthmanic-hafs ${
                               isActive 
                                 ? 'bg-accent/15 dark:bg-accent/20' 
@@ -862,9 +861,6 @@ export default function QuranContent({
                         );
                       }
 
-                      if (showWordByWordTooltip && translation && shouldShowTranslationTooltip) {
-                        pageTooltips15Map.set(translationTooltipId, translation);
-                      }
                       return (
                         <span
                           key={`word-${wordId}`}
@@ -872,7 +868,8 @@ export default function QuranContent({
                             e.stopPropagation();
                             onActiveAyahChange?.({ surah: wordSurah, ayah: wordAyah });
                           }}
-                          data-tooltip-id={showWordByWordTooltip && translation && shouldShowTranslationTooltip ? translationTooltipId : undefined}
+                          data-tooltip-id={showWordByWordTooltip && translation && shouldShowTranslationTooltip ? WORD_TRANSLATION_TOOLTIP_ID_15 : undefined}
+                          data-tooltip-content={showWordByWordTooltip && translation && shouldShowTranslationTooltip ? translation : undefined}
                           className={`inline cursor-pointer select-none transition-all duration-200 px-0.5 rounded-sm font-arabic arabic-text uthmanic-hafs ${
                             isActive 
                               ? 'bg-accent/15 dark:bg-accent/20' 
@@ -1354,23 +1351,20 @@ export default function QuranContent({
                 boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
               }}
             />
-            {Array.from(pageTooltips15Map.entries()).map(([id, content]) => (
-              <Tooltip
-                key={id}
-                id={id}
-                style={{
-                  backgroundColor: '#111827', // bg-gray-900
-                  color: '#fff',
-                  borderRadius: '0.375rem',
-                  padding: '0.25rem 0.5rem',
-                  fontSize: '0.75rem', // text-xs
-                  zIndex: 9999,
-                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
-                }}
-              >
-                {content}
-              </Tooltip>
-            ))}
+            {/* Single shared tooltip for word translations — content comes from
+                data-tooltip-content on each word span */}
+            <Tooltip
+              id={WORD_TRANSLATION_TOOLTIP_ID_15}
+              style={{
+                backgroundColor: '#111827',
+                color: '#fff',
+                borderRadius: '0.375rem',
+                padding: '0.25rem 0.5rem',
+                fontSize: '0.75rem',
+                zIndex: 9999,
+                boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+              }}
+            />
           </>,
           document.body
         )}

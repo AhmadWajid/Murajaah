@@ -223,7 +223,10 @@ export function TajweedAyahText({
 
   // Store tooltip data for rendering outside the text flow
   const tooltipData: Array<{ id: string; content: string; bgColor: string }> = [];
-  const translationTooltipData: Array<{ id: string; content: string; wordId: string }> = [];
+  // Word translations use a single shared Tooltip with data-tooltip-content
+  // (react-tooltip v5's recommended approach for dynamic content — avoids
+  // the issue where dynamically added <Tooltip> components don't register)
+  const WORD_TRANSLATION_TOOLTIP_ID = 'word-translation-tooltip';
 
   // Combining marks that attach to the PRECEDING base letter.
   // Splitting them into a separate <span> detaches them from their base.
@@ -402,12 +405,7 @@ export function TajweedAyahText({
       
       const wordId = String(word.id);
       const isWordVisible = visibleWordIds.has(wordId);
-      const translationTooltipId = `translation-tooltip-${word.id}`;
-      
-      if (showWordByWordTooltip && translation) {
-        translationTooltipData.push({ id: translationTooltipId, content: translation, wordId });
-      }
-      
+
       return (
         <span
           key={word.id}
@@ -418,7 +416,8 @@ export function TajweedAyahText({
           }}
           onMouseEnter={() => handleWordMouseEnter(wordId, index)}
           onMouseLeave={() => handleWordMouseLeave(wordId)}
-          data-tooltip-id={showWordByWordTooltip && translation ? translationTooltipId : undefined}
+          data-tooltip-id={showWordByWordTooltip && translation ? WORD_TRANSLATION_TOOLTIP_ID : undefined}
+          data-tooltip-content={showWordByWordTooltip && translation ? translation : undefined}
           data-word-tooltip
         >
           {/* The word itself — always rendered as inline text so Arabic
@@ -456,19 +455,15 @@ export function TajweedAyahText({
       if (showWordByWordTooltip && translation) {
         const wordId = String(word.id);
         const shouldShowTooltip = isMobile ? clickedWordId === wordId : hoveredTajweedWordId !== wordId;
-        const translationTooltipId = `translation-tooltip-${word.id}`;
-        
-        if (shouldShowTooltip) {
-          translationTooltipData.push({ id: translationTooltipId, content: translation, wordId });
-        }
-        
+
         return (
           <span
             key={word.id}
             className={`inline ${isMobile ? 'cursor-pointer' : ''}`}
             style={{ fontSize: `${currentFontSize}px` }}
             onClick={handleWordClick}
-            data-tooltip-id={shouldShowTooltip ? translationTooltipId : undefined}
+            data-tooltip-id={shouldShowTooltip ? WORD_TRANSLATION_TOOLTIP_ID : undefined}
+            data-tooltip-content={shouldShowTooltip ? translation : undefined}
             data-word-tooltip
           >
             <span>{word.text}</span>
@@ -601,19 +596,15 @@ export function TajweedAyahText({
     if (showWordByWordTooltip && translation) {
       const wordId = String(word.id);
       const shouldShowTooltip = isMobile ? clickedWordId === wordId : hoveredTajweedWordId !== wordId;
-      const translationTooltipId = `translation-tooltip-${word.id}`;
-      
-      if (shouldShowTooltip) {
-        translationTooltipData.push({ id: translationTooltipId, content: translation, wordId });
-      }
-      
+
       return (
         <span
           key={word.id}
           className={`inline ${isMobile ? 'cursor-pointer' : ''}`}
           style={{ fontSize: `${currentFontSize}px` }}
           onClick={handleWordClick}
-          data-tooltip-id={shouldShowTooltip ? translationTooltipId : undefined}
+          data-tooltip-id={shouldShowTooltip ? WORD_TRANSLATION_TOOLTIP_ID : undefined}
+          data-tooltip-content={shouldShowTooltip ? translation : undefined}
           data-word-tooltip
         >
           {segments}
@@ -705,27 +696,21 @@ export function TajweedAyahText({
               {content}
             </Tooltip>
           ))}
-          {translationTooltipData.map(({ id, content, wordId }) => {
-            const tooltipProps = isMobile ? { isOpen: clickedWordId === wordId } : {};
-            return (
-              <Tooltip
-                key={id}
-                id={id}
-                {...tooltipProps}
-                style={{
-                  backgroundColor: '#111827', // bg-gray-900
-                  color: '#fff',
-                  borderRadius: '0.375rem',
-                  padding: '0.25rem 0.5rem',
-                  fontSize: '0.75rem', // text-xs
-                  zIndex: 9999,
-                  boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
-                }}
-              >
-                {content}
-              </Tooltip>
-            );
-          })}
+          {/* Single shared tooltip for word translations — content comes from
+              data-tooltip-content on each word span. This avoids react-tooltip's
+              issue with dynamically registered <Tooltip> components. */}
+          <Tooltip
+            id={WORD_TRANSLATION_TOOLTIP_ID}
+            style={{
+              backgroundColor: '#111827',
+              color: '#fff',
+              borderRadius: '0.375rem',
+              padding: '0.25rem 0.5rem',
+              fontSize: '0.75rem',
+              zIndex: 9999,
+              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+            }}
+          />
         </>,
         document.body
       )}
