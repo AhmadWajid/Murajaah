@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Tooltip } from '@/components/ui/tooltip';
 import { ControlGroup } from '@/components/ui/control-group';
 import { RECITER_GROUPS, getReciterById } from '@/lib/recitations';
+import { loadFavoriteReciters, toggleFavoriteReciter } from '@/lib/storage';
 import {
   ChevronLeft,
   ChevronRight,
@@ -24,6 +25,7 @@ import {
   X,
   Info,
   Keyboard,
+  Star,
 } from 'lucide-react';
 import { getLanguagesWithTranslations } from '@/lib/quranService';
 import { getNextMistakeInVerseOrder, getPreviousMistakeInVerseOrder } from '@/lib/storageService';
@@ -120,6 +122,7 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
   const [showMistakeMenu, setShowMistakeMenu] = useState(false);
   const [showOverflow, setShowOverflow] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [favoriteReciters, setFavoriteReciters] = useState<string[]>([]);
   const mistakeBtnRef = useRef<HTMLDivElement>(null);
   const [mistakeMenuPos, setMistakeMenuPos] = useState<{ top: number; left: number } | null>(null);
 
@@ -141,6 +144,7 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
 
   useEffect(() => {
     if (showReciterSelector && audioTab === 'reciters') {
+      setFavoriteReciters(loadFavoriteReciters());
       const t = setTimeout(() => {
         selectedReciterRef.current?.scrollIntoView({ block: 'center', behavior: 'instant' });
       }, 80);
@@ -945,43 +949,117 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
 
             {audioTab === 'reciters' ? (
               <div ref={reciterListRef} className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                {/* Favorites section — starred reciters pinned to the top */}
+                {(() => {
+                  const favReciters = favoriteReciters
+                    .map((id) => getReciterById(id))
+                    .filter((r): r is NonNullable<typeof r> => Boolean(r));
+                  if (favReciters.length === 0) return null;
+                  return (
+                    <div className="space-y-1">
+                      <div className="px-2 pt-1 pb-1 flex items-baseline gap-2 border-b border-border">
+                        <Star className="w-3 h-3 text-accent fill-accent" />
+                        <span className="text-[10px] font-semibold tracking-wider uppercase text-muted-foreground">Favorites</span>
+                      </div>
+                      {favReciters.map((reciter) => (
+                        <div
+                          key={`fav-${reciter.id}`}
+                          ref={selectedReciter === reciter.id ? selectedReciterRef : null}
+                          className={`flex items-center gap-1 rounded-[var(--radius-sm)] px-1 transition-colors ${
+                            selectedReciter === reciter.id
+                              ? 'bg-accent/10 border border-accent/20'
+                              : 'hover:bg-secondary'
+                          }`}
+                        >
+                          <Button
+                            variant="ghost"
+                            className="flex-1 justify-start h-auto py-2.5 rounded-[var(--radius-sm)] px-3 text-left transition-colors border-0"
+                            onClick={() => {
+                              onReciterChange(reciter.id);
+                              setShowReciterSelector(false);
+                            }}
+                          >
+                            <div className="flex flex-col items-start min-w-0 flex-1">
+                              <span className="truncate text-sm font-semibold text-foreground" title={reciter.englishName}>
+                                {reciter.englishName}
+                              </span>
+                              <span className="truncate text-xs text-muted-foreground mt-0.5" title={reciter.name} style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif" }}>
+                                {reciter.name}
+                              </span>
+                            </div>
+                          </Button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFavoriteReciters(toggleFavoriteReciter(reciter.id));
+                            }}
+                            className="size-7 flex items-center justify-center rounded-[var(--radius-xs)] text-accent hover:bg-accent/10 transition-colors flex-shrink-0"
+                            title="Remove from favorites"
+                            aria-label={`Remove ${reciter.englishName} from favorites`}
+                          >
+                            <Star className="w-4 h-4 fill-accent" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  );
+                })()}
+
                 {reciterGroups.map((group) => (
                   <div key={group.label} className="space-y-1">
                     <div className="px-2 pt-1 pb-1 flex items-baseline gap-2 border-b border-border">
                       <span className="text-[10px] font-semibold tracking-wider uppercase text-muted-foreground">{group.labelEn}</span>
                       <span className="text-[9px] text-muted-foreground/70 font-medium" style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif" }}>{group.label}</span>
                     </div>
-                    {group.reciters.map((reciter) => (
-                      <div
-                        key={reciter.id}
-                        ref={selectedReciter === reciter.id ? selectedReciterRef : null}
-                      >
-                        <Button
-                          variant="ghost"
-                          className={`w-full justify-start h-auto py-2.5 rounded-[var(--radius-sm)] px-4 text-left transition-colors ${
+                    {group.reciters.map((reciter) => {
+                      const isFav = favoriteReciters.includes(reciter.id);
+                      return (
+                        <div
+                          key={reciter.id}
+                          ref={selectedReciter === reciter.id ? selectedReciterRef : null}
+                          className={`flex items-center gap-1 rounded-[var(--radius-sm)] px-1 transition-colors ${
                             selectedReciter === reciter.id
-                              ? 'bg-accent/10 border border-accent/20 text-accent font-semibold'
-                              : 'hover:bg-secondary text-foreground'
+                              ? 'bg-accent/10 border border-accent/20'
+                              : 'hover:bg-secondary'
                           }`}
-                          onClick={() => {
-                            onReciterChange(reciter.id);
-                            setShowReciterSelector(false);
-                          }}
                         >
-                          <div className="flex flex-col items-start min-w-0 flex-1">
-                            <span className="truncate text-sm font-semibold text-foreground" title={reciter.englishName}>
-                              {reciter.englishName}
-                            </span>
-                            <span className="truncate text-xs text-muted-foreground mt-0.5" title={reciter.name} style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif" }}>
-                              {reciter.name}
-                            </span>
-                          </div>
-                          {selectedReciter === reciter.id && (
-                            <div className="ml-auto size-2 bg-accent rounded-full flex-shrink-0" />
-                          )}
-                        </Button>
-                      </div>
-                    ))}
+                          <Button
+                            variant="ghost"
+                            className={`flex-1 justify-start h-auto py-2.5 rounded-[var(--radius-sm)] px-3 text-left transition-colors border-0 ${
+                              selectedReciter === reciter.id ? 'text-accent font-semibold' : 'text-foreground'
+                            }`}
+                            onClick={() => {
+                              onReciterChange(reciter.id);
+                              setShowReciterSelector(false);
+                            }}
+                          >
+                            <div className="flex flex-col items-start min-w-0 flex-1">
+                              <span className="truncate text-sm font-semibold text-foreground" title={reciter.englishName}>
+                                {reciter.englishName}
+                              </span>
+                              <span className="truncate text-xs text-muted-foreground mt-0.5" title={reciter.name} style={{ fontFamily: "'UthmanicHafs_V22', 'Amiri', serif" }}>
+                                {reciter.name}
+                              </span>
+                            </div>
+                          </Button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFavoriteReciters(toggleFavoriteReciter(reciter.id));
+                            }}
+                            className={`size-7 flex items-center justify-center rounded-[var(--radius-xs)] transition-colors flex-shrink-0 ${
+                              isFav
+                                ? 'text-accent hover:bg-accent/10'
+                                : 'text-muted-foreground/50 hover:text-accent hover:bg-accent/10'
+                            }`}
+                            title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+                            aria-label={`${isFav ? 'Remove' : 'Add'} ${reciter.englishName} ${isFav ? 'from' : 'to'} favorites`}
+                          >
+                            <Star className={`w-4 h-4 ${isFav ? 'fill-accent' : ''}`} />
+                          </button>
+                        </div>
+                      );
+                    })}
                   </div>
                 ))}
               </div>

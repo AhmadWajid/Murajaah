@@ -306,6 +306,36 @@ export const loadSelectedReciter = (): string => {
   return 'Ayman_Sowaid_64kbps';
 };
 
+// Favorite reciters storage (UI preference, localStorage only)
+const FAVORITE_RECITERS_KEY = 'mquran_favorite_reciters';
+
+export const loadFavoriteReciters = (): string[] => {
+  if (typeof window !== 'undefined') {
+    try {
+      const raw = localStorage.getItem(FAVORITE_RECITERS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    } catch {
+      return [];
+    }
+  }
+  return [];
+};
+
+export const saveFavoriteReciters = (ids: string[]) => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(FAVORITE_RECITERS_KEY, JSON.stringify(ids));
+  }
+};
+
+export const toggleFavoriteReciter = (reciterId: string): string[] => {
+  const current = loadFavoriteReciters();
+  const next = current.includes(reciterId)
+    ? current.filter((id) => id !== reciterId)
+    : [...current, reciterId];
+  saveFavoriteReciters(next);
+  return next;
+};
+
 export const removeMistake = (surahNumber: number, ayahNumber: number) => {
   const mistakes = getMistakes();
   const key = `${surahNumber}:${ayahNumber}`;
