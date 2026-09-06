@@ -88,8 +88,7 @@ function QuranPageContent() {
   const [selectedAyahs, setSelectedAyahs] = useState<Set<{surah: number, ayah: number}>>(new Set());
   const [openReviewDropdown, setOpenReviewDropdown] = useState<string | null>(null);
   const [showEnhancedModal, setShowEnhancedModal] = useState(false);
-  const [arabicTexts, setArabicTexts] = useState<Record<string, string>>({});
-  const [previousArabicTexts, setPreviousArabicTexts] = useState<Record<string, string>>({});
+
   
   const [reviewsOnCurrentPage, setReviewsOnCurrentPage] = useState<ReviewItem[]>([]);
   
@@ -254,19 +253,44 @@ function QuranPageContent() {
     loadInitialPage();
   }, [searchParams, isInitialized]);
 
+  // Load surah list once on mount — it never changes
+  useEffect(() => {
+    loadSurahList();
+  }, []);
+
   useEffect(() => {
     if (!isInitialized) return;
-    
-    loadSurahList();
+
     loadPageData(currentPage);
   }, [currentPage, isInitialized]);
 
-  // Reload page data when layout mode changes to handle previous page loading
+  // When layout mode changes, only fetch/clear the adjacent page instead
+  // of reloading the entire current page (which is already loaded).
   useEffect(() => {
     if (!isInitialized || !pageData) return;
-    
-    // Reload page data to handle previous page loading for spread mode
-    loadPageData(currentPage);
+
+    if (layoutMode === 'spread') {
+      // Fetch only the adjacent page
+      const isOddPage = currentPage % 2 === 1;
+      const adjacentPage = isOddPage ? currentPage + 1 : currentPage - 1;
+      if (adjacentPage >= 1 && adjacentPage <= TOTAL_QURAN_PAGES) {
+        Promise.all([
+          getPage(adjacentPage, 'quran-uthmani'),
+          fetchPageWithTranslation(adjacentPage, selectedTranslation),
+        ]).then(([adjArabic, adjTranslation]) => {
+          const adjacentCombinedAyahs = adjArabic.ayahs.map((arabicAyah: any, index: number) => ({
+            ...arabicAyah,
+            translation: adjTranslation?.data?.ayahs?.[index]?.text || '',
+          }));
+          setPreviousPageData({ ...adjArabic, ayahs: adjacentCombinedAyahs });
+        }).catch(() => setPreviousPageData(null));
+      } else {
+        setPreviousPageData(null);
+      }
+    } else {
+      setPreviousPageData(null);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layoutMode, isInitialized]);
 
   // Handle translation changes separately to avoid full page reload
@@ -608,55 +632,53 @@ function QuranPageContent() {
   const loadPageData = async (page: number) => {
     setLoading(true);
     try {
-      // Load current page with Arabic text
-      const arabicPageData = await getPage(page, 'quran-uthmani');
-      const translationPageData = await fetchPageWithTranslation(page, selectedTranslation);
-      
-      // Combine Arabic and translation data
+      // Determine if we need the adjacent page for spread layout
+      const isOddPage = page % 2 === 1;
+      const adjacentPage = layoutMode === 'spread'
+        ? (isOddPage ? page + 1 : page - 1)
+        : null;
+      const needAdjacent = adjacentPage !== null && adjacentPage >= 1 && adjacentPage <= TOTAL_QURAN_PAGES;
+
+      // Fetch current page Arabic + translation in parallel, and also
+      // fetch the adjacent page in parallel if in spread mode.
+      const [arabicPageData, translationPageData, adjacentResult] = await Promise.all([
+        getPage(page, 'quran-uthmani'),
+        fetchPageWithTranslation(page, selectedTranslation),
+        needAdjacent && adjacentPage !== null
+          ? Promise.all([
+              getPage(adjacentPage, 'quran-uthmani'),
+              fetchPageWithTranslation(adjacentPage, selectedTranslation),
+            ]).then(([a, t]) => ({ arabic: a, translation: t }))
+          : Promise.resolve(null),
+      ]);
+
+      // Combine Arabic and translation data for current page
       const combinedAyahs = arabicPageData.ayahs.map((arabicAyah: any, index: number) => ({
         ...arabicAyah,
         translation: translationPageData?.data?.ayahs?.[index]?.text || '',
       }));
-      
+
       const pageData = {
         number: page,
         ayahs: combinedAyahs
       };
-      
+
       setPageData(pageData);
-      
 
-      
-      // Load adjacent page for spread layout (like a real mushaf)
-      // Odd pages are on the right, even pages are on the left
-      // If current page is odd → fetch next page (even) for the left side
-      // If current page is even → fetch previous page (odd) for the right side
-      if (layoutMode === 'spread') {
-        const isOddPage = page % 2 === 1;
-        const adjacentPage = isOddPage ? page + 1 : page - 1;
-
-        if (adjacentPage >= 1 && adjacentPage <= TOTAL_QURAN_PAGES) {
-          const adjacentArabicPageData = await getPage(adjacentPage, 'quran-uthmani');
-          const adjacentTranslationPageData = await fetchPageWithTranslation(adjacentPage, selectedTranslation);
-
-          const adjacentCombinedAyahs = adjacentArabicPageData.ayahs.map((arabicAyah: any, index: number) => ({
-            ...arabicAyah,
-            translation: adjacentTranslationPageData?.data?.ayahs?.[index]?.text || '',
-          }));
-
-          const adjacentPageData = {
-            ...adjacentArabicPageData,
-            ayahs: adjacentCombinedAyahs
-          };
-
-          setPreviousPageData(adjacentPageData);
-        } else {
-          setPreviousPageData(null);
-        }
+      // Set adjacent page data (or clear it)
+      if (adjacentResult) {
+        const adjacentCombinedAyahs = adjacentResult.arabic.ayahs.map((arabicAyah: any, index: number) => ({
+          ...arabicAyah,
+          translation: adjacentResult.translation?.data?.ayahs?.[index]?.text || '',
+        }));
+        setPreviousPageData({
+          ...adjacentResult.arabic,
+          ayahs: adjacentCombinedAyahs,
+        });
       } else {
         setPreviousPageData(null);
       }
-      
+
       // Update current surah and ayah based on the first ayah of the page
       if (pageData.ayahs && pageData.ayahs.length > 0) {
         const firstAyah = pageData.ayahs[0];
@@ -665,51 +687,11 @@ function QuranPageContent() {
           setCurrentAyah(firstAyah.numberInSurah);
         }
       }
-      
-      // Load Arabic texts for the current page
-      await loadArabicTexts(page);
-      
-      // Load Arabic texts for the previous page if in spread mode
-      if (layoutMode === 'spread' && page > 1) {
-        await loadPreviousArabicTexts(page - 1);
-      }
-      
+
     } catch (error) {
       console.error('Error loading page data:', error);
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadArabicTexts = async (pageNumber: number) => {
-    try {
-      const arabicPageData = await getPage(pageNumber, 'quran-uthmani');
-      const texts: Record<string, string> = {};
-      
-      arabicPageData.ayahs.forEach((ayah: any) => {
-        const key = `${ayah.surah.number}:${ayah.numberInSurah}`;
-        texts[key] = ayah.text;
-      });
-      
-      setArabicTexts(texts);
-    } catch (error) {
-      console.error('Error loading Arabic texts:', error);
-    }
-  };
-
-  const loadPreviousArabicTexts = async (pageNumber: number) => {
-    try {
-      const arabicPageData = await getPage(pageNumber, 'quran-uthmani');
-      const texts: Record<string, string> = {};
-      
-      arabicPageData.ayahs.forEach((ayah: any) => {
-        const key = `${ayah.surah.number}:${ayah.numberInSurah}`;
-        texts[key] = ayah.text;
-      });
-      
-      setPreviousArabicTexts(texts);
-    } catch (error) {
-      console.error('Error loading previous Arabic texts:', error);
     }
   };
 
@@ -1466,26 +1448,23 @@ function QuranPageContent() {
   useEffect(() => {
     async function fetchWordByWord() {
       try {
-        // Skip fetching if word-by-word is disabled
         if (!showWordByWordTooltip) {
           setWordByWordData([]);
           return;
         }
-        
+
         const pagesToFetch = [currentPage];
         if (layoutMode === 'spread' && previousPageData?.number) {
           pagesToFetch.push(previousPageData.number);
         }
-        
+
+        // Fetch all pages in parallel
+        const results = await Promise.all(
+          pagesToFetch.map(p => fetch(`/api/wordbyword?page=${p}`).then(res => res.ok ? res.json() : null).catch(() => null))
+        );
         const allWords: any[] = [];
-        for (const p of pagesToFetch) {
-          const res = await fetch(`/api/wordbyword?page=${p}`);
-          if (res.ok) {
-            const data = await res.json();
-            if (data.words) {
-              allWords.push(...data.words);
-            }
-          }
+        for (const data of results) {
+          if (data?.words) allWords.push(...data.words);
         }
         setWordByWordData(allWords);
       } catch {
@@ -1624,8 +1603,6 @@ function QuranPageContent() {
         previousPageData={previousPageData}
         layoutMode={layoutMode}
         currentPage={currentPage}
-        arabicTexts={arabicTexts}
-        previousArabicTexts={previousArabicTexts}
         showTranslation={showTranslation}
         memorizationItems={memorizationItems}
         highlightedRange={highlightedRange}

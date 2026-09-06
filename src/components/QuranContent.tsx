@@ -131,8 +131,6 @@ interface QuranContentProps {
   previousPageData: any;
   layoutMode: 'spread' | 'single';
   currentPage: number;
-  arabicTexts: Record<string, string>;
-  previousArabicTexts: Record<string, string>;
   showTranslation: boolean;
   memorizationItems: any[];
   highlightedRange: { surah: number; start: number; end: number } | null;
@@ -173,8 +171,6 @@ export default function QuranContent({
   previousPageData,
   layoutMode,
   currentPage,
-  arabicTexts,
-  previousArabicTexts,
   showTranslation,
   memorizationItems,
   highlightedRange,
