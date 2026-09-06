@@ -337,8 +337,8 @@ export default function AyahCard({
   // Check if this ayah has been marked as a mistake
   const mistakeKey = `${surahNumber}:${ayahNumber}`;
   // Use local state for immediate feedback, fallback to props for initial state
-  const hasMistake = localMistakeState[mistakeKey] !== undefined 
-    ? localMistakeState[mistakeKey] 
+  const hasMistake = localMistakeState[mistakeKey] !== undefined
+    ? localMistakeState[mistakeKey]
     : (mistakes[mistakeKey] || false);
   const isMistakeHidden = hasMistake && hideMistakes;
 
@@ -353,7 +353,11 @@ export default function AyahCard({
       return { ...prev, [mistakeKey]: propValue };
     });
   }, [mistakes, mistakeKey]);
-  const isRevealed = revealedMistakes.has(mistakeKey);
+
+  // Reveal is only meaningful while the mistake is still marked.
+  // If the mistake is unmarked, the reveal state is irrelevant — the
+  // verse shows normally. If re-marked, it should hide again (clean state).
+  const isRevealed = hasMistake && revealedMistakes.has(mistakeKey);
   const shouldShowHidden = isMistakeHidden && !isRevealed;
 
   // Check if this is the first ayah of a surah (except Al-Fatiha and Al-Tawbah)

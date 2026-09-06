@@ -1139,6 +1139,14 @@ function QuranPageContent() {
 
   const handleToggleMistake = async (surahNumber: number, ayahNumber: number) => {
     const mistakeKey = `${surahNumber}:${ayahNumber}`;
+    // Clear any reveal state for this ayah — toggling the mistake should
+    // reset the hidden/revealed view to a clean state.
+    setRevealedMistakes(prev => {
+      if (!prev.has(mistakeKey)) return prev;
+      const next = new Set(prev);
+      next.delete(mistakeKey);
+      return next;
+    });
     // Optimistically update mistakes state so the UI (header nav, overlays)
     // reflects the change immediately without waiting for the async refresh.
     const wasMarked = Boolean(mistakes[mistakeKey]);
@@ -1178,6 +1186,12 @@ function QuranPageContent() {
     const mistakeKey = `${surahNumber}:${ayahNumber}`;
     setRevealedMistakes(prev => new Set([...prev, mistakeKey]));
   };
+
+  // Clear revealed mistakes when the page changes — stale reveals from
+  // other pages are meaningless and would cause hidden verses to show.
+  useEffect(() => {
+    setRevealedMistakes(new Set());
+  }, [currentPage]);
 
   const getReviewsOnCurrentPage = async (currentPageData: PageData): Promise<ReviewItem[]> => {
     if (!currentPageData || !currentPageData.ayahs) return [];
