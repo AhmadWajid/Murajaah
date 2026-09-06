@@ -1016,7 +1016,7 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                       return (
                         <div
                           key={reciter.id}
-                          ref={selectedReciter === reciter.id ? selectedReciterRef : null}
+                          ref={selectedReciter === reciter.id && !isFav ? selectedReciterRef : null}
                           className={`flex items-center gap-1 rounded-[var(--radius-sm)] px-1 transition-colors ${
                             selectedReciter === reciter.id
                               ? 'bg-accent/10 border border-accent/20'
