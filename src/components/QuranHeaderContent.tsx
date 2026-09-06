@@ -61,6 +61,7 @@ interface QuranHeaderContentProps {
   currentAyah?: number;
   onNavigateToNextMistake?: (surahNumber: number, ayahNumber: number) => void;
   pageData?: any;
+  mistakes?: Record<string, MistakeData | boolean>;
   selectedLanguage: string;
   selectedTranslation: string;
   onLanguageChange: (lang: string) => void;
@@ -102,6 +103,7 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
     currentAyah = 1,
     onNavigateToNextMistake,
     pageData,
+    mistakes = {},
     onLanguageChange,
     onTranslationChange,
   } = props;
@@ -184,7 +186,7 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
       }
     };
     loadMistakes();
-  }, [currentSurah, currentAyah, pageData]);
+  }, [currentSurah, currentAyah, pageData, mistakes]);
 
   useEffect(() => {
     const loadTranslations = async () => {

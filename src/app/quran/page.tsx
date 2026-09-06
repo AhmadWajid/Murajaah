@@ -1568,6 +1568,7 @@ function QuranPageContent() {
             currentAyah={currentAyah}
             onNavigateToNextMistake={handleNavigateToAyah}
             pageData={pageData}
+            mistakes={mistakes}
             readingLayout={readingLayout}
             onReadingLayoutChange={setReadingLayout}
           />
