@@ -667,7 +667,7 @@ export default function QuranContent({
                         }
                       }
 
-                      const shouldShowTranslationTooltip = hoveredTajweedWordId15 !== String(wordId);
+                      const shouldShowTranslationTooltip = true;
 
                       const isWordVisible = visibleWordIds15.has(String(wordId));
 

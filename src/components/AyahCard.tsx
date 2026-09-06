@@ -344,12 +344,14 @@ export default function AyahCard({
 
   // Sync local state with props when mistakes change
   useEffect(() => {
-    if (mistakes[mistakeKey] !== undefined) {
-      setLocalMistakeState(prev => ({
-        ...prev,
-        [mistakeKey]: Boolean(mistakes[mistakeKey])
-      }));
-    }
+    const propValue = Boolean(mistakes[mistakeKey]);
+    setLocalMistakeState(prev => {
+      // Only update if the prop value differs from what we have locally.
+      // This keeps instant feedback (optimistic toggle) while ensuring we
+      // converge to the server state once the async refresh completes.
+      if (prev[mistakeKey] === propValue) return prev;
+      return { ...prev, [mistakeKey]: propValue };
+    });
   }, [mistakes, mistakeKey]);
   const isRevealed = revealedMistakes.has(mistakeKey);
   const shouldShowHidden = isMistakeHidden && !isRevealed;

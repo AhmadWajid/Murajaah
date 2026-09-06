@@ -454,7 +454,7 @@ export function TajweedAyahText({
       // No tajweed rules, just render the word (with translation tooltip if enabled)
       if (showWordByWordTooltip && translation) {
         const wordId = String(word.id);
-        const shouldShowTooltip = isMobile ? clickedWordId === wordId : hoveredTajweedWordId !== wordId;
+        const shouldShowTooltip = isMobile ? clickedWordId === wordId : true;
 
         return (
           <span
@@ -595,7 +595,7 @@ export function TajweedAyahText({
     // If translation tooltip is enabled, wrap the whole word in a tooltip container
     if (showWordByWordTooltip && translation) {
       const wordId = String(word.id);
-      const shouldShowTooltip = isMobile ? clickedWordId === wordId : hoveredTajweedWordId !== wordId;
+      const shouldShowTooltip = isMobile ? clickedWordId === wordId : true;
 
       return (
         <span

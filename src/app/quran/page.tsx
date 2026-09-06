@@ -1138,14 +1138,38 @@ function QuranPageContent() {
   };
 
   const handleToggleMistake = async (surahNumber: number, ayahNumber: number) => {
+    const mistakeKey = `${surahNumber}:${ayahNumber}`;
+    // Optimistically update mistakes state so the UI (header nav, overlays)
+    // reflects the change immediately without waiting for the async refresh.
+    const wasMarked = Boolean(mistakes[mistakeKey]);
+    setMistakes(prev => {
+      const next = { ...prev };
+      if (wasMarked) {
+        delete next[mistakeKey];
+      } else {
+        next[mistakeKey] = {
+          timestamp: new Date().toISOString(),
+          surah: surahNumber,
+          ayah: ayahNumber,
+        };
+      }
+      return next;
+    });
     try {
-      // Perform the actual toggle operation
       await toggleMistake(surahNumber, ayahNumber);
-      // Refresh to ensure consistency with server
       refreshMistakesOnly();
     } catch (error) {
       console.error('Error toggling mistake:', error);
-      // Refresh to ensure consistency on error
+      // Revert optimistic update on error
+      setMistakes(prev => {
+        const next = { ...prev };
+        if (wasMarked) {
+          next[mistakeKey] = { timestamp: new Date().toISOString(), surah: surahNumber, ayah: ayahNumber };
+        } else {
+          delete next[mistakeKey];
+        }
+        return next;
+      });
       refreshMistakesOnly();
     }
   };
