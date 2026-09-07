@@ -317,6 +317,12 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
   const [familiarity, setFamiliarity] = useState<FamiliarityLevel>(deriveFamiliarity(item));
   const [formError, setFormError] = useState<string | null>(null);
   const wasBeginner = item.isBeginner || false;
+  // String state for number inputs so they can be freely edited
+  const [surahStr, setSurahStr] = useState(String(item.surah));
+  const [ayahStartStr, setAyahStartStr] = useState(String(item.ayahStart));
+  const [ayahEndStr, setAyahEndStr] = useState(String(item.ayahEnd));
+  const [intervalStr, setIntervalStr] = useState(String(item.interval));
+  const [reviewCountStr, setReviewCountStr] = useState(String(item.reviewCount));
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -383,32 +389,69 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
             <div>
               <label className="block text-xs text-muted-foreground mb-1">Surah #</label>
               <input
-                type="number"
-                value={formData.surah}
-                onChange={(e) => setFormData({ ...formData, surah: parseInt(e.target.value) })}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={surahStr}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/[^0-9]/g, '');
+                  setSurahStr(raw);
+                  const v = parseInt(raw);
+                  if (!isNaN(v)) setFormData({ ...formData, surah: v });
+                }}
+                onBlur={() => {
+                  const v = parseInt(surahStr);
+                  if (isNaN(v) || v < 1) { setSurahStr('1'); setFormData({ ...formData, surah: 1 }); }
+                  else if (v > 114) { setSurahStr('114'); setFormData({ ...formData, surah: 114 }); }
+                  else setSurahStr(String(v));
+                }}
+                onFocus={(e) => e.target.select()}
                 className="w-full p-2 border rounded-md text-sm"
-                min="1"
-                max="114"
               />
             </div>
             <div>
               <label className="block text-xs text-muted-foreground mb-1">From Ayah</label>
               <input
-                type="number"
-                value={formData.ayahStart}
-                onChange={(e) => setFormData({ ...formData, ayahStart: parseInt(e.target.value) })}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={ayahStartStr}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/[^0-9]/g, '');
+                  setAyahStartStr(raw);
+                  const v = parseInt(raw);
+                  if (!isNaN(v)) setFormData({ ...formData, ayahStart: v });
+                }}
+                onBlur={() => {
+                  const v = parseInt(ayahStartStr);
+                  if (isNaN(v) || v < 1) { setAyahStartStr('1'); setFormData({ ...formData, ayahStart: 1 }); }
+                  else setAyahStartStr(String(v));
+                }}
+                onFocus={(e) => e.target.select()}
                 className="w-full p-2 border rounded-md text-sm"
-                min="1"
               />
             </div>
             <div>
               <label className="block text-xs text-muted-foreground mb-1">To Ayah</label>
               <input
-                type="number"
-                value={formData.ayahEnd}
-                onChange={(e) => setFormData({ ...formData, ayahEnd: parseInt(e.target.value) })}
+                type="text"
+                inputMode="numeric"
+                pattern="[0-9]*"
+                value={ayahEndStr}
+                onChange={(e) => {
+                  const raw = e.target.value.replace(/[^0-9]/g, '');
+                  setAyahEndStr(raw);
+                  const v = parseInt(raw);
+                  if (!isNaN(v)) setFormData({ ...formData, ayahEnd: v });
+                }}
+                onBlur={() => {
+                  const v = parseInt(ayahEndStr);
+                  const min = formData.ayahStart || 1;
+                  if (isNaN(v) || v < min) { setAyahEndStr(String(min)); setFormData({ ...formData, ayahEnd: min }); }
+                  else setAyahEndStr(String(v));
+                }}
+                onFocus={(e) => e.target.select()}
                 className="w-full p-2 border rounded-md text-sm"
-                min={formData.ayahStart}
               />
             </div>
           </div>
@@ -417,11 +460,23 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
         <div>
         <label className="block text-sm font-medium mb-2">Days until next review</label>
           <input
-            type="number"
-          value={formData.interval}
-          onChange={(e) => setFormData({ ...formData, interval: parseInt(e.target.value) })}
-          className="w-full p-2 border rounded-md"
-            min="1"
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={intervalStr}
+            onChange={(e) => {
+              const raw = e.target.value.replace(/[^0-9]/g, '');
+              setIntervalStr(raw);
+              const v = parseInt(raw);
+              if (!isNaN(v)) setFormData({ ...formData, interval: v });
+            }}
+            onBlur={() => {
+              const v = parseInt(intervalStr);
+              if (isNaN(v) || v < 1) { setIntervalStr('1'); setFormData({ ...formData, interval: 1 }); }
+              else setIntervalStr(String(v));
+            }}
+            onFocus={(e) => e.target.select()}
+            className="w-full p-2 border rounded-md"
           />
         </div>
         <div>
@@ -436,11 +491,23 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
         <div>
         <label className="block text-sm font-medium mb-2">Total reviews completed</label>
           <input
-            type="number"
-            value={formData.reviewCount}
-            onChange={(e) => setFormData({ ...formData, reviewCount: Math.max(0, parseInt(e.target.value) || 0) })}
+            type="text"
+            inputMode="numeric"
+            pattern="[0-9]*"
+            value={reviewCountStr}
+            onChange={(e) => {
+              const raw = e.target.value.replace(/[^0-9]/g, '');
+              setReviewCountStr(raw);
+              const v = parseInt(raw);
+              if (!isNaN(v)) setFormData({ ...formData, reviewCount: Math.max(0, v) });
+            }}
+            onBlur={() => {
+              const v = parseInt(reviewCountStr);
+              if (isNaN(v) || v < 0) { setReviewCountStr('0'); setFormData({ ...formData, reviewCount: 0 }); }
+              else setReviewCountStr(String(v));
+            }}
+            onFocus={(e) => e.target.select()}
             className="w-full p-2 border rounded-md"
-            min="0"
           />
           <p className="text-xs text-muted-foreground mt-1">Update this if you reviewed outside the app</p>
         </div>

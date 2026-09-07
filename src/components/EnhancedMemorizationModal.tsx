@@ -75,6 +75,11 @@ export default function EnhancedMemorizationModal({
   const [surahContainerRef, setSurahContainerRef] = useState<HTMLDivElement | null>(null);
   const [nameEdited, setNameEdited] = useState(false);
   const [descriptionEdited, setDescriptionEdited] = useState(false);
+  // String-based input state so users can freely type/clear/edit numbers
+  const [customStartStr, setCustomStartStr] = useState('1');
+  const [customEndStr, setCustomEndStr] = useState('1');
+  const [rangeStartStr, setRangeStartStr] = useState('1');
+  const [rangeEndStr, setRangeEndStr] = useState('1');
   const [selectedSurah, setSelectedSurah] = useState<number | null>(null);
 
   // Custom mode state (replaces QuranSelector integration)
@@ -93,6 +98,8 @@ export default function EnhancedMemorizationModal({
       setCustomSurah(currentSurah || 1);
       setCustomAyahStart(1);
       setCustomAyahEnd(1);
+      setCustomStartStr('1');
+      setCustomEndStr('1');
       return;
     }
     if (pageData?.ayahs?.length > 0) {
@@ -109,7 +116,11 @@ export default function EnhancedMemorizationModal({
         );
         setSelectedSurah(ayahObj?.surah?.number ?? defaultSurah);
         const sorted = Array.from(externalSelectedAyahs).sort((a, b) => a.ayah - b.ayah);
-        setCustomRange({ start: sorted[0].ayah, end: sorted[sorted.length - 1].ayah });
+        const s = sorted[0].ayah;
+        const e = sorted[sorted.length - 1].ayah;
+        setCustomRange({ start: s, end: e });
+        setRangeStartStr(String(s));
+        setRangeEndStr(String(e));
       } else {
         setSelectionType('page');
         setSelectedSurah(defaultSurah);
@@ -181,7 +192,11 @@ export default function EnhancedMemorizationModal({
   useEffect(() => {
     if (selectionType === 'ayahs' && selectedAyahs.size > 0) {
       const sorted = Array.from(selectedAyahs).sort((a, b) => a.ayah - b.ayah);
-      setCustomRange({ start: sorted[0].ayah, end: sorted[sorted.length - 1].ayah });
+      const s = sorted[0].ayah;
+      const e = sorted[sorted.length - 1].ayah;
+      setCustomRange({ start: s, end: e });
+      setRangeStartStr(String(s));
+      setRangeEndStr(String(e));
     }
   }, [selectedAyahs, selectionType]);
 
@@ -222,6 +237,8 @@ export default function EnhancedMemorizationModal({
     setCustomSurah(surah);
     setCustomAyahStart(1);
     setCustomAyahEnd(1);
+    setCustomStartStr('1');
+    setCustomEndStr('1');
     setNameEdited(false);
     setDescriptionEdited(false);
   };
@@ -556,14 +573,22 @@ export default function EnhancedMemorizationModal({
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">Start</Label>
                     <Input
-                      type="number"
-                      min={1}
-                      max={fullSurahData?.ayahs?.length || 1}
-                      value={customRange.start || ''}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={rangeStartStr}
                       onChange={(e) => {
-                        const v = parseInt(e.target.value);
-                        if (!isNaN(v)) handleRangeChange('start', v);
-                        else if (e.target.value === '') handleRangeChange('start', 1);
+                        const raw = e.target.value.replace(/[^0-9]/g, '');
+                        setRangeStartStr(raw);
+                        const v = parseInt(raw);
+                        if (!isNaN(v) && v >= 1) handleRangeChange('start', v);
+                      }}
+                      onBlur={() => {
+                        const v = parseInt(rangeStartStr);
+                        const max = fullSurahData?.ayahs?.length || 1;
+                        if (isNaN(v) || v < 1) { setRangeStartStr('1'); handleRangeChange('start', 1); }
+                        else if (v > max) { setRangeStartStr(String(max)); handleRangeChange('start', max); }
+                        else setRangeStartStr(String(v));
                       }}
                       onFocus={(e) => e.target.select()}
                     />
@@ -571,14 +596,23 @@ export default function EnhancedMemorizationModal({
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">End</Label>
                     <Input
-                      type="number"
-                      min={customRange.start || 1}
-                      max={fullSurahData?.ayahs?.length || 1}
-                      value={customRange.end || ''}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={rangeEndStr}
                       onChange={(e) => {
-                        const v = parseInt(e.target.value);
-                        if (!isNaN(v)) handleRangeChange('end', v);
-                        else if (e.target.value === '') handleRangeChange('end', customRange.start || 1);
+                        const raw = e.target.value.replace(/[^0-9]/g, '');
+                        setRangeEndStr(raw);
+                        const v = parseInt(raw);
+                        if (!isNaN(v) && v >= 1) handleRangeChange('end', v);
+                      }}
+                      onBlur={() => {
+                        const v = parseInt(rangeEndStr);
+                        const max = fullSurahData?.ayahs?.length || 1;
+                        const minStart = customRange.start || 1;
+                        if (isNaN(v) || v < minStart) { setRangeEndStr(String(minStart)); handleRangeChange('end', minStart); }
+                        else if (v > max) { setRangeEndStr(String(max)); handleRangeChange('end', max); }
+                        else setRangeEndStr(String(v));
                       }}
                       onFocus={(e) => e.target.select()}
                     />
@@ -665,18 +699,26 @@ export default function EnhancedMemorizationModal({
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">Start</Label>
                     <Input
-                      type="number"
-                      min={1}
-                      max={customMaxAyahs}
-                      value={customAyahStart || ''}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={customStartStr}
                       onChange={(e) => {
-                        const v = parseInt(e.target.value);
-                        if (!isNaN(v)) {
+                        const raw = e.target.value.replace(/[^0-9]/g, '');
+                        setCustomStartStr(raw);
+                        const v = parseInt(raw);
+                        if (!isNaN(v) && v >= 1) {
                           setCustomAyahStart(v);
-                          if (v > customAyahEnd) setCustomAyahEnd(v);
+                          if (v > customAyahEnd) { setCustomAyahEnd(v); setCustomEndStr(String(v)); }
                           setNameEdited(false);
                           setDescriptionEdited(false);
                         }
+                      }}
+                      onBlur={() => {
+                        const v = parseInt(customStartStr);
+                        if (isNaN(v) || v < 1) { setCustomStartStr('1'); setCustomAyahStart(1); }
+                        else if (v > customMaxAyahs) { setCustomStartStr(String(customMaxAyahs)); setCustomAyahStart(customMaxAyahs); }
+                        else setCustomStartStr(String(v));
                       }}
                       onFocus={(e) => e.target.select()}
                     />
@@ -684,17 +726,26 @@ export default function EnhancedMemorizationModal({
                   <div className="space-y-1">
                     <Label className="text-[11px] text-muted-foreground">End</Label>
                     <Input
-                      type="number"
-                      min={customAyahStart || 1}
-                      max={customMaxAyahs}
-                      value={customAyahEnd || ''}
+                      type="text"
+                      inputMode="numeric"
+                      pattern="[0-9]*"
+                      value={customEndStr}
                       onChange={(e) => {
-                        const v = parseInt(e.target.value);
-                        if (!isNaN(v)) {
+                        const raw = e.target.value.replace(/[^0-9]/g, '');
+                        setCustomEndStr(raw);
+                        const v = parseInt(raw);
+                        if (!isNaN(v) && v >= 1) {
                           setCustomAyahEnd(v);
                           setNameEdited(false);
                           setDescriptionEdited(false);
                         }
+                      }}
+                      onBlur={() => {
+                        const v = parseInt(customEndStr);
+                        const minStart = customAyahStart || 1;
+                        if (isNaN(v) || v < minStart) { setCustomEndStr(String(minStart)); setCustomAyahEnd(minStart); }
+                        else if (v > customMaxAyahs) { setCustomEndStr(String(customMaxAyahs)); setCustomAyahEnd(customMaxAyahs); }
+                        else setCustomEndStr(String(v));
                       }}
                       onFocus={(e) => e.target.select()}
                     />
