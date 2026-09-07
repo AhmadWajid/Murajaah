@@ -35,6 +35,10 @@ function convertDbItemToMemorizationItem(dbItem: DbMemorizationItem): Memorizati
     name: dbItem.name || undefined,
     description: dbItem.description || undefined,
     tags: dbItem.tags || undefined,
+    isBeginner: (dbItem as any).is_beginner || undefined,
+    beginnerStartedAtReview: (dbItem as any).beginner_started_at_review || undefined,
+    stability: (dbItem as any).stability || undefined,
+    difficulty: (dbItem as any).difficulty || undefined,
   };
 }
 
@@ -62,7 +66,11 @@ function convertMemorizationItemToDbItem(item: MemorizationItem, userId: string)
     name: item.name || null,
     description: item.description || null,
     tags: item.tags || [],
-  };
+    ...((item.isBeginner !== undefined) ? { is_beginner: item.isBeginner } : {}),
+    ...((item.beginnerStartedAtReview !== undefined) ? { beginner_started_at_review: item.beginnerStartedAtReview } : {}),
+    ...((item.stability !== undefined) ? { stability: item.stability } : {}),
+    ...((item.difficulty !== undefined) ? { difficulty: item.difficulty } : {}),
+  } as Database['public']['Tables']['memorization_items']['Insert'];
 }
 
 // =============================================

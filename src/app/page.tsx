@@ -1,18 +1,19 @@
 'use client';
 
-import { useState, useEffect, useMemo, useCallback, useTransition } from 'react';
+import { useState, useEffect, useMemo, useCallback, useTransition, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getAllMemorizationItems, updateMemorizationItem, removeMemorizationItem, cleanupDuplicateItems, getMistakesList, removeMistake, addMemorizationItem, batchUpdateMemorizationItems } from '@/lib/storageService';
 import { MistakeData } from '@/lib/supabase/database';
 import { generateMemorizationId, getTodayISODate } from '@/lib/utils';
-import { MemorizationItem, updateInterval, resetDailyCompletions, getDueItems, getUpcomingReviews } from '@/lib/spacedRepetition';
+import { MemorizationItem, updateInterval, updateIntervalWithSettings, resetDailyCompletions, getDueItems, getUpcomingReviews } from '@/lib/spacedRepetition';
+import { ReviewSettings, getReviewSettings, saveReviewSettings, previewIntervals, ALGORITHM_INFO, AlgorithmType, DEFAULT_SETTINGS } from '@/lib/reviewAlgorithms';
 import { formatAyahRange, formatAyahRangeArabic, getSurahName, getSurahNameArabic } from '@/lib/quran';
 import { getSurahList, SurahListItem } from '@/lib/quranService';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronRight, Trash2, CheckCircle, Edit, Loader2, X, AlertTriangle, Calendar, Clock, BookOpen, Target, MoreVertical, Zap } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, CheckCircle, Edit, Loader2, X, AlertTriangle, Calendar, Clock, BookOpen, Target, MoreVertical, Zap, Settings, Sparkles, GraduationCap } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import AppHeader from '@/components/AppHeader';
 import ReviewCard from '@/components/ReviewCard';
@@ -60,6 +61,8 @@ function ReviewRow({
   onDelete: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0 });
+  const menuBtnRef = useRef<HTMLButtonElement>(null);
   const englishName = getSurahName(item.surah);
   const arabicName = getSurahNameArabic(item.surah);
   const ayahLabel = item.ayahStart === item.ayahEnd ? `Ayah ${item.ayahStart}` : `Ayahs ${item.ayahStart}-${item.ayahEnd}`;
@@ -87,6 +90,7 @@ function ReviewRow({
         </div>
         <p className="text-xs text-muted-foreground mt-0.5 truncate">
           {ayahLabel} · {item.interval}d · {item.reviewCount} {item.reviewCount === 1 ? 'review' : 'reviews'}
+          {item.isBeginner && ' · Learning'}
         </p>
       </div>
 
@@ -97,11 +101,19 @@ function ReviewRow({
           Done
         </span>
       ) : (
-        <span className={`text-xs font-semibold px-2 py-1 rounded-[var(--radius-sm)] flex-shrink-0 ${
-          isOverdue ? 'text-destructive bg-destructive/15' : 'text-accent bg-accent/15'
-        }`}>
-          {isOverdue ? 'Overdue' : 'Due'}
-        </span>
+        <div className="flex items-center gap-1.5 flex-shrink-0">
+          {item.isBeginner && (
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-accent bg-accent/15 px-2 py-1 rounded-[var(--radius-sm)]">
+              <GraduationCap className="w-3 h-3" />
+              Learning
+            </span>
+          )}
+          <span className={`text-xs font-semibold px-2 py-1 rounded-[var(--radius-sm)] ${
+            isOverdue ? 'text-destructive bg-destructive/15' : 'text-accent bg-accent/15'
+          }`}>
+            {isOverdue ? 'Overdue' : 'Due'}
+          </span>
+        </div>
       )}
 
       {/* Primary action: Review */}
@@ -114,8 +126,17 @@ function ReviewRow({
       {/* Overflow menu for secondary actions */}
       <div className="relative flex-shrink-0">
         <button
+          ref={menuBtnRef}
           className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-muted transition-colors"
-          onClick={() => setMenuOpen(!menuOpen)}
+          onClick={() => {
+            if (!menuOpen && menuBtnRef.current) {
+              const rect = menuBtnRef.current.getBoundingClientRect();
+              const menuWidth = 176; // w-44 = 11rem = 176px
+              const left = Math.min(rect.right - menuWidth, window.innerWidth - menuWidth - 8);
+              setMenuPos({ top: rect.bottom + 4, left: Math.max(8, left) });
+            }
+            setMenuOpen(!menuOpen);
+          }}
           aria-label="More actions"
           type="button"
         >
@@ -124,7 +145,13 @@ function ReviewRow({
         {menuOpen && (
           <>
             <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
-            <div className="absolute right-0 top-full mt-1 z-50 w-44 panel-surface rounded-[var(--radius-md)] p-1 animate-popover shadow-lg">
+            <div
+              className="fixed z-50 w-44 panel-surface rounded-[var(--radius-md)] p-1 animate-popover shadow-lg"
+              style={{
+                top: menuPos.top,
+                left: menuPos.left,
+              }}
+            >
               {!isDone && (
                 <button
                   className="flex w-full items-center gap-2.5 rounded-[var(--radius-sm)] px-3 py-2 text-sm hover:bg-secondary transition-colors"
@@ -170,29 +197,15 @@ function QuickReviewModal({
   const arabicName = getSurahNameArabic(item.surah);
   const ayahLabel = item.ayahStart === item.ayahEnd ? `Ayah ${item.ayahStart}` : `Ayahs ${item.ayahStart}-${item.ayahEnd}`;
 
-  // Calculate intervals using the same logic as updateInterval()
-  const daysSinceCreation = (() => {
-    if (item.memorizationAge !== undefined) {
-      const created = new Date(item.createdAt);
-      const today = new Date();
-      const daysPassed = Math.floor((today.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
-      return item.memorizationAge + daysPassed;
-    }
-    const created = new Date(item.createdAt);
-    const today = new Date();
-    return Math.floor((today.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
-  })();
-
-  const intervals = daysSinceCreation < 10
-    ? { easy: 1, medium: 1, hard: 1 }
-    : daysSinceCreation < 180
-      ? { easy: 4, medium: 2, hard: 1 }
-      : { easy: 7, medium: 4, hard: 1 };
+  // Get intervals from the selected algorithm
+  const settings = getReviewSettings();
+  const intervals = previewIntervals(item, settings);
+  const beginnerActive = item.isBeginner === true;
 
   const ratingOptions: { rating: 'easy' | 'medium' | 'hard'; label: string; desc: string; color: string; bg: string; border: string }[] = [
-    { rating: 'easy', label: 'Easy', desc: 'Perfect recall, no hesitation', color: 'text-success', bg: 'bg-success/15', border: 'hover:border-success/30 hover:bg-success/[0.04]' },
-    { rating: 'medium', label: 'Medium', desc: 'Good recall, minor hesitation', color: 'text-accent', bg: 'bg-accent/15', border: 'hover:border-accent/30 hover:bg-accent/[0.04]' },
-    { rating: 'hard', label: 'Hard', desc: 'Difficult, needed help', color: 'text-warning', bg: 'bg-warning/15', border: 'hover:border-warning/30 hover:bg-warning/[0.04]' },
+    { rating: 'easy', label: 'Easy', desc: 'Remembered it perfectly', color: 'text-success', bg: 'bg-success/15', border: 'hover:border-success/30 hover:bg-success/[0.04]' },
+    { rating: 'medium', label: 'Medium', desc: 'Mostly remembered it', color: 'text-accent', bg: 'bg-accent/15', border: 'hover:border-accent/30 hover:bg-accent/[0.04]' },
+    { rating: 'hard', label: 'Hard', desc: 'Struggled to remember', color: 'text-warning', bg: 'bg-warning/15', border: 'hover:border-warning/30 hover:bg-warning/[0.04]' },
   ];
 
   return (
@@ -214,6 +227,12 @@ function QuickReviewModal({
                 <span className="font-arabic text-accent text-sm" dir="rtl">{arabicName}</span>
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">{ayahLabel} · {item.interval}d interval · {item.reviewCount} reviews</p>
+              {beginnerActive && (
+                <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-accent bg-accent/10 px-1.5 py-0.5 rounded-[var(--radius-xs)] mt-1">
+                  <GraduationCap className="w-2.5 h-2.5" />
+                  Beginner mode
+                </span>
+              )}
             </div>
           </div>
           <button
@@ -277,8 +296,11 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
     interval: item.interval,
     nextReview: item.nextReview,
     easeFactor: item.easeFactor,
+    isBeginner: item.isBeginner || false,
+    reviewCount: item.reviewCount,
   });
   const [formError, setFormError] = useState<string | null>(null);
+  const wasBeginner = item.isBeginner || false;
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -296,14 +318,29 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
       return;
     }
     setFormError(null);
-    
+
     // Generate new ID if the range has changed
     const newId = generateMemorizationId(formData.surah, formData.ayahStart, formData.ayahEnd);
-    
+
+    // If the next review date is today or earlier, clear completedToday
+    // so the item shows as due again instead of "Done"
+    const todayISO = getTodayISODate();
+    const isDue = formData.nextReview <= todayISO;
+    const completedToday = isDue ? undefined : item.completedToday;
+
+    // If beginner mode was just toggled ON (was off, now on), record the
+    // current review count so auto-disable counts from this point
+    const beginnerJustEnabled = formData.isBeginner && !wasBeginner;
+    const beginnerStartedAtReview = beginnerJustEnabled
+      ? formData.reviewCount
+      : item.beginnerStartedAtReview;
+
     onSave({
       ...item,
       ...formData,
-      id: newId, // Update the ID to reflect the new range
+      id: newId,
+      completedToday,
+      beginnerStartedAtReview,
     });
   };
 
@@ -371,6 +408,30 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
           className="w-full p-2 border rounded-md"
           />
         </div>
+        <div>
+        <label className="block text-sm font-medium mb-2">Total reviews completed</label>
+          <input
+            type="number"
+            value={formData.reviewCount}
+            onChange={(e) => setFormData({ ...formData, reviewCount: Math.max(0, parseInt(e.target.value) || 0) })}
+            className="w-full p-2 border rounded-md"
+            min="0"
+          />
+          <p className="text-xs text-muted-foreground mt-1">Update this if you reviewed outside the app</p>
+        </div>
+        <div className="flex items-center justify-between gap-3 p-3 rounded-[var(--radius-md)] border border-border bg-muted/20">
+          <div>
+            <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
+              <GraduationCap className="w-3.5 h-3.5 text-accent" />
+              Still learning this passage
+            </label>
+            <p className="text-xs text-muted-foreground mt-0.5">Reviews happen more often until it's solid</p>
+          </div>
+          <Switch
+            checked={formData.isBeginner}
+            onCheckedChange={(v) => setFormData({ ...formData, isBeginner: v })}
+          />
+        </div>
       <div className="flex gap-2 pt-4">
         <Button type="submit" className="flex-1">Save</Button>
         <Button type="button" variant="outline" onClick={onCancel} className="flex-1">Cancel</Button>
@@ -402,6 +463,13 @@ export default function Dashboard() {
   const [reviewingItem, setReviewingItem] = useState<MemorizationItem | null>(null);
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
   const [collapseAll, setCollapseAll] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [reviewSettings, setReviewSettings] = useState<ReviewSettings>(DEFAULT_SETTINGS);
+
+  // Load review settings on mount
+  useEffect(() => {
+    setReviewSettings(getReviewSettings());
+  }, []);
 
   // Optimized data loading with caching
   const loadAllData = useCallback(async (showLoading = true) => {
@@ -433,7 +501,7 @@ export default function Dashboard() {
       // Update allItems with the reset items
       const finalItems = resetItems;
       
-      const due = getDueItems(finalItems);
+      const due = getDueItems(finalItems).filter(item => item.completedToday !== todayISO);
       const upcoming = getUpcomingReviews(finalItems, 7); // Next 7 days
 
       setItems(finalItems);
@@ -541,12 +609,8 @@ export default function Dashboard() {
         )
       );
       
-      // Update due and upcoming items
-      setDueItems(prevDue => 
-        prevDue.map(prevItem => 
-          prevItem.id === item.id ? updatedItem : prevItem
-        )
-      );
+      // Remove from due items (it's completed now)
+      setDueItems(prevDue => prevDue.filter(prevItem => prevItem.id !== item.id));
       
       setUpcomingItems(prevUpcoming => 
         prevUpcoming.map(prevItem => 
@@ -628,39 +692,20 @@ export default function Dashboard() {
 
   const handleSaveEdit = useCallback(async (updatedItem: MemorizationItem) => {
     try {
-      // Optimistic update - update UI immediately
-      setItems(prevItems => 
-        prevItems.map(prevItem => 
-          prevItem.id === editingItem?.id ? updatedItem : prevItem
-        )
-      );
-      
-      setDueItems(prevDue => 
-        prevDue.map(prevItem => 
-          prevItem.id === editingItem?.id ? updatedItem : prevItem
-        )
-      );
-      
-      setUpcomingItems(prevUpcoming => 
-        prevUpcoming.map(prevItem => 
-          prevItem.id === editingItem?.id ? updatedItem : prevItem
-        )
-      );
-      
       setEditingItem(null);
-      
-      // Save to storage in background
+
+      // Save to storage
       if (editingItem && updatedItem.id !== editingItem.id) {
-        // If the ID has changed (range was modified), we need to handle it carefully
         await addMemorizationItem(updatedItem);
         await removeMemorizationItem(editingItem.id);
       } else {
-        // Just update the existing item
         await updateMemorizationItem(updatedItem);
       }
+
+      // Reload all data to ensure due items and sorting are correct
+      await loadAllData(false);
     } catch (error) {
       console.error('Error saving edit:', error);
-      // Reload data on error to ensure consistency
       await loadAllData(false);
     }
   }, [editingItem, loadAllData]);
@@ -782,22 +827,33 @@ export default function Dashboard() {
         )}
 
         {/* ─── Greeting ─── */}
-        <div className="mb-8">
-          <p className="font-arabic text-xl text-accent mb-1" dir="rtl">السلام عليكم</p>
-          <h1 className="text-2xl font-bold font-serif-header text-foreground tracking-tight">
-            {dueItems.length > 0
-              ? `${dueItems.length} ${dueItems.length === 1 ? 'review' : 'reviews'} due`
-              : mistakes.length > 0
-                ? 'Reviews done — review your mistakes'
-                : 'All caught up'}
-          </h1>
-          <p className="text-sm text-muted-foreground mt-1">
-            {dueItems.length > 0
-              ? 'Tap Review to open the passage and test your memory.'
-              : mistakes.length > 0
-                ? 'You have marked mistakes to go over.'
-                : 'Add a new passage to start tracking your memorization.'}
-          </p>
+        <div className="mb-8 flex items-start justify-between gap-4">
+          <div>
+            <p className="font-arabic text-xl text-accent mb-1" dir="rtl">السلام عليكم</p>
+            <h1 className="text-2xl font-bold font-serif-header text-foreground tracking-tight">
+              {dueItems.length > 0
+                ? `${dueItems.length} ${dueItems.length === 1 ? 'review' : 'reviews'} due`
+                : mistakes.length > 0
+                  ? 'No reviews due — check your mistakes'
+                  : 'All caught up'}
+            </h1>
+            <p className="text-sm text-muted-foreground mt-1">
+              {dueItems.length > 0
+                ? 'Tap Review to open the passage and test your memory.'
+                : mistakes.length > 0
+                  ? 'You have marked mistakes to go over.'
+                  : 'Add a new passage to start tracking your memorization.'}
+            </p>
+          </div>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="w-9 h-9 rounded-[var(--radius-sm)] border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors flex-shrink-0"
+            aria-label="Review settings"
+            title="Review method & beginner mode"
+            type="button"
+          >
+            <Settings className="w-4 h-4 text-muted-foreground" />
+          </button>
         </div>
 
         {/* ─── Due Now (primary section) ─── */}
@@ -946,96 +1002,31 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* ─── Completed Today (subtle) ─── */}
-        {getCompletedTodayItems.length > 0 && (
-          <section className="mb-8">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-              Completed Today ({getCompletedTodayItems.length})
-            </h2>
-            <div className="space-y-1.5">
-              {getCompletedTodayItems.map((item) => (
-                <Link
-                  key={item.id}
-                  href={`/quran?review=${encodeURIComponent(item.id)}`}
-                  className="flex items-center gap-3 px-4 py-2.5 rounded-[var(--radius-md)] border border-success/15 bg-success/[0.03] hover:bg-success/[0.06] transition-colors"
-                  style={{ textDecoration: 'none' }}
-                >
-                  <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
-                  <span className="text-sm text-foreground font-medium truncate">{getSurahName(item.surah)}</span>
-                  <span className="font-arabic text-accent text-sm" dir="rtl">{getSurahNameArabic(item.surah)}</span>
-                  <span className="text-xs text-muted-foreground ml-auto flex-shrink-0">
-                    {item.ayahStart === item.ayahEnd ? `Ayah ${item.ayahStart}` : `${item.ayahStart}-${item.ayahEnd}`}
-                    {' · '}next {parseLocalDate(item.nextReview).toLocaleDateString()}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          </section>
-        )}
-
-        {/* ─── All Passages (collapsed by default) ─── */}
+        {/* ─── All Passages (sorted by next review date) ─── */}
         {items.length > 0 && (
           <section className="mb-8">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
-                All Passages ({items.length})
-              </h2>
-              <div className="flex items-center gap-2">
-                <label htmlFor="collapse-all" className="text-xs select-none cursor-pointer text-muted-foreground">Expand</label>
-                <Switch id="collapse-all" checked={!collapseAll} onCheckedChange={(v) => setCollapseAll(!v)} />
-              </div>
-            </div>
-
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              All Passages ({items.length})
+            </h2>
             <div className="space-y-2">
-              {Object.entries(groupedByDate).map(([date, dateItems]) => {
-                const label = getDateLabel(date);
-                const isToday = isDateToday(date);
-                const isOverdue = isDateOverdue(date);
-                const expanded = expandedDates[date] ?? isToday;
-
-                return (
-                  <div
-                    key={date}
-                    className={`rounded-[var(--radius-md)] border overflow-hidden ${
-                      isToday ? 'border-accent/20' : isOverdue ? 'border-destructive/15' : 'border-border'
-                    }`}
-                  >
-                    <button
-                      className="flex items-center gap-2 w-full px-4 py-2.5 text-left hover:bg-muted/30 transition-colors"
-                      onClick={() => toggleDateExpand(date)}
-                    >
-                      {expanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
-                      <span className="font-medium text-sm text-foreground">{label}</span>
-                      <span className={`text-xs px-1.5 py-0.5 rounded-[var(--radius-xs)] font-medium ${
-                        isToday ? 'bg-accent/15 text-accent' : isOverdue ? 'bg-destructive/15 text-destructive' : 'text-muted-foreground bg-muted'
-                      }`}>
-                        {dateItems.length}
-                      </span>
-                      <span className="text-xs text-muted-foreground ml-auto">{date}</span>
-                    </button>
-                    {expanded && (
-                      <div className="divide-y divide-border">
-                        {dateItems.map((item) => {
-                          const isDone = item.completedToday === todayISO;
-                          return (
-                            <ReviewRow
-                              key={item.id}
-                              item={item}
-                              isDone={isDone}
-                              isOverdue={isDateOverdue(item.nextReview)}
-                              compact
-                              onReview={() => router.push(`/quran?review=${encodeURIComponent(item.id)}`)}
-                              onQuickRate={() => setReviewingItem(item)}
-                              onEdit={() => handleEdit(item)}
-                              onDelete={() => setShowDeleteConfirm(item.id)}
-                            />
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+              {[...items]
+                .sort((a, b) => a.nextReview.localeCompare(b.nextReview))
+                .map((item) => {
+                  const isDone = item.completedToday === todayISO;
+                  const isOverdue = item.nextReview < todayISO;
+                  return (
+                    <ReviewRow
+                      key={item.id}
+                      item={item}
+                      isDone={isDone}
+                      isOverdue={isOverdue}
+                      onReview={() => router.push(`/quran?review=${encodeURIComponent(item.id)}`)}
+                      onQuickRate={() => setReviewingItem(item)}
+                      onEdit={() => handleEdit(item)}
+                      onDelete={() => setShowDeleteConfirm(item.id)}
+                    />
+                  );
+                })}
             </div>
           </section>
         )}
@@ -1087,11 +1078,11 @@ export default function Dashboard() {
           <QuickReviewModal
             item={reviewingItem}
             onClose={() => setReviewingItem(null)}
-            onSubmit={(rating) => {
-              const updated = updateInterval(reviewingItem, rating);
-              updateMemorizationItem(updated);
-              loadAllData();
+            onSubmit={async (rating) => {
+              const updated = updateIntervalWithSettings(reviewingItem, rating, reviewSettings);
               setReviewingItem(null);
+              await updateMemorizationItem(updated);
+              await loadAllData(false);
             }}
           />
         )}
@@ -1159,7 +1150,128 @@ export default function Dashboard() {
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
+
+        {/* ─── Review Settings Modal ─── */}
+        {showSettings && (
+          <ReviewSettingsModal
+            settings={reviewSettings}
+            onClose={() => setShowSettings(false)}
+            onSave={(newSettings) => {
+              setReviewSettings(newSettings);
+              saveReviewSettings(newSettings);
+              setShowSettings(false);
+            }}
+          />
+        )}
       </main>
+    </div>
+  );
+}
+
+/* ─── Review Settings Modal ─── */
+function ReviewSettingsModal({
+  settings,
+  onClose,
+  onSave,
+}: {
+  settings: ReviewSettings;
+  onClose: () => void;
+  onSave: (settings: ReviewSettings) => void;
+}) {
+  const [localSettings, setLocalSettings] = useState<ReviewSettings>(settings);
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-overlay"
+      style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
+    >
+      <div className="bg-card text-card-foreground rounded-[var(--radius-2xl)] w-full max-w-md max-h-[90vh] shadow-2xl border border-border flex flex-col animate-fade-in-up overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-[var(--radius)] bg-accent/15 flex items-center justify-center flex-shrink-0">
+              <Settings className="w-4 h-4 text-accent" />
+            </div>
+            <h3 className="text-base font-bold font-serif-header text-foreground">Review Method</h3>
+          </div>
+          <button
+            className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-muted transition-colors flex-shrink-0"
+            onClick={onClose}
+            aria-label="Close"
+            type="button"
+          >
+            <X className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="flex-1 overflow-y-auto p-5 space-y-4">
+          {/* Algorithm selection */}
+          <div>
+            <p className="text-sm font-medium text-foreground mb-1">How should reviews be scheduled?</p>
+            <p className="text-xs text-muted-foreground mb-4">This controls when passages come back for review after you rate them. You can change this anytime — existing passages will use the new method on their next review.</p>
+            <div className="space-y-2.5">
+              {(Object.keys(ALGORITHM_INFO) as AlgorithmType[]).map((algo) => {
+                const info = ALGORITHM_INFO[algo];
+                const isSelected = localSettings.algorithm === algo;
+                return (
+                  <button
+                    key={algo}
+                    onClick={() => setLocalSettings({ ...localSettings, algorithm: algo })}
+                    className={`w-full text-left p-4 rounded-[var(--radius-lg)] border transition-colors ${
+                      isSelected
+                        ? 'border-accent/40 bg-accent/[0.06]'
+                        : 'border-border hover:border-accent/20 hover:bg-muted/30'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 mb-1.5">
+                      {isSelected ? (
+                        <CheckCircle className="w-4 h-4 text-accent flex-shrink-0" />
+                      ) : (
+                        <div className="w-4 h-4 rounded-full border-2 border-muted-foreground/30 flex-shrink-0" />
+                      )}
+                      <span className="font-semibold text-sm text-foreground">{info.name}</span>
+                      {info.recommended && (
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-accent bg-accent/10 px-1.5 py-0.5 rounded-[var(--radius-xs)]">
+                          <Sparkles className="w-2.5 h-2.5" />
+                          Recommended
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-1.5">{info.shortDesc}</p>
+                    {isSelected && (
+                      <p className="text-xs text-muted-foreground leading-relaxed mt-2 pt-2 border-t border-border/50">
+                        {info.details}
+                      </p>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Per-passage beginner mode info */}
+          <div className="pt-4 border-t border-border">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-accent/15 flex items-center justify-center flex-shrink-0">
+                <GraduationCap className="w-4 h-4 text-accent" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">"Still learning" mode</p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  You can mark individual passages as "still learning" when you add or edit them. This keeps reviews frequent (daily or every 2 days) until you've reviewed it confidently several times — then it automatically switches to normal scheduling. Use this for passages you just memorized or ones you keep struggling with.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-4 border-t border-border flex gap-2">
+          <Button variant="outline" className="flex-1" onClick={onClose}>Cancel</Button>
+          <Button className="flex-1" onClick={() => onSave(localSettings)}>Save</Button>
+        </div>
+      </div>
     </div>
   );
 }

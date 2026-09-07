@@ -10,7 +10,8 @@ import { getSurah } from '@/lib/quranService';
 import { getSurahName, getAyahCount, SURAH_NAMES } from '@/lib/quran';
 import { useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { BookPlus, X, FileText, BookOpen, Hash, SlidersHorizontal, Clock, CheckCircle2 } from 'lucide-react';
+import { BookPlus, X, FileText, BookOpen, Hash, SlidersHorizontal, Clock, CheckCircle2, GraduationCap } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 
 interface EnhancedMemorizationModalProps {
   isOpen: boolean;
@@ -18,7 +19,7 @@ interface EnhancedMemorizationModalProps {
   currentSurah: number;
   pageData: any;
   selectedAyahs?: Set<{ surah: number; ayah: number }>;
-  onConfirm: (selections: any[], name: string, description?: string, memorizationLevel?: string, memorizationAge?: number) => void;
+  onConfirm: (selections: any[], name: string, description?: string, memorizationLevel?: string, memorizationAge?: number, isBeginner?: boolean) => void;
   onClose: () => void;
 }
 
@@ -62,6 +63,7 @@ export default function EnhancedMemorizationModal({
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [memorizationAge, setMemorizationAge] = useState<number>(0);
+  const [isBeginner, setIsBeginner] = useState<boolean>(false);
   const [fullSurahData, setFullSurahData] = useState<any>(null);
   const [loadingSurah, setLoadingSurah] = useState(false);
   const [surahContainerRef, setSurahContainerRef] = useState<HTMLDivElement | null>(null);
@@ -364,7 +366,7 @@ export default function EnhancedMemorizationModal({
 
   const handleConfirm = () => {
     if (selections.length === 0 || !name.trim()) return;
-    onConfirm(selections, name, description, undefined, memorizationAge);
+    onConfirm(selections, name, description, undefined, memorizationAge, isBeginner);
     onClose();
   };
 
@@ -737,6 +739,23 @@ export default function EnhancedMemorizationModal({
               <p className="text-[11px] text-muted-foreground">
                 This helps determine appropriate review intervals.
               </p>
+            </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3 p-3 rounded-[var(--radius-md)] border border-border bg-muted/20">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <GraduationCap className="w-3.5 h-3.5 text-accent" />
+                    <Label className="text-xs font-semibold text-foreground">Still learning this passage</Label>
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Reviews will happen more often to help it stick. Turns off automatically after you've reviewed it confidently a few times.
+                  </p>
+                </div>
+                <Switch
+                  checked={isBeginner}
+                  onCheckedChange={setIsBeginner}
+                />
+              </div>
             </div>
           </div>
         </div>

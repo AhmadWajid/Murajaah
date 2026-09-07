@@ -10,8 +10,9 @@ import ReactMarkdown from 'react-markdown';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { formatAyahRange, formatAyahRangeArabic } from '@/lib/quran';
+import { formatAyahRange, formatAyahRangeArabic, getSurahName, getSurahNameArabic } from '@/lib/quran';
 import { qpcFontLoader } from '@/lib/qpcFontLoader';
+import { previewIntervals, getReviewSettings, isItemBeginner } from '@/lib/reviewAlgorithms';
 
 /** Strip tajweed <rule class="...">text</rule> tags from a string, keeping only the inner text. Handles nested tags. */
 function stripRuleTags(text: string): string {
@@ -169,6 +170,7 @@ export default function AyahCard({
 
 
   const [showReviewRatingDropdown, setShowReviewRatingDropdown] = useState(false);
+  const [isSubmittingReview, setIsSubmittingReview] = useState(false);
   // Tajweed breakdown modal state
   const [showTajweedBreakdown, setShowTajweedBreakdown] = useState(false);
   // Tafsir modal state
@@ -177,22 +179,7 @@ export default function AyahCard({
   const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
   const [loadingTafsir, setLoadingTafsir] = useState(false);
 
-  // Close dropdown when clicking outside
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as Element;
-      const isOutsideReviewDropdown = !target.closest('[data-modal="review-rating"]');
-      
-      if (showReviewRatingDropdown && isOutsideReviewDropdown) {
-        setShowReviewRatingDropdown(false);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [showReviewRatingDropdown]);
+  // (Modal close is handled by the overlay onClick + close button)
   
   const handleMistakeToggle = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -476,8 +463,8 @@ export default function AyahCard({
               e.stopPropagation();
               setShowReviewRatingDropdown(true);
             }}
-            className="flex items-center justify-center rounded-full w-8 h-8 sm:w-9 sm:h-9 text-purple-600 dark:text-purple-400 bg-purple-500/8 hover:bg-purple-500/15 dark:bg-purple-400/10 dark:hover:bg-purple-400/20 border border-purple-500/10 dark:border-purple-400/10 transition-all duration-200 hover:scale-105 active:scale-95"
-            title="Complete Review"
+            className="flex items-center justify-center rounded-full w-8 h-8 sm:w-9 sm:h-9 text-accent bg-accent/8 hover:bg-accent/15 dark:bg-accent/10 dark:hover:bg-accent/20 border border-accent/10 transition-all duration-200 hover:scale-105 active:scale-95"
+            title="Finish Review"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -1008,189 +995,133 @@ export default function AyahCard({
 
       {/* Review Rating Modal - positioned outside card for proper overlay */}
       {showReviewRatingDropdown && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <Card className="w-full max-w-lg max-h-[90vh] shadow-2xl border flex flex-col" data-modal="review-rating">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
+          data-modal="review-rating"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowReviewRatingDropdown(false);
+          }}
+        >
+          <div className="bg-card text-card-foreground rounded-[var(--radius-2xl)] w-full max-w-md max-h-[90vh] shadow-2xl border border-border flex flex-col animate-fade-in-up overflow-hidden">
             {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b">
-              <div className="flex items-center space-x-3">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                  Finish Review
-                </h3>
-                <Badge variant="secondary" className="text-xs">
-                  {formatAyahRange((() => {
+            <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-9 h-9 rounded-[var(--radius)] bg-accent/15 flex items-center justify-center flex-shrink-0">
+                  <svg className="w-4 h-4 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <div className="min-w-0">
+                  <h3 className="text-base font-bold font-serif-header text-foreground leading-tight">Finish Review</h3>
+                  {(() => {
                     const reviewItem = getReviewItem();
-                    return reviewItem ? reviewItem.surah : surahNumber;
-                  })(), (() => {
-                    const reviewItem = getReviewItem();
-                    return reviewItem ? reviewItem.ayahStart : ayahNumber;
-                  })(), (() => {
-                    const reviewItem = getReviewItem();
-                    return reviewItem ? reviewItem.ayahEnd : ayahNumber;
-                  })())}
-                </Badge>
-                <span className="text-sm text-muted-foreground">
-                  {formatAyahRangeArabic((() => {
-                    const reviewItem = getReviewItem();
-                    return reviewItem ? reviewItem.surah : surahNumber;
-                  })(), (() => {
-                    const reviewItem = getReviewItem();
-                    return reviewItem ? reviewItem.ayahStart : ayahNumber;
-                  })(), (() => {
-                    const reviewItem = getReviewItem();
-                    return reviewItem ? reviewItem.ayahEnd : ayahNumber;
-                  })())}
-                </span>
+                    const s = reviewItem ? reviewItem.surah : surahNumber;
+                    return (
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-sm text-foreground font-medium truncate">{getSurahName(s)}</span>
+                        <span className="font-arabic text-accent text-sm" dir="rtl">{getSurahNameArabic(s)}</span>
+                        <span className="text-xs text-muted-foreground">
+                          {formatAyahRange(s, reviewItem ? reviewItem.ayahStart : ayahNumber, reviewItem ? reviewItem.ayahEnd : ayahNumber)}
+                        </span>
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
+              <button
+                className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-muted transition-colors flex-shrink-0"
                 onClick={() => setShowReviewRatingDropdown(false)}
-                className="h-8 w-8 p-0"
+                aria-label="Close"
+                type="button"
               >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 text-muted-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 </svg>
-              </Button>
+              </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-6">
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-5 space-y-4">
               {/* Review Item Info */}
               {(() => {
                 const reviewItem = getReviewItem();
-                if (reviewItem) {
-                  return (
-                    <div className="space-y-2">
-                      <div className="flex justify-center gap-4 text-sm text-muted-foreground">
-                        <span>Reviews: {reviewItem.reviewCount}</span>
-                        <span>Interval: {reviewItem.interval}d</span>
-                      </div>
-                      {reviewItem.name && (
-                        <div className="text-center text-sm text-muted-foreground">
-                          {reviewItem.name}
-                        </div>
-                      )}
-                    </div>
-                  );
-                }
-                return null;
+                if (!reviewItem) return null;
+                const beginnerActive = isItemBeginner(reviewItem);
+                return (
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span>{reviewItem.reviewCount} {reviewItem.reviewCount === 1 ? 'review' : 'reviews'}</span>
+                    <span>·</span>
+                    <span>{reviewItem.interval}d interval</span>
+                    {beginnerActive && (
+                      <>
+                        <span>·</span>
+                        <span className="text-accent font-semibold">Learning mode</span>
+                      </>
+                    )}
+                  </div>
+                );
               })()}
 
               {/* Rating Selection */}
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div>
-                  <h4 className="text-lg font-semibold mb-2">How well did you remember it?</h4>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    This decides when you'll see this passage again.
-                  </p>
+                  <h4 className="text-base font-semibold text-foreground mb-1">How well did you remember it?</h4>
+                  <p className="text-sm text-muted-foreground">This decides when you'll see this passage again.</p>
                 </div>
                 {(() => {
                   const reviewItem = getReviewItem();
                   if (!reviewItem) return null;
-                  
-                  // Calculate the current memorization age by adding days passed since creation
-                  let currentMemorizationAge: number;
-                  let daysPassedSinceCreation: number;
-                  const originalMemorizationAge: number | undefined = reviewItem.memorizationAge;
-                  
-                  if (reviewItem.memorizationAge !== undefined) {
-                    // Calculate days passed since the item was added to the app
-                    const createdAt = new Date(reviewItem.createdAt);
-                    const today = new Date();
-                    daysPassedSinceCreation = Math.floor((today.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
-                    
-                    // Current memorization age = original memorization age + days passed since creation
-                    currentMemorizationAge = reviewItem.memorizationAge + daysPassedSinceCreation;
-                  } else {
-                    // Fallback to calculating from createdAt (for existing items without memorizationAge)
-                    const createdAt = new Date(reviewItem.createdAt);
-                    const today = new Date();
-                    daysPassedSinceCreation = Math.floor((today.getTime() - createdAt.getTime()) / (1000 * 60 * 60 * 24));
-                    currentMemorizationAge = daysPassedSinceCreation;
-                  }
-                  
-                  // Define intervals based on memorization age
-                  let easyInterval: number;
-                  let mediumInterval: number;
-                  let hardInterval: number;
-                  
-                  if (currentMemorizationAge < 10) {
-                    easyInterval = 1;
-                    mediumInterval = 1;
-                    hardInterval = 1;
-                  } else if (currentMemorizationAge < 180) {
-                    easyInterval = 4;
-                    mediumInterval = 2;
-                    hardInterval = 1;
-                  } else {
-                    easyInterval = 7;
-                    mediumInterval = 4;
-                    hardInterval = 1;
-                  }
-                  
+
+                  // Get intervals from the selected algorithm
+                  const settings = getReviewSettings();
+                  const intervals = previewIntervals(reviewItem, settings);
+
+                  const ratingOptions: { rating: 'easy' | 'medium' | 'hard'; label: string; desc: string; color: string; bg: string; border: string }[] = [
+                    { rating: 'easy', label: 'Easy', desc: 'Remembered it perfectly', color: 'text-success', bg: 'bg-success/15', border: 'hover:border-success/30 hover:bg-success/[0.04]' },
+                    { rating: 'medium', label: 'Medium', desc: 'Mostly remembered it', color: 'text-accent', bg: 'bg-accent/15', border: 'hover:border-accent/30 hover:bg-accent/[0.04]' },
+                    { rating: 'hard', label: 'Hard', desc: 'Struggled to remember', color: 'text-warning', bg: 'bg-warning/15', border: 'hover:border-warning/30 hover:bg-warning/[0.04]' },
+                  ];
+
                   return (
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                      <Button
-                        onClick={() => {
-                          if (reviewItem) {
-                            onReviewComplete?.({ ...reviewItem, rating: 'easy' });
-                          }
-                          setShowReviewRatingDropdown(false);
-                        }}
-                        variant="outline"
-                        className="w-full justify-between h-auto p-4 text-left"
-                      >
-                        <div>
-                          <div className="font-medium">Easy</div>
-                          <div className="text-sm text-muted-foreground">Remembered it perfectly</div>
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          {easyInterval} day{easyInterval !== 1 ? 's' : ''}
-                        </Badge>
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          if (reviewItem) {
-                            onReviewComplete?.({ ...reviewItem, rating: 'medium' });
-                          }
-                          setShowReviewRatingDropdown(false);
-                        }}
-                        variant="outline"
-                        className="w-full justify-between h-auto p-4 text-left"
-                      >
-                        <div>
-                          <div className="font-medium">Medium</div>
-                          <div className="text-sm text-muted-foreground">Mostly remembered it</div>
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          {mediumInterval} day{mediumInterval !== 1 ? 's' : ''}
-                        </Badge>
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          if (reviewItem) {
-                            onReviewComplete?.({ ...reviewItem, rating: 'hard' });
-                          }
-                          setShowReviewRatingDropdown(false);
-                        }}
-                        variant="outline"
-                        className="w-full justify-between h-auto p-4 text-left"
-                      >
-                        <div>
-                          <div className="font-medium">Hard</div>
-                          <div className="text-sm text-muted-foreground">Struggled to remember</div>
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          1 day
-                        </Badge>
-                      </Button>
-                      </div>
+                    <div className="space-y-2.5">
+                      {ratingOptions.map((opt) => {
+                        const days = intervals[opt.rating];
+                        return (
+                          <button
+                            key={opt.rating}
+                            disabled={isSubmittingReview}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              if (isSubmittingReview) return;
+                              setIsSubmittingReview(true);
+                              const itemToSubmit = { ...reviewItem, rating: opt.rating };
+                              setShowReviewRatingDropdown(false);
+                              // Call onReviewComplete after closing modal
+                              Promise.resolve().then(() => {
+                                onReviewComplete?.(itemToSubmit);
+                              }).finally(() => {
+                                setIsSubmittingReview(false);
+                              });
+                            }}
+                            className={`w-full flex items-center justify-between p-3.5 rounded-[var(--radius-lg)] border border-border ${opt.border} transition-colors text-left`}
+                          >
+                            <div>
+                              <div className="font-semibold text-sm text-foreground">{opt.label}</div>
+                              <div className="text-xs text-muted-foreground mt-0.5">{opt.desc}</div>
+                            </div>
+                            <span className={`text-xs font-semibold ${opt.color} ${opt.bg} px-2.5 py-1 rounded-[var(--radius-sm)] flex-shrink-0`}>
+                              +{days} {days === 1 ? 'day' : 'days'}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </div>
                   );
                 })()}
               </div>
             </div>
-          </Card>
+          </div>
         </div>
       )}
       {/* Tajweed Breakdown Modal */}

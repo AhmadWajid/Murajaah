@@ -22,6 +22,17 @@ export interface MemorizationItem {
   name?: string; // Optional name for the memorization set
   description?: string; // Optional description
   tags?: string[]; // Optional tags for organization
+
+  // Per-item beginner mode: this passage is still being learned
+  // When true, intervals stay short until the student builds confidence
+  isBeginner?: boolean;
+  // Review count at the time beginner mode was (re)enabled, so auto-disable
+  // counts from that point rather than from zero
+  beginnerStartedAtReview?: number;
+  // FSRS memory state: stability (days until 90% recall) and difficulty (1-10)
+  // Used by the adaptive algorithm. Derived from interval/easeFactor for old items.
+  stability?: number;
+  difficulty?: number;
 }
 
 export type ReviewRating = 'easy' | 'medium' | 'hard';
@@ -30,63 +41,34 @@ export type RecallQuality = 'perfect' | 'partial' | 'hint-needed' | 'forgot';
 import { SPACED_REPETITION, UI } from './constants';
 import { formatToISODate, generateMemorizationId, getUserTimeZone, getTodayInUserTimeZone, addDaysInUserTimeZone, toUserTimeZoneDate } from './utils';
 import { DateTime } from 'luxon';
+import { calculateReviewInterval, getReviewSettings, ReviewSettings, DEFAULT_SETTINGS } from './reviewAlgorithms';
 
+/**
+ * Update a memorization item's review interval based on the rating.
+ *
+ * This now delegates to the selected review algorithm (Adaptive/Classic/Hifz)
+ * based on the user's settings. Falls back to the classic algorithm if
+ * settings can't be loaded (e.g., during SSR).
+ */
 export function updateInterval(
   item: MemorizationItem,
   rating: ReviewRating,
   userTimeZone?: string
 ): MemorizationItem {
-  const tz = userTimeZone || getUserTimeZone();
-  const today = getTodayInUserTimeZone(tz);
+  const settings = getReviewSettings();
+  return calculateReviewInterval(item, rating, settings, userTimeZone);
+}
 
-  // Calculate the current memorization age by adding days passed since creation
-  let daysSinceCreation: number;
-  
-  if (item.memorizationAge !== undefined) {
-    // Calculate days passed since the item was added to the app
-    const createdAt = DateTime.fromISO(item.createdAt, { zone: tz });
-    const todayDate = DateTime.now().setZone(tz).startOf('day');
-    const daysPassedSinceCreation = todayDate.diff(createdAt, 'days').days;
-    
-    // Current memorization age = original memorization age + days passed since creation
-    daysSinceCreation = item.memorizationAge + daysPassedSinceCreation;
-  } else {
-    // Fallback to calculating from createdAt (for existing items without memorizationAge)
-    const createdAt = DateTime.fromISO(item.createdAt, { zone: tz });
-    const todayDate = DateTime.now().setZone(tz).startOf('day');
-    daysSinceCreation = todayDate.diff(createdAt, 'days').days;
-  }
-
-  // Define intervals based on both rating and how "new" the memorization is
-  let newInterval: number;
-
-  if (daysSinceCreation < 10) {
-    // First 10 days: always daily review
-    newInterval = 1;
-  } else if (daysSinceCreation < 180) {
-    // 10 days to 6 months
-    if (rating === 'easy') newInterval = 4;
-    else if (rating === 'medium') newInterval = 2;
-    else newInterval = 1;
-  } else {
-    // 6+ months
-    if (rating === 'easy') newInterval = 7;
-    else if (rating === 'medium') newInterval = 4;
-    else newInterval = 1;
-  }
-
-  const nextReviewDate = addDaysInUserTimeZone(today, newInterval, tz);
-  const newEaseFactor = calculateNewEaseFactor(item.easeFactor, rating);
-
-  return {
-    ...item,
-    interval: newInterval,
-    nextReview: nextReviewDate,
-    easeFactor: newEaseFactor,
-    reviewCount: item.reviewCount + 1,
-    lastReviewed: today,
-    completedToday: today, // Mark as completed today
-  };
+/**
+ * Update interval with explicit settings (for preview or when settings are already loaded).
+ */
+export function updateIntervalWithSettings(
+  item: MemorizationItem,
+  rating: ReviewRating,
+  settings: ReviewSettings,
+  userTimeZone?: string
+): MemorizationItem {
+  return calculateReviewInterval(item, rating, settings, userTimeZone);
 }
 
 export function updateIndividualAyahRating(

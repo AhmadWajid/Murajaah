@@ -919,33 +919,35 @@ function QuranPageContent() {
     setShowEnhancedModal(true);
   };
 
-  const handleEnhancedMemorization = async (selections: any[], name: string, description?: string, memorizationLevel?: string, memorizationAge?: number) => {
+  const handleEnhancedMemorization = async (selections: any[], name: string, description?: string, memorizationLevel?: string, memorizationAge?: number, isBeginner?: boolean) => {
     try {
       // If all selections are from the same surah and are adjacent, create a single item
       const allSameSurah = selections.every(s => s.surah === selections[0].surah);
-      const allAdjacent = selections.length === 1 || 
-        (allSameSurah && selections.every((s, i) => 
+      const allAdjacent = selections.length === 1 ||
+        (allSameSurah && selections.every((s, i) =>
           i === 0 || s.ayahStart === selections[i-1].ayahEnd + 1
         ));
-      
+
       if (allSameSurah && allAdjacent) {
         // Create a single memorization item for adjacent ayahs in the same surah
         const minAyah = Math.min(...selections.map(s => s.ayahStart));
         const maxAyah = Math.max(...selections.map(s => s.ayahEnd));
         const surah = selections[0].surah;
-        
+
         const memorizationItem = await createMemorizationItem(
-          surah, 
-          minAyah, 
-          maxAyah, 
+          surah,
+          minAyah,
+          maxAyah,
           memorizationLevel,
           undefined, // userTimeZone
           memorizationAge
         );
-        
+
         memorizationItem.name = name;
         memorizationItem.description = description || '';
         memorizationItem.tags = [];
+        memorizationItem.isBeginner = isBeginner || false;
+        if (isBeginner) memorizationItem.beginnerStartedAtReview = 0;
 
         await addMemorizationItem(memorizationItem);
       } else {
@@ -955,7 +957,7 @@ function QuranPageContent() {
           const selection = selections[i];
           const itemName = selections.length === 1 ? name : `${name} - Part ${i + 1}`;
           const itemDescription = selections.length === 1 ? description : `${description || ''} (Part ${i + 1})`;
-          
+
           const memorizationItem = await createMemorizationItem(
             selection.surah,
             selection.ayahStart,
@@ -964,10 +966,12 @@ function QuranPageContent() {
             undefined, // userTimeZone
             memorizationAge
           );
-          
+
           memorizationItem.name = itemName;
           memorizationItem.description = itemDescription;
           memorizationItem.tags = [];
+          memorizationItem.isBeginner = isBeginner || false;
+          if (isBeginner) memorizationItem.beginnerStartedAtReview = 0;
 
           await addMemorizationItem(memorizationItem);
           createdItems.push(memorizationItem);
@@ -1087,23 +1091,14 @@ function QuranPageContent() {
     }
   };
 
-  const handleOverallRating = (item: any) => {
-    // This function is called when a review is completed via the Complete Review button
-    console.log('Complete review rating received:', item);
-    
+  const handleOverallRating = async (item: any) => {
     if (item && item.rating) {
       const rating = item.rating;
-      
-      // Update the item with the rating
-      const updatedItem = updateInterval(item, rating);
-      updateMemorizationItem(updatedItem);
-      
-      // Refresh data to reflect changes
-      refreshData();
-      
-      console.log(`Complete review finished for ${item.surah}:${item.ayahStart}-${item.ayahEnd} with rating: ${rating}`);
-    } else {
-      console.log('No rating provided for complete review');
+      // Remove the rating field before passing to updateInterval
+      const { rating: _rating, ...itemWithoutRating } = item;
+      const updatedItem = updateInterval(itemWithoutRating, rating);
+      await updateMemorizationItem(updatedItem);
+      await refreshData();
     }
   };
 
