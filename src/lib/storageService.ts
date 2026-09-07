@@ -638,7 +638,7 @@ export async function batchAddMemorizationItems(items: MemorizationItem[]): Prom
 }
 
 // =============================================
-// MIGRATION
+// MIGRATION (legacy — merge local into DB)
 // =============================================
 
 export async function migrateToDatabase(): Promise<void> {
@@ -656,4 +656,129 @@ export async function migrateToDatabase(): Promise<void> {
     console.error('Failed to migrate data to database:', error);
     throw error;
   }
+}
+
+// =============================================
+// SYNC — compare local vs DB, upload, download, merge
+// =============================================
+
+export interface SyncComparison {
+  localItems: number;
+  dbItems: number;
+  localMistakes: number;
+  dbMistakes: number;
+  hasMismatch: boolean;
+  // Items only in local (not in DB)
+  localOnlyItems: number;
+  // Items only in DB (not in local)
+  dbOnlyItems: number;
+  // Items in both but with different data
+  differentItems: number;
+}
+
+export async function compareLocalAndDb(): Promise<SyncComparison> {
+  const localItems = localStorageService.getAllMemorizationItems();
+  const localMistakes = localStorageService.getMistakes();
+
+  const res = await fetch('/api/data?type=items');
+  const dbData = await res.json();
+  const dbItems: MemorizationItem[] = dbData.items || [];
+
+  const dbMistakesRes = await fetch('/api/data?type=mistakes');
+  const dbMistakesData = await dbMistakesRes.json();
+  const dbMistakesRecord = dbMistakesData.mistakes || {};
+
+  const localIds = new Set(localItems.map(i => i.id));
+  const dbIds = new Set(dbItems.map(i => i.id));
+
+  const localOnlyItems = localItems.filter(i => !dbIds.has(i.id)).length;
+  const dbOnlyItems = dbItems.filter(i => !localIds.has(i.id)).length;
+
+  // Count items that exist in both but differ
+  let differentItems = 0;
+  for (const localItem of localItems) {
+    const dbItem = dbItems.find(i => i.id === localItem.id);
+    if (dbItem) {
+      if (dbItem.reviewCount !== localItem.reviewCount ||
+          dbItem.nextReview !== localItem.nextReview ||
+          dbItem.interval !== localItem.interval ||
+          dbItem.completedToday !== localItem.completedToday) {
+        differentItems++;
+      }
+    }
+  }
+
+  const localMistakeKeys = Object.keys(localMistakes);
+  const dbMistakeKeys = Object.keys(dbMistakesRecord);
+
+  const hasMismatch =
+    localOnlyItems > 0 || dbOnlyItems > 0 || differentItems > 0 ||
+    localMistakeKeys.length !== dbMistakeKeys.length ||
+    localMistakeKeys.some(k => !dbMistakesRecord[k]);
+
+  return {
+    localItems: localItems.length,
+    dbItems: dbItems.length,
+    localMistakes: localMistakeKeys.length,
+    dbMistakes: dbMistakeKeys.length,
+    hasMismatch,
+    localOnlyItems,
+    dbOnlyItems,
+    differentItems,
+  };
+}
+
+export async function syncUploadLocalToDb(): Promise<void> {
+  const items = localStorageService.getAllMemorizationItems();
+  const mistakes = localStorageService.getMistakes();
+  await fetch('/api/data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ op: 'syncUploadLocal', items, mistakes }),
+  });
+}
+
+export async function syncDownloadDbToLocal(): Promise<void> {
+  const res = await fetch('/api/data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ op: 'syncDownloadDb' }),
+  });
+  const data = await res.json();
+
+  // Overwrite localStorage with DB data
+  if (data.items && Array.isArray(data.items)) {
+    localStorageService.clearAllData();
+    for (const item of data.items) {
+      localStorageService.addMemorizationItem(item);
+    }
+  }
+  if (data.mistakes) {
+    localStorageService.saveMistakes(data.mistakes);
+  }
+}
+
+export async function syncMerge(): Promise<{ items: MemorizationItem[]; mistakes: Record<string, any> }> {
+  const items = localStorageService.getAllMemorizationItems();
+  const mistakes = localStorageService.getMistakes();
+
+  const res = await fetch('/api/data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ op: 'syncMerge', items, mistakes }),
+  });
+  const data = await res.json();
+
+  // Update localStorage with merged result
+  if (data.items && Array.isArray(data.items)) {
+    localStorageService.clearAllData();
+    for (const item of data.items) {
+      localStorageService.addMemorizationItem(item);
+    }
+  }
+  if (data.mistakes) {
+    localStorageService.saveMistakes(data.mistakes);
+  }
+
+  return { items: data.items || [], mistakes: data.mistakes || {} };
 }

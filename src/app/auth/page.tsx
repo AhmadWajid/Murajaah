@@ -3,11 +3,9 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { AlertCircle, Loader2 } from 'lucide-react';
+import { AlertCircle, Loader2, BookOpen } from 'lucide-react';
 
 type AuthMode = 'login' | 'signup';
 
@@ -70,105 +68,151 @@ export default function AuthPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-amber-50 to-orange-100 px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4 py-8">
+      {/* Ornamental top border */}
+      <div className="fixed top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
+
+      <div className="w-full max-w-md animate-fade-in-up">
+        {/* Brand */}
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-foreground mb-2">Murajaah</h1>
-          <p className="text-muted-foreground">Sign in to sync your Quran memorization progress</p>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-[var(--radius-xl)] bg-accent/10 border border-accent/20 mb-4">
+            <BookOpen className="h-8 w-8 text-accent" />
+          </div>
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">Murajaah</h1>
+          <p className="font-arabic text-lg text-accent mt-1" dir="rtl">السلام عليكم</p>
+          <p className="text-sm text-muted-foreground mt-2">
+            {mode === 'login' ? 'Sign in to sync your memorization progress' : 'Create an account to begin your journey'}
+          </p>
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{mode === 'login' ? 'Welcome Back' : 'Create Account'}</CardTitle>
-            <CardDescription>
-              {mode === 'login'
-                ? 'Sign in to access your memorization data'
-                : 'Create an account to start memorizing'}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleAuth} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-              </div>
+        {/* Card */}
+        <div className="panel-surface rounded-[var(--radius-xl)] p-6 space-y-5">
+          {/* Mode toggle */}
+          <div className="flex gap-1 p-1 rounded-[var(--radius-md)] bg-muted/50">
+            <button
+              type="button"
+              onClick={() => { setMode('login'); setError(''); }}
+              className={`flex-1 py-2 px-3 rounded-[var(--radius-sm)] text-sm font-semibold transition-all ${
+                mode === 'login'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              type="button"
+              onClick={() => { setMode('signup'); setError(''); }}
+              className={`flex-1 py-2 px-3 rounded-[var(--radius-sm)] text-sm font-semibold transition-all ${
+                mode === 'signup'
+                  ? 'bg-card text-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              Sign Up
+            </button>
+          </div>
 
+          <form onSubmit={handleAuth} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-sm font-medium text-foreground">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="you@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+                className="h-11 rounded-[var(--radius)]"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password" className="text-sm font-medium text-foreground">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="At least 6 characters"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+                className="h-11 rounded-[var(--radius)]"
+              />
+            </div>
+
+            {mode === 'signup' && (
               <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
+                <Label htmlFor="confirmPassword" className="text-sm font-medium text-foreground">Confirm Password</Label>
                 <Input
-                  id="password"
+                  id="confirmPassword"
                   type="password"
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Re-enter your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
                   required
                   minLength={6}
+                  className="h-11 rounded-[var(--radius)]"
                 />
               </div>
+            )}
 
-              {mode === 'signup' && (
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <Input
-                    id="confirmPassword"
-                    type="password"
-                    placeholder="Confirm your password"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    minLength={6}
-                  />
-                </div>
-              )}
+            {error && (
+              <div className="flex items-center gap-2 text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-[var(--radius-sm)] px-3 py-2.5">
+                <AlertCircle className="h-4 w-4 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
 
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+            <Button
+              type="submit"
+              className="w-full h-11 rounded-[var(--radius)] text-sm font-semibold"
+              disabled={loading}
+            >
+              {loading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+              {mode === 'login' ? 'Sign In' : 'Create Account'}
+            </Button>
+          </form>
 
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {mode === 'login' ? 'Sign In' : 'Create Account'}
-              </Button>
-            </form>
-
-            <div className="mt-6">
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => router.push('/')}
-                className="w-full text-muted-foreground hover:text-foreground"
-              >
-                Continue as Guest
-              </Button>
-              <p className="text-xs text-center text-muted-foreground mt-1">
-                Your progress will be saved locally on this device
-              </p>
+          {/* Divider */}
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-border" />
             </div>
-
-            <div className="mt-4 text-center">
-              <button
-                type="button"
-                onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
-                className="text-sm text-primary hover:underline"
-              >
-                {mode === 'login'
-                  ? "Don't have an account? Sign up"
-                  : 'Already have an account? Sign in'}
-              </button>
+            <div className="relative flex justify-center">
+              <span className="bg-popover px-3 text-xs text-muted-foreground uppercase tracking-wide">or</span>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+
+          {/* Guest */}
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => router.push('/')}
+            className="w-full h-11 rounded-[var(--radius)] text-muted-foreground hover:text-foreground"
+          >
+            Continue as Guest
+          </Button>
+          <p className="text-xs text-center text-muted-foreground -mt-2">
+            Your progress will be saved locally on this device
+          </p>
+        </div>
+
+        {/* Switch mode */}
+        <p className="text-center text-sm text-muted-foreground mt-6">
+          {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
+          <button
+            type="button"
+            onClick={() => { setMode(mode === 'login' ? 'signup' : 'login'); setError(''); }}
+            className="text-accent font-semibold hover:underline"
+          >
+            {mode === 'login' ? 'Sign up' : 'Sign in'}
+          </button>
+        </p>
       </div>
+
+      {/* Ornamental bottom border */}
+      <div className="fixed bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
     </div>
   );
 }

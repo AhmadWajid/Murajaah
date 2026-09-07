@@ -5,8 +5,9 @@ import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
-import { RefreshCw, BarChart3, Target, User, LogOut, BookOpen, ChevronDown } from 'lucide-react';
+import { RefreshCw, BarChart3, Target, User, LogOut, BookOpen, ChevronDown, Cloud } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
+import { SyncModal } from '@/components/SyncModal';
 
 interface AppHeaderProps {
   pageType: 'home' | 'quran';
@@ -28,6 +29,7 @@ export default function AppHeader({ pageType, onRefresh, quranHeaderComponent }:
   const { user, signOut } = useAuth();
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [quranToolbarOpen, setQuranToolbarOpen] = useState(true);
+  const [syncOpen, setSyncOpen] = useState(false);
 
   const AccountControl = ({ compact = false }: { compact?: boolean }) =>
     user ? (
@@ -169,6 +171,19 @@ export default function AppHeader({ pageType, onRefresh, quranHeaderComponent }:
                         <RefreshCw className="h-4 w-4" />
                         Refresh
                       </button>
+                      {user && (
+                        <button
+                          onClick={() => {
+                            setSyncOpen(true);
+                            setOverflowOpen(false);
+                          }}
+                          className="flex w-full items-center gap-2.5 rounded-[var(--radius-sm)] px-3 py-2 text-sm hover:bg-secondary"
+                          role="menuitem"
+                        >
+                          <Cloud className="h-4 w-4" />
+                          Sync Data
+                        </button>
+                      )}
                     </div>
                   </>
                 )}
@@ -180,10 +195,25 @@ export default function AppHeader({ pageType, onRefresh, quranHeaderComponent }:
 
           {/* ── Account ── */}
           <div className="flex items-center gap-1.5 shrink-0">
+            {user && (
+              <Tooltip label="Sync data">
+                <Button
+                  variant="ghost"
+                  size={pageType === 'quran' ? 'icon-sm' : 'sm'}
+                  onClick={() => setSyncOpen(true)}
+                  aria-label="Sync data"
+                >
+                  <Cloud className="h-4 w-4" />
+                  {pageType !== 'quran' && <span className="hidden lg:inline">Sync</span>}
+                </Button>
+              </Tooltip>
+            )}
             <AccountControl compact={pageType === 'quran'} />
           </div>
         </div>
       </div>
+
+      <SyncModal open={syncOpen} onOpenChange={setSyncOpen} onSyncComplete={onRefresh} />
 
       {/* ── Collapsible Quran toolbar + trapezoid toggle ── */}
       {pageType === 'quran' && (

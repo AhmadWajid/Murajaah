@@ -350,7 +350,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true });
     }
 
-    // ─── Migration ───
+    // ─── Migration (legacy — uploads local data to DB, merging) ───
     if (op === 'migrate') {
       const { items, mistakes: localMistakes } = body;
       if (items && Array.isArray(items)) {
@@ -375,6 +375,121 @@ export async function POST(request: NextRequest) {
         }
       }
       return NextResponse.json({ success: true });
+    }
+
+    // ─── Sync: upload local data to DB (overwrite DB with local) ───
+    if (op === 'syncUploadLocal') {
+      const { items, mistakes: localMistakes } = body;
+      // Clear all DB data for this user, then insert local data
+      await db.delete(memorizationItems).where(eq(memorizationItems.userId, session.userId));
+      await db.delete(mistakes).where(eq(mistakes.userId, session.userId));
+
+      if (items && Array.isArray(items)) {
+        for (const item of items) {
+          await db.insert(memorizationItems).values(itemToDb(item, session.userId));
+        }
+      }
+      if (localMistakes) {
+        const entries = Object.entries(localMistakes as Record<string, any>);
+        for (const [, m] of entries) {
+          if (typeof m === 'object' && m !== null) {
+            await db.insert(mistakes).values({
+              id: generateId(),
+              userId: session.userId,
+              surah: m.surah,
+              ayah: m.ayah,
+              timestamp: m.timestamp,
+            });
+          }
+        }
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    // ─── Sync: download DB data (return everything for local overwrite) ───
+    if (op === 'syncDownloadDb') {
+      const itemRows = await db.select().from(memorizationItems)
+        .where(eq(memorizationItems.userId, session.userId))
+        .orderBy(asc(memorizationItems.createdAt));
+      const mistakeRows = await db.select().from(mistakes)
+        .where(eq(mistakes.userId, session.userId));
+
+      const mistakesRecord: Record<string, any> = {};
+      mistakeRows.forEach(r => {
+        mistakesRecord[`${r.surah}:${r.ayah}`] = { timestamp: r.timestamp, surah: r.surah, ayah: r.ayah };
+      });
+
+      return NextResponse.json({
+        items: itemRows.map(dbToItem),
+        mistakes: mistakesRecord,
+      });
+    }
+
+    // ─── Sync: merge local into DB (keep newest version of each item) ───
+    if (op === 'syncMerge') {
+      const { items: localItems, mistakes: localMistakes } = body;
+
+      // Get existing DB items
+      const dbRows = await db.select().from(memorizationItems)
+        .where(eq(memorizationItems.userId, session.userId));
+      const dbItemMap = new Map(dbRows.map(r => [r.id, r]));
+
+      if (localItems && Array.isArray(localItems)) {
+        for (const localItem of localItems) {
+          const dbItem = dbItemMap.get(localItem.id);
+          if (!dbItem) {
+            // Item doesn't exist in DB — add it
+            await db.insert(memorizationItems).values(itemToDb(localItem, session.userId));
+          } else {
+            // Item exists in both — keep the one with the more recent lastReviewed
+            const dbLast = dbItem.lastReviewed || '';
+            const localLast = localItem.lastReviewed || '';
+            if (localLast >= dbLast) {
+              // Local is newer or equal — update DB with local
+              await db.update(memorizationItems)
+                .set(itemToDb(localItem, session.userId))
+                .where(and(eq(memorizationItems.id, localItem.id), eq(memorizationItems.userId, session.userId)));
+            }
+            // If DB is newer, keep DB version (do nothing)
+          }
+        }
+      }
+
+      // Merge mistakes — add local mistakes that don't exist in DB
+      if (localMistakes) {
+        const dbMistakeRows = await db.select().from(mistakes)
+          .where(eq(mistakes.userId, session.userId));
+        const dbMistakeKeys = new Set(dbMistakeRows.map(r => `${r.surah}:${r.ayah}`));
+
+        const entries = Object.entries(localMistakes as Record<string, any>);
+        for (const [key, m] of entries) {
+          if (typeof m === 'object' && m !== null && !dbMistakeKeys.has(key)) {
+            await db.insert(mistakes).values({
+              id: generateId(),
+              userId: session.userId,
+              surah: m.surah,
+              ayah: m.ayah,
+              timestamp: m.timestamp,
+            });
+          }
+        }
+      }
+
+      // Return the merged result
+      const mergedItems = await db.select().from(memorizationItems)
+        .where(eq(memorizationItems.userId, session.userId))
+        .orderBy(asc(memorizationItems.createdAt));
+      const mergedMistakes = await db.select().from(mistakes)
+        .where(eq(mistakes.userId, session.userId));
+      const mistakesRecord: Record<string, any> = {};
+      mergedMistakes.forEach(r => {
+        mistakesRecord[`${r.surah}:${r.ayah}`] = { timestamp: r.timestamp, surah: r.surah, ayah: r.ayah };
+      });
+
+      return NextResponse.json({
+        items: mergedItems.map(dbToItem),
+        mistakes: mistakesRecord,
+      });
     }
 
     return NextResponse.json({ error: 'Unknown operation' }, { status: 400 });
