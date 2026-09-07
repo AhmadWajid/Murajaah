@@ -96,6 +96,8 @@ export async function addMemorizationItem(item: MemorizationItem): Promise<void>
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ op: 'addItem', item }),
     });
+    // Keep localStorage in sync so compareLocalAndDb doesn't show a mismatch
+    localStorageService.addMemorizationItem(item);
   } else {
     localStorageService.addMemorizationItem(item);
   }
@@ -108,6 +110,8 @@ export async function updateMemorizationItem(item: MemorizationItem): Promise<vo
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ op: 'updateItem', item }),
     });
+    // Keep localStorage in sync
+    localStorageService.updateMemorizationItem(item);
   } else {
     localStorageService.updateMemorizationItem(item);
   }
@@ -134,12 +138,14 @@ export async function updateMemorizationItemWithIndividualRating(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ op: 'removeItem', id: itemId }),
       });
+      localStorageService.removeMemorizationItem(itemId);
       for (const newItem of result.newItems) {
         await fetch('/api/data', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ op: 'addItem', item: newItem }),
         });
+        localStorageService.addMemorizationItem(newItem);
       }
     } else {
       await fetch('/api/data', {
@@ -147,6 +153,7 @@ export async function updateMemorizationItemWithIndividualRating(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ op: 'updateItem', item: result.updatedItem }),
       });
+      localStorageService.updateMemorizationItem(result.updatedItem);
     }
   } else {
     localStorageService.updateMemorizationItemWithIndividualRating(itemId, ayahNumber, rating);
@@ -160,6 +167,7 @@ export async function removeMemorizationItem(id: string): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ op: 'removeItem', id }),
     });
+    localStorageService.removeMemorizationItem(id);
   } else {
     localStorageService.removeMemorizationItem(id);
   }
@@ -196,6 +204,7 @@ export async function clearAllData(): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ op: 'clearAllItems' }),
     });
+    localStorageService.clearAllData();
   } else {
     localStorageService.clearAllData();
   }
@@ -255,59 +264,57 @@ export async function saveMistakes(mistakes: Record<string, MistakeData | boolea
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ op: 'saveMistakes', mistakes: dbMistakes }),
     });
+    // Keep localStorage in sync
+    localStorageService.saveMistakes(mistakes);
   } else {
     localStorageService.saveMistakes(mistakes);
   }
 }
 
 export async function toggleMistake(surahNumber: number, ayahNumber: number): Promise<Record<string, MistakeData | boolean>> {
-  return withFallback(
-    async () => {
-      const res = await fetch('/api/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ op: 'toggleMistake', surah: surahNumber, ayah: ayahNumber }),
-      });
-      const data = await res.json();
-      return data.mistakes || {};
-    },
-    () => localStorageService.toggleMistake(surahNumber, ayahNumber),
-    {}
-  );
+  if (await isAuthenticated()) {
+    const res = await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'toggleMistake', surah: surahNumber, ayah: ayahNumber }),
+    });
+    const data = await res.json();
+    const mistakes = data.mistakes || {};
+    // Keep localStorage in sync
+    localStorageService.saveMistakes(mistakes);
+    return mistakes;
+  }
+  return localStorageService.toggleMistake(surahNumber, ayahNumber);
 }
 
 export async function showMistake(surahNumber: number, ayahNumber: number): Promise<Record<string, MistakeData | boolean>> {
-  // Same as toggleMistake but only adds (doesn't remove)
-  return withFallback(
-    async () => {
-      // Use toggleMistake logic — if it exists, it stays; if not, it adds
-      const res = await fetch('/api/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ op: 'toggleMistake', surah: surahNumber, ayah: ayahNumber }),
-      });
-      const data = await res.json();
-      return data.mistakes || {};
-    },
-    () => localStorageService.showMistake(surahNumber, ayahNumber),
-    {}
-  );
+  if (await isAuthenticated()) {
+    const res = await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'toggleMistake', surah: surahNumber, ayah: ayahNumber }),
+    });
+    const data = await res.json();
+    const mistakes = data.mistakes || {};
+    localStorageService.saveMistakes(mistakes);
+    return mistakes;
+  }
+  return localStorageService.showMistake(surahNumber, ayahNumber);
 }
 
 export async function removeMistake(surahNumber: number, ayahNumber: number): Promise<Record<string, MistakeData | boolean>> {
-  return withFallback(
-    async () => {
-      const res = await fetch('/api/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ op: 'removeMistake', surah: surahNumber, ayah: ayahNumber }),
-      });
-      const data = await res.json();
-      return data.mistakes || {};
-    },
-    () => localStorageService.removeMistake(surahNumber, ayahNumber),
-    {}
-  );
+  if (await isAuthenticated()) {
+    const res = await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'removeMistake', surah: surahNumber, ayah: ayahNumber }),
+    });
+    const data = await res.json();
+    const mistakes = data.mistakes || {};
+    localStorageService.saveMistakes(mistakes);
+    return mistakes;
+  }
+  return localStorageService.removeMistake(surahNumber, ayahNumber);
 }
 
 export async function clearAllMistakes(): Promise<void> {
@@ -317,6 +324,7 @@ export async function clearAllMistakes(): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ op: 'clearAllMistakes' }),
     });
+    localStorageService.clearAllMistakes();
   } else {
     localStorageService.clearAllMistakes();
   }
@@ -394,9 +402,9 @@ export async function saveSelectedReciter(reciter: string): Promise<void> {
   if (await isAuthenticated()) {
     const current = await fetchSettings();
     await saveSettingsToDb({ ...current, selectedReciter: reciter });
-  } else {
-    localStorageService.saveSelectedReciter(reciter);
   }
+  // Always keep localStorage in sync
+  localStorageService.saveSelectedReciter(reciter);
 }
 
 export async function loadSelectedReciter(): Promise<string> {
@@ -413,9 +421,8 @@ export async function saveHideMistakesSetting(hideMistakes: boolean): Promise<vo
   if (await isAuthenticated()) {
     const current = await fetchSettings();
     await saveSettingsToDb({ ...current, hideMistakes });
-  } else {
-    localStorageService.saveHideMistakesSetting(hideMistakes);
   }
+  localStorageService.saveHideMistakesSetting(hideMistakes);
 }
 
 export async function getHideMistakesSetting(): Promise<boolean> {
@@ -432,9 +439,8 @@ export async function saveLastPage(page: number): Promise<void> {
   if (await isAuthenticated()) {
     const current = await fetchSettings();
     await saveSettingsToDb({ ...current, lastPage: page });
-  } else {
-    localStorageService.saveLastPage(page);
   }
+  localStorageService.saveLastPage(page);
 }
 
 export async function loadLastPage(): Promise<number> {
@@ -472,9 +478,8 @@ export async function saveFontSettings(settings: {
       selectedTranslation: settings.selectedTranslation,
       enableTajweed: settings.enableTajweed,
     });
-  } else {
-    localStorageService.saveFontSettings(settings);
   }
+  localStorageService.saveFontSettings(settings);
 }
 
 export async function loadFontSettings() {
@@ -520,16 +525,16 @@ export async function saveAudioSettings(settings: {
       audioCustomLoop: settings.customLoop,
       audioPlaybackSpeed: settings.playbackSpeed,
     });
-  } else {
-    if (settings.loopMode !== undefined && typeof window !== 'undefined') {
-      localStorage.setItem('mquran_audio_loop_mode', settings.loopMode);
-    }
-    if (settings.customLoop !== undefined && typeof window !== 'undefined') {
-      localStorage.setItem('mquran_audio_custom_loop', JSON.stringify(settings.customLoop));
-    }
-    if (settings.playbackSpeed !== undefined && typeof window !== 'undefined') {
-      localStorage.setItem('mquran_audio_playback_speed', String(settings.playbackSpeed));
-    }
+  }
+  // Always keep localStorage in sync
+  if (settings.loopMode !== undefined && typeof window !== 'undefined') {
+    localStorage.setItem('mquran_audio_loop_mode', settings.loopMode);
+  }
+  if (settings.customLoop !== undefined && typeof window !== 'undefined') {
+    localStorage.setItem('mquran_audio_custom_loop', JSON.stringify(settings.customLoop));
+  }
+  if (settings.playbackSpeed !== undefined && typeof window !== 'undefined') {
+    localStorage.setItem('mquran_audio_playback_speed', String(settings.playbackSpeed));
   }
 }
 
