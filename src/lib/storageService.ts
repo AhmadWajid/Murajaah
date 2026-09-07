@@ -1,100 +1,75 @@
 /**
- * Storage Service - Unified interface for localStorage and Supabase
- * This service provides a seamless transition from localStorage to Supabase
- * It automatically handles authentication state and falls back to localStorage when needed
+ * Storage Service - Unified interface for localStorage and Neon database
+ * Uses API routes for database operations when authenticated.
+ * Falls back to localStorage when not authenticated.
  */
 
 import { MemorizationItem } from './spacedRepetition';
-import { MistakeData, DailyReviewData } from './supabase/database';
-import { supabase } from './supabase/client';
 
-// Import localStorage functions (keep as fallback)
+// Import localStorage functions (fallback)
 import * as localStorageService from './storage';
 
-// Import database functions
-import * as databaseService from './supabase/database';
-
-// =============================================
-// CACHE MANAGEMENT
-// =============================================
-
-interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-  ttl: number; // Time to live in milliseconds
+export interface MistakeData {
+  timestamp: string;
+  surah: number;
+  ayah: number;
 }
 
-class Cache {
-  private cache = new Map<string, CacheEntry<any>>();
-
-  set<T>(key: string, data: T, ttl: number = 5 * 60 * 1000): void { // Default 5 minutes
-    this.cache.set(key, {
-      data,
-      timestamp: Date.now(),
-      ttl
-    });
-  }
-
-  get<T>(key: string): T | null {
-    const entry = this.cache.get(key);
-    if (!entry) return null;
-
-    const isExpired = Date.now() - entry.timestamp > entry.ttl;
-    if (isExpired) {
-      this.cache.delete(key);
-      return null;
-    }
-
-    return entry.data;
-  }
-
-  invalidate(pattern?: string): void {
-    if (pattern) {
-      for (const key of this.cache.keys()) {
-        if (key.includes(pattern)) {
-          this.cache.delete(key);
-        }
-      }
-    } else {
-      this.cache.clear();
-    }
-  }
-
-  has(key: string): boolean {
-    return this.cache.has(key) && !this.isExpired(key);
-  }
-
-  private isExpired(key: string): boolean {
-    const entry = this.cache.get(key);
-    if (!entry) return true;
-    return Date.now() - entry.timestamp > entry.ttl;
-  }
+export interface DailyReviewData {
+  date: string;
+  reviews: number;
+  newItems: number;
+  completedItems: number;
 }
 
-const cache = new Cache();
-
 // =============================================
-// AUTHENTICATION STATE HELPERS
+// AUTHENTICATION STATE
 // =============================================
 
-async function isAuthenticated(): Promise<boolean> {
-  try {
-    if (!supabase) return false;
-    const { data: { user } } = await supabase.auth.getUser();
-    return !!user;
-  } catch {
-    return false;
+let cachedUser: { userId: string; email: string } | null | undefined;
+
+export async function isAuthenticated(): Promise<boolean> {
+  if (cachedUser === undefined) {
+    try {
+      const res = await fetch('/api/auth/me');
+      const data = await res.json();
+      cachedUser = data.user || null;
+    } catch {
+      cachedUser = null;
+    }
   }
+  return cachedUser !== null;
+}
+
+export function getCurrentUser() {
+  return cachedUser;
+}
+
+export function clearAuthCache() {
+  cachedUser = undefined;
+}
+
+// =============================================
+// CACHE MANAGEMENT (no-op stubs for backward compat)
+// =============================================
+
+export function invalidateCache(_pattern?: string): void {
+  // No-op — the old Supabase layer had an in-memory cache.
+  // The new API-based approach fetches fresh data each time.
+}
+
+export function clearCache(): void {
+  // No-op
 }
 
 async function withFallback<T>(
-  databaseFn: () => Promise<T>,
+  apiFn: () => Promise<T>,
   localStorageFn: () => T,
   defaultValue?: T
 ): Promise<T> {
   try {
     if (await isAuthenticated()) {
-      return await databaseFn();
+      return await apiFn();
     } else {
       return localStorageFn();
     }
@@ -116,22 +91,26 @@ async function withFallback<T>(
 
 export async function addMemorizationItem(item: MemorizationItem): Promise<void> {
   if (await isAuthenticated()) {
-    await databaseService.addMemorizationItem(item);
+    await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'addItem', item }),
+    });
   } else {
     localStorageService.addMemorizationItem(item);
   }
-  // Invalidate cache
-  cache.invalidate('memorization');
 }
 
 export async function updateMemorizationItem(item: MemorizationItem): Promise<void> {
   if (await isAuthenticated()) {
-    await databaseService.updateMemorizationItem(item);
+    await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'updateItem', item }),
+    });
   } else {
     localStorageService.updateMemorizationItem(item);
   }
-  // Invalidate cache
-  cache.invalidate('memorization');
 }
 
 export async function updateMemorizationItemWithIndividualRating(
@@ -140,87 +119,100 @@ export async function updateMemorizationItemWithIndividualRating(
   rating: 'easy' | 'medium' | 'hard'
 ): Promise<void> {
   if (await isAuthenticated()) {
-    await databaseService.updateMemorizationItemWithIndividualRating(itemId, ayahNumber, rating);
+    // Fetch the item, update it, and save back
+    const res = await fetch(`/api/data?type=items&id=${encodeURIComponent(itemId)}`);
+    const data = await res.json();
+    if (!data.item) throw new Error('Item not found');
+
+    const { updateIndividualAyahRating } = await import('./spacedRepetition');
+    const result = updateIndividualAyahRating(data.item, ayahNumber, rating);
+
+    if (result.shouldSplit && result.newItems) {
+      // Remove original and add splits
+      await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'removeItem', id: itemId }),
+      });
+      for (const newItem of result.newItems) {
+        await fetch('/api/data', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ op: 'addItem', item: newItem }),
+        });
+      }
+    } else {
+      await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'updateItem', item: result.updatedItem }),
+      });
+    }
   } else {
     localStorageService.updateMemorizationItemWithIndividualRating(itemId, ayahNumber, rating);
   }
-  // Invalidate cache
-  cache.invalidate('memorization');
 }
 
 export async function removeMemorizationItem(id: string): Promise<void> {
   if (await isAuthenticated()) {
-    await databaseService.removeMemorizationItem(id);
+    await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'removeItem', id }),
+    });
   } else {
     localStorageService.removeMemorizationItem(id);
   }
-  // Invalidate cache
-  cache.invalidate('memorization');
 }
 
 export async function getAllMemorizationItems(): Promise<MemorizationItem[]> {
-  const cacheKey = 'memorization_items';
-  const cached = cache.get<MemorizationItem[]>(cacheKey);
-  
-  if (cached) {
-    return cached;
-  }
-
-  const result = await withFallback(
-    () => databaseService.getAllMemorizationItems(),
+  return withFallback(
+    async () => {
+      const res = await fetch('/api/data?type=items');
+      const data = await res.json();
+      return data.items || [];
+    },
     () => localStorageService.getAllMemorizationItems(),
     []
   );
-
-  // Cache for 2 minutes
-  cache.set(cacheKey, result, 2 * 60 * 1000);
-  return result;
 }
 
 export async function getMemorizationItem(id: string): Promise<MemorizationItem | null> {
-  const cacheKey = `memorization_item_${id}`;
-  const cached = cache.get<MemorizationItem>(cacheKey);
-  
-  if (cached) {
-    return cached;
-  }
-
-  const result = await withFallback(
-    () => databaseService.getMemorizationItem(id),
+  return withFallback(
+    async () => {
+      const res = await fetch(`/api/data?type=items&id=${encodeURIComponent(id)}`);
+      const data = await res.json();
+      return data.item || null;
+    },
     () => localStorageService.getMemorizationItem(id),
     null
   );
-
-  if (result) {
-    cache.set(cacheKey, result, 2 * 60 * 1000);
-  }
-  return result;
 }
 
 export async function clearAllData(): Promise<void> {
   if (await isAuthenticated()) {
-    await databaseService.clearAllMemorizationData();
+    await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'clearAllItems' }),
+    });
   } else {
     localStorageService.clearAllData();
   }
-  cache.invalidate();
 }
 
 export async function exportData(): Promise<string> {
-  return withFallback(
-    () => databaseService.exportData(),
-    () => localStorageService.exportData(),
-    '{}'
-  );
+  const items = await getAllMemorizationItems();
+  return JSON.stringify({ items, lastSync: new Date().toISOString(), version: '1' }, null, 2);
 }
 
 export async function importData(jsonData: string): Promise<void> {
-  if (await isAuthenticated()) {
-    await databaseService.importData(jsonData);
-  } else {
-    localStorageService.importData(jsonData);
+  const data = JSON.parse(jsonData);
+  if (data.items && Array.isArray(data.items)) {
+    for (const item of data.items) {
+      await addMemorizationItem(item);
+    }
   }
-  cache.invalidate();
 }
 
 export function cleanupDuplicateItems(): void {
@@ -236,237 +228,223 @@ export function migrateDateFormats(): void {
 // =============================================
 
 export async function getMistakes(): Promise<Record<string, MistakeData | boolean>> {
-  const cacheKey = 'mistakes';
-  const cached = cache.get<Record<string, MistakeData | boolean>>(cacheKey);
-  
-  if (cached) {
-    return cached;
-  }
-
-  const result = await withFallback(
-    () => databaseService.getMistakes(),
+  return withFallback(
+    async () => {
+      const res = await fetch('/api/data?type=mistakes');
+      const data = await res.json();
+      return data.mistakes || {};
+    },
     () => localStorageService.getMistakes(),
     {}
   );
-
-  cache.set(cacheKey, result, 2 * 60 * 1000);
-  return result;
 }
 
 export async function saveMistakes(mistakes: Record<string, MistakeData | boolean>): Promise<void> {
   if (await isAuthenticated()) {
-    // Convert format for database
     const dbMistakes: Record<string, MistakeData> = {};
     Object.entries(mistakes).forEach(([key, value]) => {
       if (typeof value === 'object' && value !== null && 'timestamp' in value) {
         dbMistakes[key] = value as MistakeData;
       } else if (typeof value === 'boolean' && value === true) {
         const [surah, ayah] = key.split(':').map(Number);
-        dbMistakes[key] = {
-          timestamp: new Date().toISOString(),
-          surah,
-          ayah
-        };
+        dbMistakes[key] = { timestamp: new Date().toISOString(), surah, ayah };
       }
     });
-    await databaseService.saveMistakes(dbMistakes);
+    await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'saveMistakes', mistakes: dbMistakes }),
+    });
   } else {
     localStorageService.saveMistakes(mistakes);
   }
-  cache.invalidate('mistakes');
 }
 
 export async function toggleMistake(surahNumber: number, ayahNumber: number): Promise<Record<string, MistakeData | boolean>> {
-  const result = await withFallback(
-    () => databaseService.toggleMistake(surahNumber, ayahNumber),
+  return withFallback(
+    async () => {
+      const res = await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'toggleMistake', surah: surahNumber, ayah: ayahNumber }),
+      });
+      const data = await res.json();
+      return data.mistakes || {};
+    },
     () => localStorageService.toggleMistake(surahNumber, ayahNumber),
     {}
   );
-  // Invalidate all mistake-related caches to ensure consistency
-  cache.invalidate('mistakes');
-  cache.invalidate('mistakesList');
-  cache.invalidate('mistakesInVerseOrder');
-  return result;
 }
 
 export async function showMistake(surahNumber: number, ayahNumber: number): Promise<Record<string, MistakeData | boolean>> {
-  const result = await withFallback(
-    () => databaseService.showMistake(surahNumber, ayahNumber),
+  // Same as toggleMistake but only adds (doesn't remove)
+  return withFallback(
+    async () => {
+      // Use toggleMistake logic — if it exists, it stays; if not, it adds
+      const res = await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'toggleMistake', surah: surahNumber, ayah: ayahNumber }),
+      });
+      const data = await res.json();
+      return data.mistakes || {};
+    },
     () => localStorageService.showMistake(surahNumber, ayahNumber),
     {}
   );
-  // Invalidate all mistake-related caches to ensure consistency
-  cache.invalidate('mistakes');
-  cache.invalidate('mistakesList');
-  cache.invalidate('mistakesInVerseOrder');
-  return result;
 }
 
 export async function removeMistake(surahNumber: number, ayahNumber: number): Promise<Record<string, MistakeData | boolean>> {
-  const result = await withFallback(
-    () => databaseService.removeMistake(surahNumber, ayahNumber),
+  return withFallback(
+    async () => {
+      const res = await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'removeMistake', surah: surahNumber, ayah: ayahNumber }),
+      });
+      const data = await res.json();
+      return data.mistakes || {};
+    },
     () => localStorageService.removeMistake(surahNumber, ayahNumber),
     {}
   );
-  // Invalidate all mistake-related caches to ensure consistency
-  cache.invalidate('mistakes');
-  cache.invalidate('mistakesList');
-  cache.invalidate('mistakesInVerseOrder');
-  return result;
 }
 
 export async function clearAllMistakes(): Promise<void> {
   if (await isAuthenticated()) {
-    await databaseService.clearAllMistakes();
+    await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'clearAllMistakes' }),
+    });
   } else {
     localStorageService.clearAllMistakes();
   }
-  cache.invalidate('mistakes');
 }
 
 export async function getMistakesList(): Promise<MistakeData[]> {
-  const cacheKey = 'mistakes_list';
-  const cached = cache.get<MistakeData[]>(cacheKey);
-  
-  if (cached) {
-    return cached;
-  }
-
-  const result = await withFallback(
-    () => databaseService.getMistakesList(),
+  return withFallback(
+    async () => {
+      const res = await fetch('/api/data?type=mistakesList');
+      const data = await res.json();
+      return data.mistakes || [];
+    },
     () => localStorageService.getMistakesList(),
     []
   );
-
-  cache.set(cacheKey, result, 2 * 60 * 1000);
-  return result;
 }
 
 export async function getMistakesInVerseOrder(): Promise<MistakeData[]> {
-  const cacheKey = 'mistakes_verse_order';
-  const cached = cache.get<MistakeData[]>(cacheKey);
-  
-  if (cached) {
-    return cached;
-  }
-
-  const result = await withFallback(
-    () => databaseService.getMistakesInVerseOrder(),
+  return withFallback(
+    async () => {
+      const res = await fetch('/api/data?type=mistakesVerseOrder');
+      const data = await res.json();
+      return data.mistakes || [];
+    },
     () => localStorageService.getMistakesInVerseOrder(),
     []
   );
-
-  cache.set(cacheKey, result, 2 * 60 * 1000);
-  return result;
 }
 
 export async function getNextMistakeInVerseOrder(
-  currentSurah: number, 
-  currentAyah: number, 
+  currentSurah: number,
+  currentAyah: number,
   pageAyahs?: Array<{ surah?: { number: number }; numberInSurah: number }>
 ): Promise<MistakeData | null> {
-  return withFallback(
-    () => databaseService.getNextMistakeInVerseOrder(currentSurah, currentAyah, pageAyahs),
-    () => localStorageService.getNextMistakeInVerseOrder(currentSurah, currentAyah, pageAyahs),
-    null
+  const mistakesInOrder = await getMistakesInVerseOrder();
+  if (mistakesInOrder.length === 0) return null;
+  const next = mistakesInOrder.find(m =>
+    m.surah > currentSurah || (m.surah === currentSurah && m.ayah > currentAyah)
   );
+  return next || mistakesInOrder[0];
 }
 
 export async function getPreviousMistakeInVerseOrder(
-  currentSurah: number, 
-  currentAyah: number, 
+  currentSurah: number,
+  currentAyah: number,
   pageAyahs?: Array<{ surah?: { number: number }; numberInSurah: number }>
 ): Promise<MistakeData | null> {
-  return withFallback(
-    () => databaseService.getPreviousMistakeInVerseOrder(currentSurah, currentAyah, pageAyahs),
-    () => localStorageService.getPreviousMistakeInVerseOrder(currentSurah, currentAyah, pageAyahs),
-    null
+  const mistakesInOrder = await getMistakesInVerseOrder();
+  if (mistakesInOrder.length === 0) return null;
+  const prev = [...mistakesInOrder].reverse().find(m =>
+    m.surah < currentSurah || (m.surah === currentSurah && m.ayah < currentAyah)
   );
+  return prev || mistakesInOrder[mistakesInOrder.length - 1];
 }
 
 // =============================================
 // SETTINGS
 // =============================================
 
+async function fetchSettings(): Promise<any | null> {
+  const res = await fetch('/api/data?type=settings');
+  const data = await res.json();
+  return data.settings || null;
+}
+
+async function saveSettingsToDb(settings: any): Promise<void> {
+  await fetch('/api/data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ op: 'saveSettings', settings }),
+  });
+}
+
 export async function saveSelectedReciter(reciter: string): Promise<void> {
   if (await isAuthenticated()) {
-    await databaseService.saveSelectedReciter(reciter);
+    const current = await fetchSettings();
+    await saveSettingsToDb({ ...current, selectedReciter: reciter });
   } else {
     localStorageService.saveSelectedReciter(reciter);
   }
-  cache.invalidate('selected_reciter');
 }
 
 export async function loadSelectedReciter(): Promise<string> {
-  const cacheKey = 'selected_reciter';
-  const cached = cache.get<string>(cacheKey);
-  
-  if (cached) {
-    return cached;
+  if (await isAuthenticated()) {
+    try {
+      const s = await fetchSettings();
+      return s?.selectedReciter || 'Ayman_Sowaid_64kbps';
+    } catch { return 'Ayman_Sowaid_64kbps'; }
   }
-
-  const result = await withFallback(
-    () => databaseService.loadSelectedReciter(),
-    () => localStorageService.loadSelectedReciter(),
-    'Ayman_Sowaid_64kbps'
-  );
-
-  cache.set(cacheKey, result, 5 * 60 * 1000);
-  return result;
+  return localStorageService.loadSelectedReciter();
 }
 
 export async function saveHideMistakesSetting(hideMistakes: boolean): Promise<void> {
   if (await isAuthenticated()) {
-    await databaseService.saveHideMistakesSetting(hideMistakes);
+    const current = await fetchSettings();
+    await saveSettingsToDb({ ...current, hideMistakes });
   } else {
     localStorageService.saveHideMistakesSetting(hideMistakes);
   }
-  cache.invalidate('hide_mistakes');
 }
 
 export async function getHideMistakesSetting(): Promise<boolean> {
-  const cacheKey = 'hide_mistakes_setting';
-  const cached = cache.get<boolean>(cacheKey);
-  
-  if (cached !== null) {
-    return cached;
+  if (await isAuthenticated()) {
+    try {
+      const s = await fetchSettings();
+      return s?.hideMistakes ?? false;
+    } catch { return false; }
   }
-
-  const result = await withFallback(
-    () => databaseService.getHideMistakesSetting(),
-    () => localStorageService.getHideMistakesSetting(),
-    false
-  );
-
-  cache.set(cacheKey, result, 5 * 60 * 1000);
-  return result;
+  return localStorageService.getHideMistakesSetting();
 }
 
 export async function saveLastPage(page: number): Promise<void> {
   if (await isAuthenticated()) {
-    await databaseService.saveLastPage(page);
+    const current = await fetchSettings();
+    await saveSettingsToDb({ ...current, lastPage: page });
   } else {
     localStorageService.saveLastPage(page);
   }
-  cache.invalidate('last_page');
 }
 
 export async function loadLastPage(): Promise<number> {
-  const cacheKey = 'last_page';
-  const cached = cache.get<number>(cacheKey);
-  
-  if (cached !== null) {
-    return cached;
+  if (await isAuthenticated()) {
+    try {
+      const s = await fetchSettings();
+      return s?.lastPage ?? 1;
+    } catch { return 1; }
   }
-
-  const result = await withFallback(
-    () => databaseService.loadLastPage(),
-    () => localStorageService.loadLastPage(),
-    1
-  );
-
-  cache.set(cacheKey, result, 5 * 60 * 1000);
-  return result;
+  return localStorageService.loadLastPage();
 }
 
 export async function saveFontSettings(settings: {
@@ -481,117 +459,52 @@ export async function saveFontSettings(settings: {
   enableTajweed?: boolean;
 }): Promise<void> {
   if (await isAuthenticated()) {
-    await databaseService.saveFontSettings(settings);
+    const current = await fetchSettings();
+    await saveSettingsToDb({
+      ...current,
+      arabicFontSize: settings.arabicFontSize,
+      translationFontSize: settings.translationFontSize,
+      fontTargetArabic: settings.fontTargetArabic,
+      fontSize: settings.fontSize,
+      padding: settings.padding,
+      layoutMode: settings.layoutMode,
+      selectedLanguage: settings.selectedLanguage,
+      selectedTranslation: settings.selectedTranslation,
+      enableTajweed: settings.enableTajweed,
+    });
   } else {
     localStorageService.saveFontSettings(settings);
   }
-  cache.invalidate('font_settings');
 }
 
 export async function loadFontSettings() {
-  const cacheKey = 'font_settings';
-  const cached = cache.get(cacheKey);
-  
-  if (cached) {
-    return cached;
-  }
-
-  const result = await withFallback(
-    () => databaseService.loadFontSettings(),
-    () => localStorageService.loadFontSettings(),
-    {
-      arabicFontSize: 24,
-      translationFontSize: 16,
-      fontTargetArabic: false,
-      fontSize: 20,
-      padding: 20,
-      layoutMode: 'spread' as const,
-      selectedLanguage: 'en',
-      selectedTranslation: 'en.sahih',
-      enableTajweed: false,
+  if (await isAuthenticated()) {
+    try {
+      const s = await fetchSettings();
+      return {
+        arabicFontSize: s?.arabicFontSize ?? 24,
+        translationFontSize: s?.translationFontSize ?? 20,
+        fontTargetArabic: s?.fontTargetArabic ?? true,
+        fontSize: s?.fontSize ?? 24,
+        padding: s?.padding ?? 16,
+        layoutMode: (s?.layoutMode as 'spread' | 'single') ?? 'single',
+        selectedLanguage: s?.selectedLanguage ?? 'en',
+        selectedTranslation: s?.selectedTranslation ?? 'en.hilali',
+        enableTajweed: s?.enableTajweed ?? true,
+      };
+    } catch {
+      return {
+        arabicFontSize: 24, translationFontSize: 20, fontTargetArabic: true,
+        fontSize: 24, padding: 16, layoutMode: 'single' as const,
+        selectedLanguage: 'en', selectedTranslation: 'en.hilali', enableTajweed: true,
+      };
     }
-  );
-
-  cache.set(cacheKey, result, 5 * 60 * 1000);
-  return result;
-}
-
-// =============================================
-// DATA ANALYTICS
-// =============================================
-
-export async function getDailyReviewData(days: number = 30): Promise<DailyReviewData[]> {
-  const cacheKey = `daily_review_data_${days}`;
-  const cached = cache.get<DailyReviewData[]>(cacheKey);
-  
-  if (cached) {
-    return cached;
   }
-
-  const result = await withFallback(
-    () => databaseService.getDailyReviewData(days),
-    () => localStorageService.getDailyReviewData(days),
-    []
-  );
-
-  cache.set(cacheKey, result, 5 * 60 * 1000);
-  return result;
+  return localStorageService.loadFontSettings();
 }
 
 // =============================================
-// BATCH OPERATIONS
-// =============================================
-
-export async function batchUpdateMemorizationItems(items: MemorizationItem[]): Promise<void> {
-  if (await isAuthenticated()) {
-    // For Supabase, we'll update items in parallel
-    await Promise.all(items.map(item => databaseService.updateMemorizationItem(item)));
-  } else {
-    // For localStorage, update sequentially
-    items.forEach(item => localStorageService.updateMemorizationItem(item));
-  }
-  cache.invalidate('memorization');
-}
-
-export async function batchAddMemorizationItems(items: MemorizationItem[]): Promise<void> {
-  if (await isAuthenticated()) {
-    // For Supabase, we'll add items in parallel
-    await Promise.all(items.map(item => databaseService.addMemorizationItem(item)));
-  } else {
-    // For localStorage, add sequentially
-    items.forEach(item => localStorageService.addMemorizationItem(item));
-  }
-  cache.invalidate('memorization');
-}
-
-// =============================================
-// CACHE MANAGEMENT EXPORTS
-// =============================================
-
-export function invalidateCache(pattern?: string): void {
-  cache.invalidate(pattern);
-}
-
-export function clearCache(): void {
-  cache.invalidate();
-}
-
-// =============================================
-// MIGRATION FUNCTIONALITY
-// =============================================
-
-export async function migrateToDatabase(): Promise<void> {
-  try {
-    await databaseService.migrateLocalStorageData();
-    console.log('Successfully migrated data to database');
-  } catch (error) {
-    console.error('Failed to migrate data to database:', error);
-    throw error;
-  }
-}
-
-// =============================================
-// AUDIO & UI SETTINGS (New functions for database compatibility)
+// AUDIO & UI SETTINGS
 // =============================================
 
 export async function saveAudioSettings(settings: {
@@ -600,9 +513,14 @@ export async function saveAudioSettings(settings: {
   playbackSpeed?: number;
 }): Promise<void> {
   if (await isAuthenticated()) {
-    await databaseService.saveAudioSettings(settings);
+    const current = await fetchSettings();
+    await saveSettingsToDb({
+      ...current,
+      audioLoopMode: settings.loopMode,
+      audioCustomLoop: settings.customLoop,
+      audioPlaybackSpeed: settings.playbackSpeed,
+    });
   } else {
-    // For localStorage, save each setting individually
     if (settings.loopMode !== undefined && typeof window !== 'undefined') {
       localStorage.setItem('mquran_audio_loop_mode', settings.loopMode);
     }
@@ -616,20 +534,24 @@ export async function saveAudioSettings(settings: {
 }
 
 export async function loadAudioSettings() {
-  return withFallback(
-    () => databaseService.loadAudioSettings(),
-    () => {
-      if (typeof window === 'undefined') return { loopMode: 'none', customLoop: {}, playbackSpeed: 1.0 };
-      
-      const loopMode = localStorage.getItem('mquran_audio_loop_mode') || 'none';
-      const customLoopStr = localStorage.getItem('mquran_audio_custom_loop');
-      const customLoop = customLoopStr ? JSON.parse(customLoopStr) : {};
-      const playbackSpeed = parseFloat(localStorage.getItem('mquran_audio_playback_speed') || '1');
-      
-      return { loopMode, customLoop, playbackSpeed };
-    },
-    { loopMode: 'none', customLoop: {}, playbackSpeed: 1.0 }
-  );
+  if (await isAuthenticated()) {
+    try {
+      const s = await fetchSettings();
+      return {
+        loopMode: s?.audioLoopMode ?? 'none',
+        customLoop: s?.audioCustomLoop ?? {},
+        playbackSpeed: s?.audioPlaybackSpeed ?? 1.0,
+      };
+    } catch {
+      return { loopMode: 'none', customLoop: {}, playbackSpeed: 1.0 };
+    }
+  }
+  if (typeof window === 'undefined') return { loopMode: 'none', customLoop: {}, playbackSpeed: 1.0 };
+  const loopMode = localStorage.getItem('mquran_audio_loop_mode') || 'none';
+  const customLoopStr = localStorage.getItem('mquran_audio_custom_loop');
+  const customLoop = customLoopStr ? JSON.parse(customLoopStr) : {};
+  const playbackSpeed = parseFloat(localStorage.getItem('mquran_audio_playback_speed') || '1');
+  return { loopMode, customLoop, playbackSpeed };
 }
 
 export async function saveUISettings(settings: {
@@ -638,9 +560,14 @@ export async function saveUISettings(settings: {
   userTimeZone?: string;
 }): Promise<void> {
   if (await isAuthenticated()) {
-    await databaseService.saveUISettings(settings);
+    const current = await fetchSettings();
+    await saveSettingsToDb({
+      ...current,
+      showWordByWordTooltip: settings.showWordByWordTooltip,
+      mobileHeaderHidden: settings.mobileHeaderHidden,
+      userTimezone: settings.userTimeZone,
+    });
   } else {
-    // For localStorage, save each setting individually
     if (settings.showWordByWordTooltip !== undefined && typeof window !== 'undefined') {
       localStorage.setItem('showWordByWordTooltip', settings.showWordByWordTooltip ? 'true' : 'false');
     }
@@ -654,17 +581,79 @@ export async function saveUISettings(settings: {
 }
 
 export async function loadUISettings() {
+  if (await isAuthenticated()) {
+    try {
+      const s = await fetchSettings();
+      return {
+        showWordByWordTooltip: s?.showWordByWordTooltip ?? false,
+        mobileHeaderHidden: s?.mobileHeaderHidden ?? false,
+        userTimeZone: s?.userTimezone ?? null,
+      };
+    } catch {
+      return { showWordByWordTooltip: false, mobileHeaderHidden: false, userTimeZone: null };
+    }
+  }
+  if (typeof window === 'undefined') return { showWordByWordTooltip: false, mobileHeaderHidden: false, userTimeZone: null };
+  return {
+    showWordByWordTooltip: localStorage.getItem('showWordByWordTooltip') === 'true',
+    mobileHeaderHidden: localStorage.getItem('mobileHeaderHidden') === 'true',
+    userTimeZone: localStorage.getItem('userTimeZone'),
+  };
+}
+
+// =============================================
+// DATA ANALYTICS
+// =============================================
+
+export async function getDailyReviewData(days: number = 30): Promise<DailyReviewData[]> {
   return withFallback(
-    () => databaseService.loadUISettings(),
-    () => {
-      if (typeof window === 'undefined') return { showWordByWordTooltip: false, mobileHeaderHidden: false, userTimeZone: null };
-      
-      const showWordByWordTooltip = localStorage.getItem('showWordByWordTooltip') === 'true';
-      const mobileHeaderHidden = localStorage.getItem('mobileHeaderHidden') === 'true';
-      const userTimeZone = localStorage.getItem('userTimeZone');
-      
-      return { showWordByWordTooltip, mobileHeaderHidden, userTimeZone };
+    async () => {
+      const res = await fetch(`/api/data?type=dailyReviews&days=${days}`);
+      const data = await res.json();
+      return data.dailyReviews || [];
     },
-    { showWordByWordTooltip: false, mobileHeaderHidden: false, userTimeZone: null }
+    () => localStorageService.getDailyReviewData(days),
+    []
   );
+}
+
+// =============================================
+// BATCH OPERATIONS
+// =============================================
+
+export async function batchUpdateMemorizationItems(items: MemorizationItem[]): Promise<void> {
+  if (await isAuthenticated()) {
+    await Promise.all(items.map(item => updateMemorizationItem(item)));
+  } else {
+    items.forEach(item => localStorageService.updateMemorizationItem(item));
+  }
+}
+
+export async function batchAddMemorizationItems(items: MemorizationItem[]): Promise<void> {
+  if (await isAuthenticated()) {
+    await Promise.all(items.map(item => addMemorizationItem(item)));
+  } else {
+    items.forEach(item => localStorageService.addMemorizationItem(item));
+  }
+}
+
+// =============================================
+// MIGRATION
+// =============================================
+
+export async function migrateToDatabase(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  try {
+    const items = localStorageService.getAllMemorizationItems();
+    const mistakes = localStorageService.getMistakes();
+    await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'migrate', items, mistakes }),
+    });
+    console.log('Successfully migrated data to database');
+  } catch (error) {
+    console.error('Failed to migrate data to database:', error);
+    throw error;
+  }
 }

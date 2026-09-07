@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useTransition } from 'react';
 import Link from 'next/link';
 import { getAllMemorizationItems, getDailyReviewData } from '@/lib/storageService';
-import { DailyReviewData } from '@/lib/supabase/database';
+import { DailyReviewData } from '@/lib/storageService';
 import { MemorizationItem, getDueItems, getUpcomingReviews, resetDailyCompletions } from '@/lib/spacedRepetition';
 import { formatAyahRange } from '@/lib/quran';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';

@@ -28,7 +28,7 @@ import {
 } from 'lucide-react';
 import { getLanguagesWithTranslations } from '@/lib/quranService';
 import { getNextMistakeInVerseOrder, getPreviousMistakeInVerseOrder } from '@/lib/storageService';
-import { MistakeData } from '@/lib/supabase/database';
+import { MistakeData } from '@/lib/storageService';
 import TajweedLegend from '@/components/TajweedLegend';
 
 interface QuranHeaderContentProps {

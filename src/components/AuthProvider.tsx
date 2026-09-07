@@ -1,20 +1,25 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState } from 'react';
-import { User } from '@supabase/supabase-js';
-import { supabase } from '@/lib/supabase/client';
-import { clearUserCache } from '@/lib/supabase/database';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { clearAuthCache } from '@/lib/storageService';
+
+interface AuthUser {
+  id: string;
+  email: string;
+}
 
 interface AuthContextType {
-  user: User | null;
+  user: AuthUser | null;
   loading: boolean;
   signOut: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
   user: null,
   loading: true,
   signOut: async () => {},
+  refreshUser: async () => {},
 });
 
 export const useAuth = () => {
@@ -30,49 +35,37 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Get initial session
-    const getInitialSession = async () => {
-      if (supabase) {
-        const { data: { session } } = await supabase.auth.getSession();
-        setUser(session?.user ?? null);
-      }
+  const refreshUser = useCallback(async () => {
+    try {
+      const res = await fetch('/api/auth/me');
+      const data = await res.json();
+      setUser(data.user || null);
+      clearAuthCache();
+    } catch {
+      setUser(null);
+    } finally {
       setLoading(false);
-    };
-
-    getInitialSession();
-
-    // Listen for auth changes
-    if (supabase) {
-      const { data: { subscription } } = supabase.auth.onAuthStateChange(
-        async (event, session) => {
-          setUser(session?.user ?? null);
-          setLoading(false);
-          
-          // Clear user cache on auth state changes
-          if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED') {
-            clearUserCache();
-          }
-        }
-      );
-
-      return () => subscription.unsubscribe();
     }
   }, []);
 
-  const signOut = async () => {
-    if (supabase) {
-      await supabase.auth.signOut();
-    }
-  };
+  useEffect(() => {
+    refreshUser();
+  }, [refreshUser]);
+
+  const signOut = useCallback(async () => {
+    await fetch('/api/auth/signout', { method: 'POST' });
+    setUser(null);
+    clearAuthCache();
+  }, []);
 
   const value = {
     user,
     loading,
     signOut,
+    refreshUser,
   };
 
   return (

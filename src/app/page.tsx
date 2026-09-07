@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useTransition, useRef } from
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getAllMemorizationItems, updateMemorizationItem, removeMemorizationItem, cleanupDuplicateItems, getMistakesList, removeMistake, addMemorizationItem, batchUpdateMemorizationItems } from '@/lib/storageService';
-import { MistakeData } from '@/lib/supabase/database';
+import { MistakeData } from '@/lib/storageService';
 import { generateMemorizationId, getTodayISODate } from '@/lib/utils';
 import { MemorizationItem, updateInterval, updateIntervalWithSettings, resetDailyCompletions, getDueItems, getUpcomingReviews, createMemorizationItem } from '@/lib/spacedRepetition';
 import { ReviewSettings, getReviewSettings, saveReviewSettings, previewIntervals, ALGORITHM_INFO, AlgorithmType, DEFAULT_SETTINGS } from '@/lib/reviewAlgorithms';

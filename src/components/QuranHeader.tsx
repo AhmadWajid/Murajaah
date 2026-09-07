@@ -33,7 +33,7 @@ import {
 } from 'lucide-react';
 import { getLanguagesWithTranslations } from '@/lib/quranService';
 import { loadFontSettings, saveFontSettings, getNextMistakeInVerseOrder } from '@/lib/storageService';
-import { MistakeData } from '@/lib/supabase/database';
+import { MistakeData } from '@/lib/storageService';
 
 interface QuranHeaderProps {
   currentPage: number;

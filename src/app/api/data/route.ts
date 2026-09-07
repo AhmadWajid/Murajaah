@@ -1,0 +1,385 @@
+/**
+ * Unified data API route for all database operations.
+ * Replaces the Supabase client-side SDK calls with server-side Drizzle queries.
+ *
+ * Operations:
+ *  GET    /api/data?type=items              — get all memorization items
+ *  GET    /api/data?type=items&id=xxx       — get single item
+ *  GET    /api/data?type=mistakes           — get all mistakes
+ *  GET    /api/data?type=mistakesList       — get mistakes as array
+ *  GET    /api/data?type=settings           — get user settings
+ *  GET    /api/data?type=dailyReviews&days=30 — get daily review data
+ *
+ *  POST   /api/data  { op: 'addItem', item }
+ *  POST   /api/data  { op: 'updateItem', item }
+ *  POST   /api/data  { op: 'removeItem', id }
+ *  POST   /api/data  { op: 'toggleMistake', surah, ayah }
+ *  POST   /api/data  { op: 'removeMistake', surah, ayah }
+ *  POST   /api/data  { op: 'clearAllMistakes' }
+ *  POST   /api/data  { op: 'clearAllItems' }
+ *  POST   /api/data  { op: 'saveSettings', settings }
+ *  POST   /api/data  { op: 'saveMistakes', mistakes }
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import { db } from '@/lib/neon/client';
+import { memorizationItems, mistakes, userSettings, storageMetadata } from '@/lib/neon/schema';
+import { getSessionFromCookie, generateId } from '@/lib/auth';
+import { eq, and, asc, desc } from 'drizzle-orm';
+import { MemorizationItem } from '@/lib/spacedRepetition';
+import { getTodayISODate } from '@/lib/utils';
+
+// ─── Converters ───
+function dbToItem(row: typeof memorizationItems.$inferSelect): MemorizationItem {
+  return {
+    id: row.id,
+    surah: row.surah,
+    ayahStart: row.ayahStart,
+    ayahEnd: row.ayahEnd,
+    interval: row.intervalDays,
+    nextReview: row.nextReview,
+    easeFactor: row.easeFactor,
+    reviewCount: row.reviewCount,
+    lastReviewed: row.lastReviewed || undefined,
+    completedToday: row.completedToday || undefined,
+    createdAt: row.createdAt,
+    memorizationAge: row.memorizationAge || undefined,
+    individualRatings: row.individualRatings as any || undefined,
+    individualRecallQuality: row.individualRecallQuality as any || undefined,
+    rukuStart: row.rukuStart || undefined,
+    rukuEnd: row.rukuEnd || undefined,
+    rukuCount: row.rukuCount || undefined,
+    difficultyLevel: row.difficultyLevel as any || undefined,
+    name: row.name || undefined,
+    description: row.description || undefined,
+    tags: row.tags as any || undefined,
+    isBeginner: row.isBeginner || undefined,
+    beginnerStartedAtReview: row.beginnerStartedAtReview || undefined,
+    stability: row.stability || undefined,
+    difficulty: row.difficulty || undefined,
+  };
+}
+
+function itemToDb(item: MemorizationItem, userId: string) {
+  return {
+    id: item.id,
+    userId,
+    surah: item.surah,
+    ayahStart: item.ayahStart,
+    ayahEnd: item.ayahEnd,
+    intervalDays: item.interval,
+    nextReview: item.nextReview,
+    easeFactor: item.easeFactor,
+    reviewCount: item.reviewCount,
+    lastReviewed: item.lastReviewed || null,
+    completedToday: item.completedToday || null,
+    createdAt: item.createdAt,
+    memorizationAge: item.memorizationAge || null,
+    individualRatings: item.individualRatings || {},
+    individualRecallQuality: item.individualRecallQuality || {},
+    rukuStart: item.rukuStart || null,
+    rukuEnd: item.rukuEnd || null,
+    rukuCount: item.rukuCount || null,
+    difficultyLevel: item.difficultyLevel || null,
+    name: item.name || null,
+    description: item.description || null,
+    tags: item.tags || [],
+    isBeginner: item.isBeginner ?? null,
+    beginnerStartedAtReview: item.beginnerStartedAtReview ?? null,
+    stability: item.stability ?? null,
+    difficulty: item.difficulty ?? null,
+  };
+}
+
+// ─── Auth guard ───
+async function requireAuth() {
+  const session = await getSessionFromCookie();
+  if (!session) return null;
+  return session;
+}
+
+// ─── GET ───
+export async function GET(request: NextRequest) {
+  try {
+    const session = await requireAuth();
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!db) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+
+    const { searchParams } = new URL(request.url);
+    const type = searchParams.get('type');
+    const id = searchParams.get('id');
+    const days = parseInt(searchParams.get('days') || '30');
+
+    if (type === 'items') {
+      if (id) {
+        const rows = await db.select().from(memorizationItems)
+          .where(and(eq(memorizationItems.id, id), eq(memorizationItems.userId, session.userId)))
+          .limit(1);
+        if (rows.length === 0) return NextResponse.json({ item: null });
+        return NextResponse.json({ item: dbToItem(rows[0]) });
+      }
+      const rows = await db.select().from(memorizationItems)
+        .where(eq(memorizationItems.userId, session.userId))
+        .orderBy(asc(memorizationItems.createdAt));
+      return NextResponse.json({ items: rows.map(dbToItem) });
+    }
+
+    if (type === 'mistakes') {
+      const rows = await db.select().from(mistakes)
+        .where(eq(mistakes.userId, session.userId));
+      const record: Record<string, any> = {};
+      rows.forEach(r => {
+        record[`${r.surah}:${r.ayah}`] = { timestamp: r.timestamp, surah: r.surah, ayah: r.ayah };
+      });
+      return NextResponse.json({ mistakes: record });
+    }
+
+    if (type === 'mistakesList') {
+      const rows = await db.select().from(mistakes)
+        .where(eq(mistakes.userId, session.userId))
+        .orderBy(desc(mistakes.timestamp));
+      return NextResponse.json({ mistakes: rows.map(r => ({ timestamp: r.timestamp, surah: r.surah, ayah: r.ayah })) });
+    }
+
+    if (type === 'mistakesVerseOrder') {
+      const rows = await db.select().from(mistakes)
+        .where(eq(mistakes.userId, session.userId))
+        .orderBy(asc(mistakes.surah), asc(mistakes.ayah));
+      return NextResponse.json({ mistakes: rows.map(r => ({ timestamp: r.timestamp, surah: r.surah, ayah: r.ayah })) });
+    }
+
+    if (type === 'settings') {
+      const rows = await db.select().from(userSettings)
+        .where(eq(userSettings.userId, session.userId))
+        .limit(1);
+      if (rows.length === 0) {
+        return NextResponse.json({ settings: null });
+      }
+      const s = rows[0];
+      return NextResponse.json({
+        settings: {
+          selectedReciter: s.selectedReciter,
+          hideMistakes: s.hideMistakes,
+          lastPage: s.lastPage,
+          arabicFontSize: s.arabicFontSize,
+          translationFontSize: s.translationFontSize,
+          fontTargetArabic: s.fontTargetArabic,
+          fontSize: s.fontSize,
+          padding: s.padding,
+          layoutMode: s.layoutMode,
+          selectedLanguage: s.selectedLanguage,
+          selectedTranslation: s.selectedTranslation,
+          enableTajweed: s.enableTajweed,
+          audioLoopMode: s.audioLoopMode,
+          audioCustomLoop: s.audioCustomLoop,
+          audioPlaybackSpeed: s.audioPlaybackSpeed,
+          showWordByWordTooltip: s.showWordByWordTooltip,
+          mobileHeaderHidden: s.mobileHeaderHidden,
+          userTimezone: s.userTimezone,
+        },
+      });
+    }
+
+    if (type === 'dailyReviews') {
+      const rows = await db.select().from(memorizationItems)
+        .where(eq(memorizationItems.userId, session.userId));
+      const today = new Date();
+      const dailyData: Record<string, { date: string; reviews: number; newItems: number; completedItems: number }> = {};
+      for (let i = days - 1; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const ds = d.toISOString().split('T')[0];
+        dailyData[ds] = { date: ds, reviews: 0, newItems: 0, completedItems: 0 };
+      }
+      rows.forEach(item => {
+        if (item.lastReviewed) {
+          const rd = item.lastReviewed.split('T')[0];
+          if (dailyData[rd]) dailyData[rd].reviews += 1;
+        }
+        if (item.completedToday) {
+          if (dailyData[item.completedToday]) dailyData[item.completedToday].completedItems += 1;
+        }
+        if (item.createdAt) {
+          const cd = item.createdAt.split('T')[0];
+          if (dailyData[cd]) dailyData[cd].newItems += 1;
+        }
+      });
+      return NextResponse.json({ dailyReviews: Object.values(dailyData).sort((a, b) => a.date.localeCompare(b.date)) });
+    }
+
+    return NextResponse.json({ error: 'Unknown type' }, { status: 400 });
+  } catch (error) {
+    console.error('Data GET error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+
+// ─── POST ───
+export async function POST(request: NextRequest) {
+  try {
+    const session = await requireAuth();
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (!db) return NextResponse.json({ error: 'Database not configured' }, { status: 500 });
+
+    const body = await request.json();
+    const { op } = body;
+
+    // ─── Memorization Items ───
+    if (op === 'addItem') {
+      await db.insert(memorizationItems)
+        .values(itemToDb(body.item, session.userId))
+        .onConflictDoUpdate({ target: memorizationItems.id, set: itemToDb(body.item, session.userId) });
+      return NextResponse.json({ success: true });
+    }
+
+    if (op === 'updateItem') {
+      await db.update(memorizationItems)
+        .set(itemToDb(body.item, session.userId))
+        .where(and(eq(memorizationItems.id, body.item.id), eq(memorizationItems.userId, session.userId)));
+      return NextResponse.json({ success: true });
+    }
+
+    if (op === 'removeItem') {
+      await db.delete(memorizationItems)
+        .where(and(eq(memorizationItems.id, body.id), eq(memorizationItems.userId, session.userId)));
+      return NextResponse.json({ success: true });
+    }
+
+    if (op === 'clearAllItems') {
+      await db.delete(memorizationItems)
+        .where(eq(memorizationItems.userId, session.userId));
+      return NextResponse.json({ success: true });
+    }
+
+    // ─── Mistakes ───
+    if (op === 'toggleMistake') {
+      const { surah, ayah } = body;
+      const existing = await db.select().from(mistakes)
+        .where(and(eq(mistakes.userId, session.userId), eq(mistakes.surah, surah), eq(mistakes.ayah, ayah)))
+        .limit(1);
+      if (existing.length > 0) {
+        await db.delete(mistakes)
+          .where(and(eq(mistakes.userId, session.userId), eq(mistakes.surah, surah), eq(mistakes.ayah, ayah)));
+      } else {
+        await db.insert(mistakes).values({
+          id: generateId(),
+          userId: session.userId,
+          surah,
+          ayah,
+          timestamp: new Date().toISOString(),
+        });
+      }
+      // Return all mistakes
+      const rows = await db.select().from(mistakes).where(eq(mistakes.userId, session.userId));
+      const record: Record<string, any> = {};
+      rows.forEach(r => {
+        record[`${r.surah}:${r.ayah}`] = { timestamp: r.timestamp, surah: r.surah, ayah: r.ayah };
+      });
+      return NextResponse.json({ mistakes: record });
+    }
+
+    if (op === 'removeMistake') {
+      const { surah, ayah } = body;
+      await db.delete(mistakes)
+        .where(and(eq(mistakes.userId, session.userId), eq(mistakes.surah, surah), eq(mistakes.ayah, ayah)));
+      const rows = await db.select().from(mistakes).where(eq(mistakes.userId, session.userId));
+      const record: Record<string, any> = {};
+      rows.forEach(r => {
+        record[`${r.surah}:${r.ayah}`] = { timestamp: r.timestamp, surah: r.surah, ayah: r.ayah };
+      });
+      return NextResponse.json({ mistakes: record });
+    }
+
+    if (op === 'clearAllMistakes') {
+      await db.delete(mistakes).where(eq(mistakes.userId, session.userId));
+      return NextResponse.json({ success: true });
+    }
+
+    if (op === 'saveMistakes') {
+      // Replace all mistakes
+      await db.delete(mistakes).where(eq(mistakes.userId, session.userId));
+      const entries = Object.entries(body.mistakes as Record<string, any>);
+      if (entries.length > 0) {
+        await db.insert(mistakes).values(
+          entries.map(([key, m]) => ({
+            id: generateId(),
+            userId: session.userId,
+            surah: m.surah,
+            ayah: m.ayah,
+            timestamp: m.timestamp,
+          }))
+        );
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    // ─── Settings ───
+    if (op === 'saveSettings') {
+      const s = body.settings;
+      // Upsert settings
+      const existing = await db.select().from(userSettings)
+        .where(eq(userSettings.userId, session.userId))
+        .limit(1);
+
+      const settingsData = {
+        userId: session.userId,
+        selectedReciter: s.selectedReciter,
+        hideMistakes: s.hideMistakes,
+        lastPage: s.lastPage,
+        arabicFontSize: s.arabicFontSize,
+        translationFontSize: s.translationFontSize,
+        fontTargetArabic: s.fontTargetArabic,
+        fontSize: s.fontSize,
+        padding: s.padding,
+        layoutMode: s.layoutMode,
+        selectedLanguage: s.selectedLanguage,
+        selectedTranslation: s.selectedTranslation,
+        enableTajweed: s.enableTajweed,
+        audioLoopMode: s.audioLoopMode,
+        audioCustomLoop: s.audioCustomLoop,
+        audioPlaybackSpeed: s.audioPlaybackSpeed,
+        showWordByWordTooltip: s.showWordByWordTooltip,
+        mobileHeaderHidden: s.mobileHeaderHidden,
+        userTimezone: s.userTimezone,
+      };
+
+      if (existing.length > 0) {
+        await db.update(userSettings).set(settingsData).where(eq(userSettings.userId, session.userId));
+      } else {
+        await db.insert(userSettings).values(settingsData);
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    // ─── Migration ───
+    if (op === 'migrate') {
+      const { items, mistakes: localMistakes } = body;
+      if (items && Array.isArray(items)) {
+        for (const item of items) {
+          await db.insert(memorizationItems)
+            .values(itemToDb(item, session.userId))
+            .onConflictDoUpdate({ target: memorizationItems.id, set: itemToDb(item, session.userId) });
+        }
+      }
+      if (localMistakes) {
+        const entries = Object.entries(localMistakes as Record<string, any>);
+        for (const [key, m] of entries) {
+          if (typeof m === 'object' && m !== null) {
+            await db.insert(mistakes).values({
+              id: generateId(),
+              userId: session.userId,
+              surah: m.surah,
+              ayah: m.ayah,
+              timestamp: m.timestamp,
+            }).onConflictDoNothing();
+          }
+        }
+      }
+      return NextResponse.json({ success: true });
+    }
+
+    return NextResponse.json({ error: 'Unknown operation' }, { status: 400 });
+  } catch (error) {
+    console.error('Data POST error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}

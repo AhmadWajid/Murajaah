@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { MistakeData } from '@/lib/supabase/database';
+import { MistakeData } from '@/lib/storageService';
 import { TajweedAyahText } from './TajweedAyahText';
 import { useIsMobile } from '@/lib/hooks/useIsMobile';
 import { TajweedBreakdownModal } from './TajweedBreakdownModal';

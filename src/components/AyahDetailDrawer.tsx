@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import AyahCard from './AyahCard';
 import { X } from 'lucide-react';
-import { MistakeData } from '@/lib/supabase/database';
+import { MistakeData } from '@/lib/storageService';
 
 interface AyahDetailDrawerProps {
   isOpen: boolean;
