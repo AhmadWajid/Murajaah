@@ -425,7 +425,7 @@ export default function ReviewCard({ item, onComplete, onViewInQuran }: ReviewCa
               
               {/* Recall Quality Section */}
               <div className="px-3 py-2 text-xs font-medium text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-700 mt-2">
-                Recall Quality
+                How well did you remember?
               </div>
               <button
                 onClick={(e) => {
@@ -434,7 +434,7 @@ export default function ReviewCard({ item, onComplete, onViewInQuran }: ReviewCa
                 }}
                 className="w-full px-3 py-2 text-left text-xs sm:text-sm text-green-700 dark:text-green-300 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
               >
-                ✅ Perfect (100%)
+                ✅ Remembered perfectly
               </button>
               <button
                 onClick={(e) => {
@@ -443,7 +443,7 @@ export default function ReviewCard({ item, onComplete, onViewInQuran }: ReviewCa
                 }}
                 className="w-full px-3 py-2 text-left text-xs sm:text-sm text-yellow-700 dark:text-yellow-300 hover:bg-yellow-50 dark:hover:bg-yellow-900/20 transition-colors"
               >
-                🔄 Partial (75%)
+                🔄 Mostly remembered
               </button>
               <button
                 onClick={(e) => {
@@ -452,7 +452,7 @@ export default function ReviewCard({ item, onComplete, onViewInQuran }: ReviewCa
                 }}
                 className="w-full px-3 py-2 text-left text-xs sm:text-sm text-orange-700 dark:text-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
               >
-                💡 Needed Hint
+                💡 Needed a hint
               </button>
               <button
                 onClick={(e) => {
@@ -461,7 +461,7 @@ export default function ReviewCard({ item, onComplete, onViewInQuran }: ReviewCa
                 }}
                 className="w-full px-3 py-2 text-left text-xs sm:text-sm text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
               >
-                ❌ Forgot
+                ❌ Couldn't remember
               </button>
             </div>
           </div>
@@ -587,13 +587,8 @@ export default function ReviewCard({ item, onComplete, onViewInQuran }: ReviewCa
         {/* Instructions */}
         <div className="mb-4 sm:mb-8 p-3 sm:p-4 bg-blue-50 dark:bg-blue-900/20 rounded-xl border border-blue-200 dark:border-blue-800">
           <p className="text-xs sm:text-sm text-blue-700 dark:text-blue-300">
-            💡 <strong>Tip:</strong> Click on any verse to play its individual audio and highlight it. 
-            Use the options menu (⋮) on each verse to rate difficulty and mark recall quality. 
-            Individual ratings are saved with the main item.
+            💡 <strong>Tip:</strong> Tap any verse to play its audio. Use the menu (⋮) on each verse to rate how well you remembered it.
           </p>
-          <div className="mt-2 text-xs text-blue-600 dark:text-blue-400">
-            <strong>Recall Quality:</strong> ✅ Perfect (100%) | 🔄 Partial (75%) | 💡 Needed Hint | ❌ Forgot
-          </div>
         </div>
 
         {/* Quran Text */}

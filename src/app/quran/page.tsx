@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { addMemorizationItem, updateMemorizationItem, getMemorizationItem, toggleMistake, saveHideMistakesSetting, saveLastPage, loadLastPage, saveSelectedReciter, saveFontSettings } from '@/lib/storageService';
 import { useOptimizedData } from '@/lib/hooks/useOptimizedData';
 import { MistakeData } from '@/lib/supabase/database';
-import { MemorizationItem, updateInterval, createMemorizationItem } from '@/lib/spacedRepetition';
+import { MemorizationItem, updateInterval, updateIndividualAyahRating, createMemorizationItem } from '@/lib/spacedRepetition';
 import { getSurah, getQuranMeta, getPage, getAyah, fetchPageWithTranslation, SurahListItem } from '@/lib/quranService';
 import { DEFAULT_RECITER_ID, resolveReciterId, getAyahAudioPlan, getReciterById, AudioPlan } from '@/lib/recitations';
 import { generateMemorizationId } from '@/lib/utils';
@@ -1070,29 +1070,17 @@ function QuranPageContent() {
   const handleQuickReview = async (surahNumber: number, ayahNumber: number, rating: 'easy' | 'medium' | 'hard') => {
     try {
       // Find the memorization item that contains this ayah
-      const item = memorizationItems.find((item: MemorizationItem) => 
-        item.surah === surahNumber && 
-        ayahNumber >= item.ayahStart && 
+      const item = memorizationItems.find((item: MemorizationItem) =>
+        item.surah === surahNumber &&
+        ayahNumber >= item.ayahStart &&
         ayahNumber <= item.ayahEnd
       );
 
-    if (item) {
-      // Rate the entire range as one unit
-      console.log(`Rating entire range ${item.ayahStart}-${item.ayahEnd} with ${rating}`);
-      
-        // Use updateInterval for the entire range, not individual ayahs
-        const updatedItem = updateInterval(item, rating);
-        
-        // Update the item
+      if (item) {
+        // Rate this individual verse, not the whole range
+        const { updatedItem } = updateIndividualAyahRating(item, ayahNumber, rating);
         await updateMemorizationItem(updatedItem);
-        
-        // Refresh data to reflect changes
         await refreshData();
-        
-        console.log(`Range review completed for ${surahNumber}:${item.ayahStart}-${item.ayahEnd} with rating: ${rating}`);
-        console.log('Item ID:', item.id);
-      } else {
-        console.log(`No memorization item found for ayah ${surahNumber}:${ayahNumber}`);
       }
     } catch (error) {
       console.error('Error in handleQuickReview:', error);

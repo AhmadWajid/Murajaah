@@ -7,12 +7,12 @@ import { getAllMemorizationItems, updateMemorizationItem, removeMemorizationItem
 import { MistakeData } from '@/lib/supabase/database';
 import { generateMemorizationId, getTodayISODate } from '@/lib/utils';
 import { MemorizationItem, updateInterval, resetDailyCompletions, getDueItems, getUpcomingReviews } from '@/lib/spacedRepetition';
-import { formatAyahRange, formatAyahRangeArabic } from '@/lib/quran';
+import { formatAyahRange, formatAyahRangeArabic, getSurahName, getSurahNameArabic } from '@/lib/quran';
 import { getSurahList, SurahListItem } from '@/lib/quranService';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronRight, Trash2, CheckCircle, Edit, Loader2, X } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, CheckCircle, Edit, Loader2, X, AlertTriangle, Calendar, Clock, BookOpen, Target, MoreVertical, Zap } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import AppHeader from '@/components/AppHeader';
 import ReviewCard from '@/components/ReviewCard';
@@ -39,6 +39,230 @@ interface GroupedItems {
   [date: string]: MemorizationItem[];
 }
 
+/* ─── ReviewRow — one passage with a primary "Review" button + overflow menu ─── */
+function ReviewRow({
+  item,
+  isDone,
+  isOverdue,
+  compact = false,
+  onReview,
+  onQuickRate,
+  onEdit,
+  onDelete,
+}: {
+  item: MemorizationItem;
+  isDone: boolean;
+  isOverdue: boolean;
+  compact?: boolean;
+  onReview: () => void;
+  onQuickRate: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const englishName = getSurahName(item.surah);
+  const arabicName = getSurahNameArabic(item.surah);
+  const ayahLabel = item.ayahStart === item.ayahEnd ? `Ayah ${item.ayahStart}` : `Ayahs ${item.ayahStart}-${item.ayahEnd}`;
+
+  return (
+    <div
+      className={`flex items-center gap-3 ${compact ? 'px-4 py-2.5' : 'p-4'} bg-card transition-colors ${
+        isDone ? 'border-l-4 border-l-success' : isOverdue ? 'border-l-4 border-l-destructive' : ''
+      } hover:bg-muted/30`}
+    >
+      {/* Surah number badge */}
+      <div
+        className={`w-9 h-9 rounded-[var(--radius)] flex items-center justify-center flex-shrink-0 font-bold text-sm ${
+          isDone ? 'bg-success/15 text-success' : isOverdue ? 'bg-destructive/15 text-destructive' : 'bg-accent/15 text-accent'
+        }`}
+      >
+        {item.surah}
+      </div>
+
+      {/* Passage info */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="font-semibold text-sm text-foreground truncate">{englishName}</span>
+          <span className="font-arabic text-accent text-base flex-shrink-0" dir="rtl">{arabicName}</span>
+        </div>
+        <p className="text-xs text-muted-foreground mt-0.5 truncate">
+          {ayahLabel} · {item.interval}d · {item.reviewCount} {item.reviewCount === 1 ? 'review' : 'reviews'}
+        </p>
+      </div>
+
+      {/* Status badge */}
+      {isDone ? (
+        <span className="inline-flex items-center gap-1 text-xs font-semibold text-success bg-success/15 px-2 py-1 rounded-[var(--radius-sm)] flex-shrink-0">
+          <CheckCircle className="w-3 h-3" />
+          Done
+        </span>
+      ) : (
+        <span className={`text-xs font-semibold px-2 py-1 rounded-[var(--radius-sm)] flex-shrink-0 ${
+          isOverdue ? 'text-destructive bg-destructive/15' : 'text-accent bg-accent/15'
+        }`}>
+          {isOverdue ? 'Overdue' : 'Due'}
+        </span>
+      )}
+
+      {/* Primary action: Review */}
+      {!isDone && (
+        <Button size="sm" onClick={onReview} className="h-8 px-3 text-xs flex-shrink-0">
+          Review
+        </Button>
+      )}
+
+      {/* Overflow menu for secondary actions */}
+      <div className="relative flex-shrink-0">
+        <button
+          className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-muted transition-colors"
+          onClick={() => setMenuOpen(!menuOpen)}
+          aria-label="More actions"
+          type="button"
+        >
+          <MoreVertical className="w-4 h-4 text-muted-foreground" />
+        </button>
+        {menuOpen && (
+          <>
+            <div className="fixed inset-0 z-40" onClick={() => setMenuOpen(false)} />
+            <div className="absolute right-0 top-full mt-1 z-50 w-44 panel-surface rounded-[var(--radius-md)] p-1 animate-popover shadow-lg">
+              {!isDone && (
+                <button
+                  className="flex w-full items-center gap-2.5 rounded-[var(--radius-sm)] px-3 py-2 text-sm hover:bg-secondary transition-colors"
+                  onClick={() => { setMenuOpen(false); onQuickRate(); }}
+                >
+                  <Zap className="w-4 h-4 text-accent" />
+                  Quick Rate
+                </button>
+              )}
+              <button
+                className="flex w-full items-center gap-2.5 rounded-[var(--radius-sm)] px-3 py-2 text-sm hover:bg-secondary transition-colors"
+                onClick={() => { setMenuOpen(false); onEdit(); }}
+              >
+                <Edit className="w-4 h-4 text-muted-foreground" />
+                Edit
+              </button>
+              <button
+                className="flex w-full items-center gap-2.5 rounded-[var(--radius-sm)] px-3 py-2 text-sm text-destructive hover:bg-destructive/10 transition-colors"
+                onClick={() => { setMenuOpen(false); onDelete(); }}
+              >
+                <Trash2 className="w-4 h-4" />
+                Delete
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ─── QuickReviewModal — rate recall without opening the Quran ─── */
+function QuickReviewModal({
+  item,
+  onClose,
+  onSubmit,
+}: {
+  item: MemorizationItem;
+  onClose: () => void;
+  onSubmit: (rating: 'easy' | 'medium' | 'hard') => void;
+}) {
+  const englishName = getSurahName(item.surah);
+  const arabicName = getSurahNameArabic(item.surah);
+  const ayahLabel = item.ayahStart === item.ayahEnd ? `Ayah ${item.ayahStart}` : `Ayahs ${item.ayahStart}-${item.ayahEnd}`;
+
+  // Calculate intervals using the same logic as updateInterval()
+  const daysSinceCreation = (() => {
+    if (item.memorizationAge !== undefined) {
+      const created = new Date(item.createdAt);
+      const today = new Date();
+      const daysPassed = Math.floor((today.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+      return item.memorizationAge + daysPassed;
+    }
+    const created = new Date(item.createdAt);
+    const today = new Date();
+    return Math.floor((today.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+  })();
+
+  const intervals = daysSinceCreation < 10
+    ? { easy: 1, medium: 1, hard: 1 }
+    : daysSinceCreation < 180
+      ? { easy: 4, medium: 2, hard: 1 }
+      : { easy: 7, medium: 4, hard: 1 };
+
+  const ratingOptions: { rating: 'easy' | 'medium' | 'hard'; label: string; desc: string; color: string; bg: string; border: string }[] = [
+    { rating: 'easy', label: 'Easy', desc: 'Perfect recall, no hesitation', color: 'text-success', bg: 'bg-success/15', border: 'hover:border-success/30 hover:bg-success/[0.04]' },
+    { rating: 'medium', label: 'Medium', desc: 'Good recall, minor hesitation', color: 'text-accent', bg: 'bg-accent/15', border: 'hover:border-accent/30 hover:bg-accent/[0.04]' },
+    { rating: 'hard', label: 'Hard', desc: 'Difficult, needed help', color: 'text-warning', bg: 'bg-warning/15', border: 'hover:border-warning/30 hover:bg-warning/[0.04]' },
+  ];
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-overlay"
+      style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
+    >
+      <div className="bg-card text-card-foreground rounded-[var(--radius-2xl)] w-full max-w-md shadow-2xl border border-border flex flex-col animate-fade-in-up overflow-hidden">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-9 h-9 rounded-[var(--radius)] bg-accent/15 flex items-center justify-center flex-shrink-0">
+              <Zap className="w-4 h-4 text-accent" />
+            </div>
+            <div className="min-w-0">
+              <h3 className="text-base font-bold font-serif-header text-foreground leading-tight">Quick Rate</h3>
+              <div className="flex items-center gap-2 mt-0.5">
+                <span className="text-sm text-foreground font-medium truncate">{englishName}</span>
+                <span className="font-arabic text-accent text-sm" dir="rtl">{arabicName}</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-0.5">{ayahLabel} · {item.interval}d interval · {item.reviewCount} reviews</p>
+            </div>
+          </div>
+          <button
+            className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-muted transition-colors flex-shrink-0"
+            onClick={onClose}
+            aria-label="Close"
+            type="button"
+          >
+            <X className="h-4 w-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="p-5 space-y-3">
+          <div>
+            <p className="text-sm font-medium text-foreground mb-1">How well did you recall this?</p>
+            <p className="text-xs text-muted-foreground">This schedules your next review automatically.</p>
+          </div>
+
+          {ratingOptions.map((opt) => (
+            <button
+              key={opt.rating}
+              onClick={() => onSubmit(opt.rating)}
+              className={`w-full flex items-center justify-between p-3.5 rounded-[var(--radius-lg)] border border-border ${opt.border} transition-colors text-left`}
+            >
+              <div>
+                <div className="font-semibold text-sm text-foreground">{opt.label}</div>
+                <div className="text-xs text-muted-foreground mt-0.5">{opt.desc}</div>
+              </div>
+              <span className={`text-xs font-semibold ${opt.color} ${opt.bg} px-2.5 py-1 rounded-[var(--radius-sm)] flex-shrink-0`}>
+                +{intervals[opt.rating]} {intervals[opt.rating] === 1 ? 'day' : 'days'}
+              </span>
+            </button>
+          ))}
+
+          <div className="pt-3 border-t border-border">
+            <p className="text-xs text-muted-foreground text-center">
+              Want to read first?{' '}
+              <Link href={`/quran?review=${encodeURIComponent(item.id)}`} className="text-accent font-medium hover:underline">
+                Open in Quran →
+              </Link>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 interface EditItemFormProps {
   item: MemorizationItem;
   onSave: (item: MemorizationItem) => void;
@@ -54,25 +278,24 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
     nextReview: item.nextReview,
     easeFactor: item.easeFactor,
   });
+  const [formError, setFormError] = useState<string | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
-    // Validate ayah range
+
     if (formData.ayahEnd < formData.ayahStart) {
-      alert('End ayah must be greater than or equal to start ayah');
+      setFormError('The "To Ayah" can\'t be before the "From Ayah".');
       return;
     }
-    
     if (formData.surah < 1 || formData.surah > 114) {
-      alert('Surah number must be between 1 and 114');
+      setFormError('Surah number must be between 1 and 114.');
       return;
     }
-    
     if (formData.ayahStart < 1 || formData.ayahEnd < 1) {
-      alert('Ayah numbers must be greater than 0');
+      setFormError('Ayah numbers must be at least 1.');
       return;
     }
+    setFormError(null);
     
     // Generate new ID if the range has changed
     const newId = generateMemorizationId(formData.surah, formData.ayahStart, formData.ayahEnd);
@@ -86,12 +309,17 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
+        {formError && (
+          <div className="p-3 rounded-[var(--radius-md)] bg-destructive/10 border border-destructive/20 text-sm text-destructive">
+            {formError}
+          </div>
+        )}
         {/* Ayah Range Section */}
         <div className="space-y-3">
-          <label className="block text-sm font-medium mb-2">Ayah Range</label>
+          <label className="block text-sm font-medium mb-2">Passage</label>
           <div className="grid grid-cols-3 gap-3">
             <div>
-              <label className="block text-xs text-muted-foreground mb-1">Surah</label>
+              <label className="block text-xs text-muted-foreground mb-1">Surah #</label>
               <input
                 type="number"
                 value={formData.surah}
@@ -102,7 +330,7 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
               />
             </div>
             <div>
-              <label className="block text-xs text-muted-foreground mb-1">Start Ayah</label>
+              <label className="block text-xs text-muted-foreground mb-1">From Ayah</label>
               <input
                 type="number"
                 value={formData.ayahStart}
@@ -112,7 +340,7 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
               />
             </div>
             <div>
-              <label className="block text-xs text-muted-foreground mb-1">End Ayah</label>
+              <label className="block text-xs text-muted-foreground mb-1">To Ayah</label>
               <input
                 type="number"
                 value={formData.ayahEnd}
@@ -125,7 +353,7 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
         </div>
 
         <div>
-        <label className="block text-sm font-medium mb-2">Interval (days)</label>
+        <label className="block text-sm font-medium mb-2">Days until next review</label>
           <input
             type="number"
           value={formData.interval}
@@ -141,18 +369,6 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
           value={formData.nextReview}
           onChange={(e) => setFormData({ ...formData, nextReview: e.target.value })}
           className="w-full p-2 border rounded-md"
-          />
-        </div>
-        <div>
-        <label className="block text-sm font-medium mb-2">Ease Factor</label>
-          <input
-            type="number"
-          value={formData.easeFactor}
-          onChange={(e) => setFormData({ ...formData, easeFactor: parseFloat(e.target.value) })}
-          className="w-full p-2 border rounded-md"
-          step="0.1"
-          min="1.3"
-          max="2.5"
           />
         </div>
       <div className="flex gap-2 pt-4">
@@ -337,16 +553,11 @@ export default function Dashboard() {
           prevItem.id === item.id ? updatedItem : prevItem
         )
       );
-      
+
       // Save to storage in background
       await updateMemorizationItem(updatedItem);
-      
-      // Show success message
-      const ratingText = rating === 'easy' ? 'Easy' : rating === 'medium' ? 'Medium' : 'Hard';
-      alert(`✅ Rated ${formatAyahRange(item.surah, item.ayahStart, item.ayahEnd)} as ${ratingText}`);
     } catch (error) {
       console.error('Error updating item:', error);
-      alert('Failed to update item. Please try again.');
       // Reload data on error to ensure consistency
       await loadAllData(false);
     }
@@ -365,7 +576,6 @@ export default function Dashboard() {
       await removeMemorizationItem(itemId);
     } catch (error) {
       console.error('Error deleting item:', error);
-      alert('Failed to delete item. Please try again.');
       // Reload data on error to ensure consistency
       await loadAllData(false);
     }
@@ -374,19 +584,18 @@ export default function Dashboard() {
   const handleDeleteMistake = useCallback(async (surahNumber: number, ayahNumber: number) => {
     try {
       // Optimistic update - remove from UI immediately
-      setMistakes(prevMistakes => 
-        prevMistakes.filter(mistake => 
+      setMistakes(prevMistakes =>
+        prevMistakes.filter(mistake =>
           !(mistake.surah === surahNumber && mistake.ayah === ayahNumber)
         )
       );
-      
+
       setShowMistakeDeleteConfirm(null);
-      
+
       // Delete from storage in background
       await removeMistake(surahNumber, ayahNumber);
     } catch (error) {
       console.error('Error deleting mistake:', error);
-      alert('Failed to delete mistake. Please try again.');
       // Reload data on error to ensure consistency
       await loadAllData(false);
     }
@@ -408,7 +617,6 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Error deleting mistakes:', error);
-      alert('Failed to delete mistakes. Please try again.');
       // Reload data on error to ensure consistency
       await loadAllData(false);
     }
@@ -452,7 +660,6 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Error saving edit:', error);
-      alert('Failed to save changes. Please try again.');
       // Reload data on error to ensure consistency
       await loadAllData(false);
     }
@@ -514,28 +721,12 @@ export default function Dashboard() {
     });
   }, [items]);
 
-  // Helper to assign a color class for each date group
-  const dateColorMap = useMemo(() => {
-    const colorMap: Record<string, string> = {};
-    const colorClasses = [
-      'bg-blue-50 dark:bg-blue-950/20',
-      'bg-yellow-50 dark:bg-yellow-950/20',
-      'bg-purple-50 dark:bg-purple-950/20',
-      'bg-pink-50 dark:bg-pink-950/20',
-      'bg-orange-50 dark:bg-orange-950/20',
-      'bg-cyan-50 dark:bg-cyan-950/20',
-      'bg-lime-50 dark:bg-lime-950/20',
-    ];
-    let colorIndex = 0;
-    sortedItems.forEach(item => {
-      const date = item.nextReview;
-      if (!colorMap[date]) {
-        colorMap[date] = colorClasses[colorIndex % colorClasses.length];
-        colorIndex++;
-      }
-    });
-    return colorMap;
-  }, [sortedItems]);
+  // Helper to determine if a date is today
+  const todayISO = useMemo(() => getTodayISODate(), []);
+  const isDateToday = useCallback((date: string) => date === todayISO, [todayISO]);
+
+  // Helper to determine if a date is overdue
+  const isDateOverdue = useCallback((date: string) => date < todayISO, [todayISO]);
 
   // Effect to collapse/expand all groups when collapseAll changes
   useEffect(() => {
@@ -580,662 +771,338 @@ export default function Dashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <AppHeader 
-        pageType="home" 
-        onRefresh={refreshData}
-      />
+      <AppHeader pageType="home" onRefresh={refreshData} />
 
-      <main className="container mx-auto px-4 py-6">
-        {/* Loading indicator for refresh */}
+      <main className="mx-auto max-w-2xl px-4 py-6 sm:py-10">
         {isRefreshing && (
-          <div className="fixed top-20 right-4 z-50 bg-card border border-border rounded-[var(--radius)] shadow-lg px-4 py-2 flex items-center space-x-2">
+          <div className="fixed top-20 right-4 z-50 bg-card border border-border rounded-[var(--radius)] shadow-lg px-3 py-2 flex items-center gap-2">
             <Loader2 className="h-4 w-4 animate-spin text-accent" />
-            <span className="text-sm">Refreshing...</span>
+            <span className="text-sm">Refreshing…</span>
           </div>
         )}
 
-        {/* Mistakes Section */}
+        {/* ─── Greeting ─── */}
+        <div className="mb-8">
+          <p className="font-arabic text-xl text-accent mb-1" dir="rtl">السلام عليكم</p>
+          <h1 className="text-2xl font-bold font-serif-header text-foreground tracking-tight">
+            {dueItems.length > 0
+              ? `${dueItems.length} ${dueItems.length === 1 ? 'review' : 'reviews'} due`
+              : mistakes.length > 0
+                ? 'Reviews done — review your mistakes'
+                : 'All caught up'}
+          </h1>
+          <p className="text-sm text-muted-foreground mt-1">
+            {dueItems.length > 0
+              ? 'Tap Review to open the passage and test your memory.'
+              : mistakes.length > 0
+                ? 'You have marked mistakes to go over.'
+                : 'Add a new passage to start tracking your memorization.'}
+          </p>
+        </div>
+
+        {/* ─── Due Now (primary section) ─── */}
+        {dueItems.length > 0 && (
+          <section className="mb-8">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Due Now</h2>
+            <div className="space-y-2.5">
+              {dueItems.map((item) => {
+                const isDone = item.completedToday === todayISO;
+                const isOverdue = item.nextReview < todayISO;
+                return (
+                  <ReviewRow
+                    key={item.id}
+                    item={item}
+                    isDone={isDone}
+                    isOverdue={isOverdue}
+                    onReview={() => router.push(`/quran?review=${encodeURIComponent(item.id)}`)}
+                    onQuickRate={() => setReviewingItem(item)}
+                    onEdit={() => handleEdit(item)}
+                    onDelete={() => setShowDeleteConfirm(item.id)}
+                  />
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* ─── Mistakes ─── */}
         {mistakes.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center space-x-3 mb-3">
-              <div className="w-5 h-5 bg-warning/15 rounded-full flex items-center justify-center">
-                <span className="text-warning text-xs font-bold">!</span>
-              </div>
-              <h2 className="text-lg font-semibold">Mistakes to Review ({mistakes.length})</h2>
-            </div>
-            
-            <Card>
-              <CardContent className="p-0">
-                <div className="space-y-0">
-                  {Object.entries(groupedMistakes).map(([surah, surahMistakes]) => {
-                    const surahNumber = parseInt(surah);
-                    const surahName = surahList.find(s => s.number === surahNumber)?.name || `Surah ${surahNumber}`;
-                    const isExpanded = expandedSurahs.has(surahNumber);
-                    
-                    // Group consecutive ayahs
-                    let ayahRanges: { start: number; end: number; mistakes: MistakeData[] }[] = [];
-                    let currentRange: { start: number; end: number; mistakes: MistakeData[] } | null = null;
-                    
-                    // Sort mistakes by ayah number to ensure correct range grouping
-                    const sortedMistakes = [...surahMistakes].sort((a, b) => a.ayah - b.ayah);
-                    sortedMistakes.forEach(mistake => {
-                      if (!currentRange) {
-                        currentRange = { start: mistake.ayah, end: mistake.ayah, mistakes: [mistake] };
-                      } else if (mistake.ayah === currentRange.end + 1) {
-                        currentRange.end = mistake.ayah;
-                        currentRange.mistakes.push(mistake);
-                      } else {
-                        ayahRanges.push(currentRange);
-                        currentRange = { start: mistake.ayah, end: mistake.ayah, mistakes: [mistake] };
-                      }
-                    });
-                    if (currentRange) {
-                      ayahRanges.push(currentRange);
-                    }
-                    // Sort ayahRanges by start ayah to ensure smallest is first
-                    ayahRanges = ayahRanges.sort((a, b) => a.start - b.start);
-                    const totalMistakes = surahMistakes.length;
-                    const latestMistake = surahMistakes.sort((a, b) => 
-                      new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-                    )[0];
-                    
-                    return (
-                      <div key={surah} className="border-b last:border-b-0">
-                        {/* Surah Header - Always Visible */}
-                        <div
-                          className="flex items-center justify-between p-4 hover:bg-warning/8 dark:hover:bg-warning/10 cursor-pointer"
-                          onClick={() => toggleSurahExpansion(surahNumber)}
-                        >
-                          <div className="flex items-center space-x-3">
-                            <div className="flex items-center space-x-2">
-                              {isExpanded ? (
-                                <ChevronDown className="h-4 w-4 text-warning" />
-                              ) : (
-                                <ChevronRight className="h-4 w-4 text-warning" />
-                              )}
-                              <div>
-                                <div className="font-medium text-sm">
-                                  {surahName}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {totalMistakes} mistake{totalMistakes > 1 ? 's' : ''} • {ayahRanges.length} range{ayahRanges.length > 1 ? 's' : ''}
-                                </div>
-                              </div>
-                            </div>
+          <section className="mb-8">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              Mistakes ({mistakes.length})
+            </h2>
+            <div className="space-y-2">
+              {Object.entries(groupedMistakes).map(([surah, surahMistakes]) => {
+                const surahNumber = parseInt(surah);
+                const englishName = surahList.find((s) => s.number === surahNumber)?.englishName || getSurahName(surahNumber);
+                const arabicName = getSurahNameArabic(surahNumber);
+                const isExpanded = expandedSurahs.has(surahNumber);
+
+                let ayahRanges: { start: number; end: number; mistakes: MistakeData[] }[] = [];
+                let currentRange: { start: number; end: number; mistakes: MistakeData[] } | null = null;
+                const sortedMistakes = [...surahMistakes].sort((a, b) => a.ayah - b.ayah);
+                sortedMistakes.forEach((mistake) => {
+                  if (!currentRange) {
+                    currentRange = { start: mistake.ayah, end: mistake.ayah, mistakes: [mistake] };
+                  } else if (mistake.ayah === currentRange.end + 1) {
+                    currentRange.end = mistake.ayah;
+                    currentRange.mistakes.push(mistake);
+                  } else {
+                    ayahRanges.push(currentRange);
+                    currentRange = { start: mistake.ayah, end: mistake.ayah, mistakes: [mistake] };
+                  }
+                });
+                if (currentRange) ayahRanges.push(currentRange);
+                ayahRanges = ayahRanges.sort((a, b) => a.start - b.start);
+
+                return (
+                  <div
+                    key={surah}
+                    className={`rounded-[var(--radius-lg)] border overflow-hidden transition-colors ${
+                      isExpanded ? 'border-warning/30' : 'border-warning/20'
+                    } bg-warning/[0.03]`}
+                  >
+                    <div className="flex items-center justify-between px-4 py-3">
+                      <button
+                        className="flex items-center gap-3 min-w-0 flex-1 text-left"
+                        onClick={() => toggleSurahExpansion(surahNumber)}
+                      >
+                        <div className="w-8 h-8 rounded-full bg-warning/15 text-warning text-xs font-bold flex items-center justify-center flex-shrink-0">
+                          {surahNumber}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm text-foreground truncate">{englishName}</span>
+                            <span className="font-arabic text-accent text-base" dir="rtl">{arabicName}</span>
                           </div>
-                          
-                          <div className="flex items-center space-x-2">
-                            <div className="text-xs text-muted-foreground">
-                              {new Date(latestMistake.timestamp).toLocaleDateString()}
-                            </div>
-                            <Button asChild size="sm" variant="outline" className="h-8 px-3 text-xs">
-                              <Link href={`/quran?surah=${surahNumber}&ayah=${ayahRanges[0].start}`}>
-                                Review All
-                              </Link>
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setShowMistakeDeleteConfirm({ surah: surahNumber, deleteAll: true });
-                              }}
-                              className="h-8 w-8 p-0 text-destructive hover:bg-destructive/10"
-                            >
-                              <Trash2 className="h-3 w-3" />
-                            </Button>
+                          <div className="text-xs text-muted-foreground mt-0.5">
+                            {surahMistakes.length} {surahMistakes.length === 1 ? 'mistake' : 'mistakes'}
+                            {ayahRanges.length > 1 ? ` in ${ayahRanges.length} ranges` : ''}
                           </div>
                         </div>
-                        
-                        {/* Expanded Content */}
-                        {isExpanded && (
-                          <div className="bg-warning/5 dark:bg-warning/8 border-t border-border">
-                            <div className="p-4 space-y-3">
-                              <div className="text-xs font-medium text-warning uppercase tracking-wide">
-                                Ayah Ranges
-                              </div>
-                              {ayahRanges.map((range, rangeIndex) => {
-                                const ayahText = range.start === range.end 
-                                  ? `${range.start}` 
-                                  : `${range.start}-${range.end}`;
-                                const rangeLatestMistake = range.mistakes.sort((a, b) => 
-                                  new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-                                )[0];
-                                
-                                return (
-                                  <div key={rangeIndex} className="flex items-center justify-between py-2 border-b last:border-b-0 border-border">
-                                    <div className="flex items-center space-x-3">
-                                      <div>
-                                        <div className="font-medium text-sm">
-                                          Ayah {ayahText}
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                          {range.mistakes.length} mistake{range.mistakes.length > 1 ? 's' : ''} • {new Date(rangeLatestMistake.timestamp).toLocaleDateString()}
-                                        </div>
-                                      </div>
-                                    </div>
-                                    <div className="flex items-center space-x-1">
-                                      <Button asChild size="sm" variant="outline" className="h-7 px-2 text-xs">
-                                        <Link href={`/quran?surah=${surahNumber}&ayah=${range.start}`}>
-                                          Review
-                                        </Link>
-                                      </Button>
-                                      <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => setShowMistakeDeleteConfirm({ surah: surahNumber, ayah: range.start, deleteAll: false })}
-                                        className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
-                                      >
-                                        <Trash2 className="h-3 w-3" />
-                                      </Button>
-                                    </div>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
+                        {isExpanded ? (
+                          <ChevronDown className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        ) : (
+                          <ChevronRight className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                         )}
+                      </button>
+                      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+                        <Button asChild size="sm" className="h-8 px-3 text-xs bg-warning text-warning-foreground hover:bg-warning/90">
+                          <Link href={`/quran?surah=${surahNumber}&ayah=${ayahRanges[0].start}`}>
+                            Review
+                          </Link>
+                        </Button>
+                        <button
+                          className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-destructive/10 transition-colors"
+                          onClick={() => setShowMistakeDeleteConfirm({ surah: surahNumber, deleteAll: true })}
+                          aria-label="Remove all mistakes in this surah"
+                          type="button"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </button>
                       </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
+                    </div>
 
-        {/* Completed Today - Compact */}
-        {getCompletedTodayItems.length > 0 && (
-          <div className="mb-6">
-            <div className="flex items-center space-x-3 mb-3">
-              <CheckCircle className="h-5 w-5 text-success" />
-              <h2 className="text-lg font-semibold">
-                Completed Today ({getCompletedTodayItems.length})
-              </h2>
-            </div>
-            <Card>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b bg-success/8">
-                        <th className="text-left p-2 font-medium text-success w-1/3">Surah & Ayahs</th>
-                        <th className="text-left p-2 font-medium text-success w-20">Reviews</th>
-                        <th className="text-left p-2 font-medium text-success w-24">Next Review</th>
-                        <th className="text-left p-2 font-medium text-success w-24">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {getCompletedTodayItems.map((item) => {
-                        const reviewDate = parseLocalDate(item.nextReview).toLocaleDateString();
-                        return (
-                          <tr
-                            key={item.id}
-                            className="border-b hover:bg-success/8 cursor-pointer"
-                            onClick={() => router.push(`/quran?review=${encodeURIComponent(item.id)}`)}
-                          >
-                            <td className="p-2">
-                              <div>
-                                <div className="font-medium text-sm">
-                                  {formatAyahRange(item.surah, item.ayahStart, item.ayahEnd)}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                  {formatAyahRangeArabic(item.surah, item.ayahStart, item.ayahEnd)}
+                    {isExpanded && (
+                      <div className="border-t border-warning/15 bg-warning/[0.02]">
+                        {ayahRanges.map((range, rangeIndex) => {
+                          const ayahText = range.start === range.end ? `${range.start}` : `${range.start}-${range.end}`;
+                          return (
+                            <div
+                              key={rangeIndex}
+                              className="flex items-center justify-between px-4 py-2.5 border-b last:border-b-0 border-warning/10 hover:bg-warning/[0.04] transition-colors"
+                            >
+                              <div className="flex items-center gap-3 min-w-0">
+                                <div className="w-1.5 h-1.5 rounded-full bg-warning flex-shrink-0" />
+                                <div className="min-w-0">
+                                  <div className="font-medium text-sm text-foreground">Ayah {ayahText}</div>
+                                  <div className="text-xs text-muted-foreground">{range.mistakes.length} {range.mistakes.length === 1 ? 'mark' : 'marks'}</div>
                                 </div>
                               </div>
-                            </td>
-                            <td className="p-2 font-medium text-sm">{item.reviewCount}</td>
-                            <td className="p-2 font-medium text-sm">{reviewDate}</td>
-                            <td className="p-2">
-                              <Badge variant="secondary" className="bg-success/15 text-success text-xs px-2 py-1">
-                                Done
-                              </Badge>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        )}
-
-        {/* Upcoming Reviews - Compact */}
-        {/* Removed the Upcoming Reviews section as requested. */}
-
-        {/* All Items - Compact Table */}
-        {items.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-2">
-               <span className="font-semibold text-lg">All Items ({items.length})</span>
-               <div className="flex items-center gap-2">
-                 <label htmlFor="collapse-all" className="text-sm select-none cursor-pointer">Expand All</label>
-                 <Switch id="collapse-all" checked={!collapseAll} onCheckedChange={v => setCollapseAll(!v)} />
-               </div>
-            </div>
-            <div className="overflow-x-auto">
-              {/* Responsive: Table on md+, Compact Card List on mobile */}
-              <div className="block md:hidden space-y-2">
-                {Object.entries(groupedByDate).map(([date, dateItems]) => {
-                  const label = getDateLabel(date);
-                  const isToday = label === 'Today';
-                  const expanded = expandedDates[date] ?? isToday;
-                  const rowColor = dateColorMap[date] || '';
-                  return (
-                    <div key={date} className={`rounded-lg border ${rowColor} mb-1`}> 
-                      <div className="flex items-center gap-2 px-3 py-2 cursor-pointer bg-muted/30" onClick={() => toggleDateExpand(date)}>
-                        {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                        <span className="font-semibold text-sm">{label}</span>
-                        <span className="ml-2 text-xs text-muted-foreground">{dateItems.length} due</span>
-                        <span className="text-xs text-muted-foreground ml-2">{date}</span>
-                      </div>
-                      {expanded && (
-                        <div>
-                          {dateItems.map((item) => {
-                            const reviewDate = parseLocalDate(item.nextReview).toLocaleDateString();
-                            const today = getTodayISODate();
-                            const isCompletedToday = item.completedToday === today;
-                            return (
-                              <Link
-                                key={item.id}
-                                href={`/quran?review=${encodeURIComponent(item.id)}`}
-                                className={`flex items-center justify-between px-3 py-2 border-b last:border-b-0 bg-card ${isCompletedToday ? 'bg-success/8 border-l-4 border-l-success' : ''} transition hover:bg-muted/40 cursor-pointer`}
-                                style={{ textDecoration: 'none' }}
-                              >
-                                <div className="flex-1 min-w-0">
-                                  <div className="font-semibold text-base truncate">{formatAyahRange(item.surah, item.ayahStart, item.ayahEnd)}</div>
-                                  <div className="text-xs text-muted-foreground truncate">{formatAyahRangeArabic(item.surah, item.ayahStart, item.ayahEnd)}</div>
-                                  <div className="text-xs text-muted-foreground mt-1">Next: {reviewDate}</div>
-                                </div>
-                                <div className="flex items-center ml-2 gap-1">
-                                  <Badge variant={
-                                    isCompletedToday ? 'secondary' :
-                                    getPriorityText(item) === 'Overdue' ? 'destructive' :
-                                    getPriorityText(item) === 'Due Today' ? 'destructive' :
-                                    getPriorityText(item) === 'Due Soon' ? 'secondary' :
-                                    'outline'
-                                  } className={`text-xs px-2 py-1 ${isCompletedToday ? 'bg-success/15 text-success' : ''}`}>{isCompletedToday ? 'Completed' : getPriorityText(item)}</Badge>
-                                  {!isCompletedToday && (
-                                    <button
-                                      className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-success/10 focus:outline-none"
-                                      onClick={e => {
-                                        e.preventDefault();
-                                        setReviewingItem(item);
-                                      }}
-                                      aria-label="Review (Easy/Medium/Hard)"
-                                      title="Review (Easy/Medium/Hard)"
-                                      type="button"
-                                    >
-                                      <CheckCircle className="h-5 w-5 text-success" />
-                                    </button>
-                                  )}
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="w-8 h-8 p-0"
-                                    onClick={e => {
-                                      e.preventDefault();
-                                      handleEdit(item);
-                                    }}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <button
-                                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/50 focus:outline-none"
-                                    onClick={e => {
-                                      e.preventDefault();
-                                      setShowDeleteConfirm(item.id);
-                                    }}
-                                    aria-label="Delete"
-                                    type="button"
-                                  >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </button>
-                                  <ChevronRight className="h-5 w-5 text-muted-foreground ml-1 flex-shrink-0" />
-                                </div>
-                              </Link>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              {/* Table for md+ screens */}
-              <table className="w-full min-w-full hidden md:table">
-                <thead>
-                  <tr className="border-b">
-                    <th className="text-left p-3 font-medium w-1/4">Surah & Ayahs</th>
-                    <th className="text-left p-3 font-medium w-16">Ruku</th>
-                    <th className="text-left p-3 font-medium w-20">Reviews</th>
-                    <th className="text-left p-3 font-medium w-20">Interval</th>
-                    <th className="text-left p-3 font-medium w-24">Next Review</th>
-                    <th className="text-left p-3 font-medium w-32">Status</th>
-                    <th className="text-left p-3 font-medium w-32">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {Object.entries(groupedByDate).map(([date, dateItems]) => {
-                    const label = getDateLabel(date);
-                    const isToday = label === 'Today';
-                    const expanded = expandedDates[date] ?? isToday;
-                    const rowColor = dateColorMap[date] || '';
-
-                    // Map rowColor to a specific hover:bg-* class
-                    const colorToHoverClass: Record<string, string> = {
-                      'bg-blue-50': 'hover:bg-blue-50',
-                      'bg-yellow-50': 'hover:bg-yellow-50',
-                      'bg-purple-50': 'hover:bg-purple-50',
-                      'bg-pink-50': 'hover:bg-pink-50',
-                      'bg-orange-50': 'hover:bg-orange-50',
-                      'bg-cyan-50': 'hover:bg-cyan-50',
-                      'bg-lime-50': 'hover:bg-lime-50',
-                      'dark:bg-blue-950/20': 'dark:hover:bg-blue-950/20',
-                      'dark:bg-yellow-950/20': 'dark:hover:bg-yellow-950/20',
-                      'dark:bg-purple-950/20': 'dark:hover:bg-purple-950/20',
-                      'dark:bg-pink-950/20': 'dark:hover:bg-pink-950/20',
-                      'dark:bg-orange-950/20': 'dark:hover:bg-orange-950/20',
-                      'dark:bg-cyan-950/20': 'dark:hover:bg-cyan-950/20',
-                      'dark:bg-lime-950/20': 'dark:hover:bg-lime-950/20',
-                    };
-                    // Extract the base color (e.g., bg-blue-50) from rowColor
-                    const baseColor = (rowColor.match(/bg-[a-z]+-\d+/) || [])[0] || '';
-                    const darkColor = (rowColor.match(/dark:bg-[a-z]+-\d+\/\d+/) || [])[0] || '';
-                    const hoverClass = colorToHoverClass[baseColor] || '';
-                    const darkHoverClass = colorToHoverClass[darkColor] || '';
-
-                    return (
-                      <React.Fragment key={date}>
-                        <tr className={`border-b cursor-pointer ${rowColor}`}
-                          onClick={() => toggleDateExpand(date)}>
-                          <td colSpan={7} className="p-2 font-semibold">
-                            <div className="flex items-center gap-2">
-                              {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
-                              <span>{label}</span>
-                              <span className="ml-2 text-xs text-muted-foreground">Due: {dateItems.length}</span>
-                              <span className="text-xs text-muted-foreground ml-2">{date}</span>
+                              <div className="flex items-center gap-1 flex-shrink-0">
+                                <Button asChild size="sm" variant="ghost" className="h-7 px-2.5 text-xs">
+                                  <Link href={`/quran?surah=${surahNumber}&ayah=${range.start}`}>
+                                    Review
+                                  </Link>
+                                </Button>
+                                <button
+                                  className="w-7 h-7 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-destructive/10 transition-colors"
+                                  onClick={() => setShowMistakeDeleteConfirm({ surah: surahNumber, ayah: range.start, deleteAll: false })}
+                                  aria-label="Remove this mistake"
+                                  type="button"
+                                >
+                                  <Trash2 className="h-3 w-3 text-destructive" />
+                                </button>
+                              </div>
                             </div>
-                          </td>
-                        </tr>
-                        {expanded && dateItems.map((item) => {
-                          const reviewDate = parseLocalDate(item.nextReview).toLocaleDateString();
-                          const today = getTodayISODate();
-                          const isCompletedToday = item.completedToday === today;
-                          return (
-                            <tr
-                              key={item.id}
-                              className={`border-b cursor-pointer ${
-                                isCompletedToday ? 'bg-success/8 border-l-4 border-l-success' : ''
-                              } ${hoverClass} ${darkHoverClass}`}
-                              onClick={() => {
-                                window.location.href = `/quran?review=${encodeURIComponent(item.id)}`;
-                              }}
-                            >
-                              <td className="p-3">
-                                <div>
-                                  <div className="font-medium text-sm">
-                                    {formatAyahRange(item.surah, item.ayahStart, item.ayahEnd)}
-                                  </div>
-                                  <div className="text-xs text-muted-foreground">
-                                    {formatAyahRangeArabic(item.surah, item.ayahStart, item.ayahEnd)}
-                                  </div>
-                                </div>
-                              </td>
-                              <td className="p-3">
-                                {item.rukuStart && item.rukuEnd ? (
-                                  <Badge variant="outline" className="text-xs px-2 py-1">
-                                    {item.rukuStart}{item.rukuStart !== item.rukuEnd ? `-${item.rukuEnd}` : ''}
-                                  </Badge>
-                                ) : (
-                                  <span className="text-muted-foreground text-sm">-</span>
-                                )}
-                              </td>
-                              <td className="p-3 font-medium text-sm">{item.reviewCount}</td>
-                              <td className="p-3 font-medium text-sm">{item.interval}d</td>
-                              <td className="p-3 font-medium text-sm">{reviewDate}</td>
-                              <td className="p-3">
-                                <Badge variant={
-                                  isCompletedToday ? 'secondary' :
-                                  getPriorityText(item) === 'Overdue' ? 'destructive' :
-                                  getPriorityText(item) === 'Due Today' ? 'destructive' :
-                                  getPriorityText(item) === 'Due Soon' ? 'secondary' :
-                                  'outline'
-                                } className={`text-xs px-2 py-1 ${
-                                  isCompletedToday ? 'bg-success/15 text-success' : ''
-                                }`}>
-                                  {isCompletedToday ? 'Completed' : getPriorityText(item)}
-                                </Badge>
-                              </td>
-                              <td className="p-3">
-                                <div className="flex items-center gap-1">
-                                  {!isCompletedToday && (
-                                    <button
-                                      className="w-8 h-8 flex items-center justify-center rounded-[var(--radius-sm)] hover:bg-success/10 focus:outline-none"
-                                      onClick={e => {
-                                        e.stopPropagation();
-                                        e.preventDefault();
-                                        setReviewingItem(item);
-                                      }}
-                                      aria-label="Review (Easy/Medium/Hard)"
-                                      title="Review (Easy/Medium/Hard)"
-                                      type="button"
-                                    >
-                                      <CheckCircle className="h-5 w-5 text-success" />
-                                    </button>
-                                  )}
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="w-8 h-8 p-0"
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      e.preventDefault();
-                                      handleEdit(item);
-                                    }}
-                                  >
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                  <button
-                                    className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-muted/50 focus:outline-none"
-                                    onClick={e => {
-                                      e.stopPropagation();
-                                      e.preventDefault();
-                                      setShowDeleteConfirm(item.id);
-                                    }}
-                                    aria-label="Delete"
-                                    type="button"
-                                  >
-                                    <Trash2 className="h-4 w-4 text-destructive" />
-                                  </button>
-                                </div>
-                              </td>
-                            </tr>
                           );
                         })}
-                      </React.Fragment>
-                    );
-                  })}
-                </tbody>
-              </table>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          </section>
         )}
 
-        {/* Empty State */}
-        {items.length === 0 && (
-          <div className="text-center py-12">
-            <div className="mx-auto w-20 h-20 bg-muted rounded-full flex items-center justify-center mb-4">
-              {/* Removed BookOpen icon */}
+        {/* ─── Completed Today (subtle) ─── */}
+        {getCompletedTodayItems.length > 0 && (
+          <section className="mb-8">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
+              Completed Today ({getCompletedTodayItems.length})
+            </h2>
+            <div className="space-y-1.5">
+              {getCompletedTodayItems.map((item) => (
+                <Link
+                  key={item.id}
+                  href={`/quran?review=${encodeURIComponent(item.id)}`}
+                  className="flex items-center gap-3 px-4 py-2.5 rounded-[var(--radius-md)] border border-success/15 bg-success/[0.03] hover:bg-success/[0.06] transition-colors"
+                  style={{ textDecoration: 'none' }}
+                >
+                  <CheckCircle className="w-4 h-4 text-success flex-shrink-0" />
+                  <span className="text-sm text-foreground font-medium truncate">{getSurahName(item.surah)}</span>
+                  <span className="font-arabic text-accent text-sm" dir="rtl">{getSurahNameArabic(item.surah)}</span>
+                  <span className="text-xs text-muted-foreground ml-auto flex-shrink-0">
+                    {item.ayahStart === item.ayahEnd ? `Ayah ${item.ayahStart}` : `${item.ayahStart}-${item.ayahEnd}`}
+                    {' · '}next {parseLocalDate(item.nextReview).toLocaleDateString()}
+                  </span>
+                </Link>
+              ))}
             </div>
-            <h3 className="text-lg font-semibold mb-2">Start Your Learning Journey</h3>
-            <p className="text-muted-foreground mb-6 max-w-md mx-auto">
-              Begin your Quran memorization journey by adding your first item. Every step counts towards your spiritual growth.
-            </p>
-            <div className="space-y-3">
-              <Button asChild>
-                <Link href="/quran?addReview=1">
-                  {/* Removed Plus icon */}
-                Add Review
-              </Link>
-              </Button>
-              <div className="text-sm text-muted-foreground">
-                <p>Or explore the Quran first</p>
-                <Button variant="link" asChild>
-                  <Link href="/quran">Open Quran</Link>
-                </Button>
+          </section>
+        )}
+
+        {/* ─── All Passages (collapsed by default) ─── */}
+        {items.length > 0 && (
+          <section className="mb-8">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">
+                All Passages ({items.length})
+              </h2>
+              <div className="flex items-center gap-2">
+                <label htmlFor="collapse-all" className="text-xs select-none cursor-pointer text-muted-foreground">Expand</label>
+                <Switch id="collapse-all" checked={!collapseAll} onCheckedChange={(v) => setCollapseAll(!v)} />
               </div>
             </div>
+
+            <div className="space-y-2">
+              {Object.entries(groupedByDate).map(([date, dateItems]) => {
+                const label = getDateLabel(date);
+                const isToday = isDateToday(date);
+                const isOverdue = isDateOverdue(date);
+                const expanded = expandedDates[date] ?? isToday;
+
+                return (
+                  <div
+                    key={date}
+                    className={`rounded-[var(--radius-md)] border overflow-hidden ${
+                      isToday ? 'border-accent/20' : isOverdue ? 'border-destructive/15' : 'border-border'
+                    }`}
+                  >
+                    <button
+                      className="flex items-center gap-2 w-full px-4 py-2.5 text-left hover:bg-muted/30 transition-colors"
+                      onClick={() => toggleDateExpand(date)}
+                    >
+                      {expanded ? <ChevronDown className="w-4 h-4 text-muted-foreground" /> : <ChevronRight className="w-4 h-4 text-muted-foreground" />}
+                      <span className="font-medium text-sm text-foreground">{label}</span>
+                      <span className={`text-xs px-1.5 py-0.5 rounded-[var(--radius-xs)] font-medium ${
+                        isToday ? 'bg-accent/15 text-accent' : isOverdue ? 'bg-destructive/15 text-destructive' : 'text-muted-foreground bg-muted'
+                      }`}>
+                        {dateItems.length}
+                      </span>
+                      <span className="text-xs text-muted-foreground ml-auto">{date}</span>
+                    </button>
+                    {expanded && (
+                      <div className="divide-y divide-border">
+                        {dateItems.map((item) => {
+                          const isDone = item.completedToday === todayISO;
+                          return (
+                            <ReviewRow
+                              key={item.id}
+                              item={item}
+                              isDone={isDone}
+                              isOverdue={isDateOverdue(item.nextReview)}
+                              compact
+                              onReview={() => router.push(`/quran?review=${encodeURIComponent(item.id)}`)}
+                              onQuickRate={() => setReviewingItem(item)}
+                              onEdit={() => handleEdit(item)}
+                              onDelete={() => setShowDeleteConfirm(item.id)}
+                            />
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* ─── Empty State ─── */}
+        {items.length === 0 && mistakes.length === 0 && (
+          <div className="text-center py-20">
+            <div className="mx-auto w-20 h-20 rounded-[var(--radius-2xl)] bg-accent/10 flex items-center justify-center mb-5">
+              <BookOpen className="w-10 h-10 text-accent" />
+            </div>
+            <h2 className="text-xl font-bold font-serif-header text-foreground mb-2">Begin Your Journey</h2>
+            <p className="text-muted-foreground mb-6 max-w-md mx-auto text-sm leading-relaxed">
+              Add Quran passages you've memorized and the app will schedule smart reviews using spaced repetition to help you retain them long-term.
+            </p>
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
+              <Button asChild size="lg">
+                <Link href="/quran?addReview=1">
+                  <Target className="w-4 h-4" />
+                  Add Your First Review
+                </Link>
+              </Button>
+              <Button asChild variant="outline" size="lg">
+                <Link href="/quran">
+                  <BookOpen className="w-4 h-4" />
+                  Explore the Quran
+                </Link>
+              </Button>
+            </div>
           </div>
         )}
 
-        {/* Edit Modal */}
+        {/* ─── Edit Modal ─── */}
         {editingItem && (
           <Dialog open onOpenChange={() => setEditingItem(null)}>
             <DialogContent>
               <DialogHeader>
-                <DialogTitle>Edit Memorization Item</DialogTitle>
+                <DialogTitle>Edit Review Item</DialogTitle>
                 <DialogDescription>
                   Update the details for {formatAyahRange(editingItem.surah, editingItem.ayahStart, editingItem.ayahEnd)}
                 </DialogDescription>
               </DialogHeader>
-                <EditItemForm 
-                  item={editingItem} 
-                  onSave={handleSaveEdit} 
-                  onCancel={handleCancelEdit} 
-                />
+              <EditItemForm item={editingItem} onSave={handleSaveEdit} onCancel={handleCancelEdit} />
             </DialogContent>
           </Dialog>
         )}
 
-        {/* Review Modal */}
+        {/* ─── Quick Review Modal ─── */}
         {reviewingItem && (
-          <div className="fixed inset-0 z-60 flex items-center justify-center p-4 animate-overlay" style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}>
-            <div className="bg-card text-card-foreground gap-6 rounded-[var(--radius-2xl)] py-6 w-full max-w-lg max-h-[90vh] shadow-2xl border border-border flex flex-col animate-fade-in-up" data-modal="review-rating">
-              {/* Header */}
-              <div className="flex items-center justify-between p-6 border-b border-border">
-                <div className="flex items-center space-x-3">
-                  <h3 className="text-xl font-bold text-foreground">Complete Review</h3>
-                  <span className="inline-flex items-center justify-center rounded-md border px-2 py-0.5 font-medium w-fit whitespace-nowrap shrink-0 border-transparent bg-secondary text-secondary-foreground text-xs">
-                    {reviewingItem.surah === 1 ? 'Al-Fatihah' : 
-                     reviewingItem.surah === 2 ? 'Al-Baqarah' : 
-                     `Surah ${reviewingItem.surah}`} {reviewingItem.ayahStart}{reviewingItem.ayahStart !== reviewingItem.ayahEnd ? `-${reviewingItem.ayahEnd}` : ''}
-                  </span>
-                  <span className="text-sm text-muted-foreground">
-                    {reviewingItem.surah === 1 ? 'الفاتحة' : 
-                     reviewingItem.surah === 2 ? 'البقرة' : 
-                     `سورة ${reviewingItem.surah}`} {reviewingItem.ayahStart}{reviewingItem.ayahStart !== reviewingItem.ayahEnd ? `-${reviewingItem.ayahEnd}` : ''}
-                  </span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="icon-sm"
-                  onClick={() => setReviewingItem(null)}
-                  aria-label="Close"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 overflow-y-auto p-6 space-y-6">
-                <div className="space-y-2">
-                  <div className="flex justify-center gap-4 text-sm text-muted-foreground">
-                    <span>Reviews: {reviewingItem.reviewCount}</span>
-                    <span>Interval: {(() => {
-                      const today = new Date();
-                      const nextReview = new Date(reviewingItem.nextReview);
-                      const diffTime = nextReview.getTime() - today.getTime();
-                      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                      return diffDays > 0 ? `${diffDays}d` : 'Today';
-                    })()}</span>
-                  </div>
-                  <div className="text-center text-sm text-muted-foreground">
-                    {reviewingItem.name}
-                  </div>
-                </div>
-
-                <div className="space-y-4">
-                  <div>
-                    <h4 className="text-lg font-semibold mb-2">How well did you recall this passage?</h4>
-                    <p className="text-sm text-muted-foreground mb-4">Select your recall quality to schedule the next review interval.</p>
-                  </div>
-
-                  {/* Rating buttons */}
-                  <div className="space-y-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        const updatedItem = { ...reviewingItem, rating: 5, completed: true };
-                        updateMemorizationItem(updatedItem);
-                        loadAllData();
-                        setReviewingItem(null);
-                      }}
-                      className="w-full justify-between h-auto p-4 text-left"
-                    >
-                      <div>
-                        <div className="font-medium">Easy</div>
-                        <div className="text-sm text-muted-foreground">Perfect recall, no mistakes</div>
-                      </div>
-                      <span className="inline-flex items-center justify-center rounded-[var(--radius-sm)] border border-border px-2 py-0.5 font-medium text-xs text-foreground">
-                        4 days
-                      </span>
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        const updatedItem = { ...reviewingItem, rating: 3, completed: true };
-                        updateMemorizationItem(updatedItem);
-                        loadAllData();
-                        setReviewingItem(null);
-                      }}
-                      className="w-full justify-between h-auto p-4 text-left"
-                    >
-                      <div>
-                        <div className="font-medium">Medium</div>
-                        <div className="text-sm text-muted-foreground">Good recall with minor hesitation</div>
-                      </div>
-                      <span className="inline-flex items-center justify-center rounded-[var(--radius-sm)] border border-border px-2 py-0.5 font-medium text-xs text-foreground">
-                        2 days
-                      </span>
-                    </Button>
-
-                    <Button
-                      variant="outline"
-                      onClick={() => {
-                        const updatedItem = { ...reviewingItem, rating: 1, completed: true };
-                        updateMemorizationItem(updatedItem);
-                        loadAllData();
-                        setReviewingItem(null);
-                      }}
-                      className="w-full justify-between h-auto p-4 text-left"
-                    >
-                      <div>
-                        <div className="font-medium">Hard</div>
-                        <div className="text-sm text-muted-foreground">Difficult recall, needed help</div>
-                      </div>
-                      <span className="inline-flex items-center justify-center rounded-[var(--radius-sm)] border border-border px-2 py-0.5 font-medium text-xs text-foreground">
-                        1 day
-                      </span>
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <QuickReviewModal
+            item={reviewingItem}
+            onClose={() => setReviewingItem(null)}
+            onSubmit={(rating) => {
+              const updated = updateInterval(reviewingItem, rating);
+              updateMemorizationItem(updated);
+              loadAllData();
+              setReviewingItem(null);
+            }}
+          />
         )}
 
-        {/* Delete Confirmation */}
+        {/* ─── Delete Confirmation ─── */}
         <AlertDialog open={!!showDeleteConfirm} onOpenChange={() => setShowDeleteConfirm(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
-              <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+              <AlertDialogTitle>Delete this review item?</AlertDialogTitle>
               <AlertDialogDescription>
-                This action cannot be undone. This will permanently delete the memorization item.
+                This will permanently remove this passage from your review schedule. This action cannot be undone.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <AlertDialogFooter>
@@ -1251,21 +1118,23 @@ export default function Dashboard() {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* Mistake Delete Confirmation */}
+        {/* ─── Mistake Delete Confirmation ─── */}
         <AlertDialog open={!!showMistakeDeleteConfirm} onOpenChange={() => setShowMistakeDeleteConfirm(null)}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>
-                {showMistakeDeleteConfirm?.deleteAll ? 'Remove All Mistakes?' : 'Remove Mistake Mark?'}
+                {showMistakeDeleteConfirm?.deleteAll ? 'Remove all mistakes for this surah?' : 'Remove this mistake mark?'}
               </AlertDialogTitle>
               <AlertDialogDescription>
                 {showMistakeDeleteConfirm?.deleteAll ? (
                   <>
-                    This will remove all mistake marks for {showMistakeDeleteConfirm && surahList.find(s => s.number === showMistakeDeleteConfirm.surah)?.name} ({groupedMistakes[showMistakeDeleteConfirm.surah]?.length || 0} mistakes). You can always mark them again later if needed.
+                    This will remove all {groupedMistakes[showMistakeDeleteConfirm.surah]?.length || 0} mistake marks for{' '}
+                    {showMistakeDeleteConfirm && getSurahName(showMistakeDeleteConfirm.surah)}. You can always mark them again while reading.
                   </>
                 ) : (
                   <>
-                    This will remove the mistake mark for {showMistakeDeleteConfirm && surahList.find(s => s.number === showMistakeDeleteConfirm.surah)?.name} Ayah {showMistakeDeleteConfirm?.ayah}. You can always mark it again later if needed.
+                    This will remove the mistake mark for {showMistakeDeleteConfirm && getSurahName(showMistakeDeleteConfirm.surah)}{' '}
+                    Ayah {showMistakeDeleteConfirm?.ayah}. You can always mark it again while reading.
                   </>
                 )}
               </AlertDialogDescription>
@@ -1285,13 +1154,11 @@ export default function Dashboard() {
                 className="bg-destructive text-white hover:bg-destructive/90"
               >
                 <Trash2 className="h-4 w-4 mr-2" />
-                {showMistakeDeleteConfirm?.deleteAll ? 'Remove All Mistakes' : 'Remove Mistake'}
+                {showMistakeDeleteConfirm?.deleteAll ? 'Remove All' : 'Remove'}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
-
-
       </main>
     </div>
   );

@@ -35,7 +35,7 @@ export async function getRukuReferences(): Promise<RukuReference[]> {
   }
 
   try {
-    const response = await fetch('http://api.alquran.cloud/v1/meta');
+    const response = await fetch('https://api.alquran.cloud/v1/meta');
     const data = await response.json();
     
     if (data.code === 200 && data.data?.rukus?.references) {
@@ -52,7 +52,7 @@ export async function getRukuReferences(): Promise<RukuReference[]> {
 
 export async function getRukuData(rukuNumber: number): Promise<RukuData | null> {
   try {
-    const response = await fetch(`http://api.alquran.cloud/v1/ruku/${rukuNumber}/quran-uthmani`);
+    const response = await fetch(`https://api.alquran.cloud/v1/ruku/${rukuNumber}/quran-uthmani`);
     const data = await response.json();
     
     if (data.code === 200) {

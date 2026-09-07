@@ -885,8 +885,8 @@ export default function AyahCard({
         } ${
           isInHighlightedRange
             ? (borderless
-                ? 'bg-purple-500/[0.04] dark:bg-purple-500/[0.04]'
-                : 'border-purple-400/40 dark:border-purple-500/30')
+                ? 'bg-accent/[0.04] dark:bg-accent/[0.04]'
+                : 'border-accent/40 dark:border-accent/30')
             : ''
         } ${
           isCurrentlyPlaying
@@ -926,18 +926,42 @@ export default function AyahCard({
                   {surahNumber}:{ayahNumber}
                 </span>
               </div>
-              {isInHighlightedRange && (
-                <span className="px-2 py-0.5 text-xs font-semibold bg-gradient-to-r from-purple-500 to-pink-500 text-white rounded-full shadow-sm font-sans">
-                  Review
-                </span>
-              )}
+              {isInHighlightedRange && (() => {
+                // Find the review item this ayah belongs to
+                const reviewItem = memorizationItems.find(item =>
+                  item.surah === surahNumber &&
+                  ayahNumber >= item.ayahStart &&
+                  ayahNumber <= item.ayahEnd
+                );
+                const totalAyahs = reviewItem ? reviewItem.ayahEnd - reviewItem.ayahStart + 1 : 0;
+                const ratedCount = reviewItem?.individualRatings
+                  ? Object.keys(reviewItem.individualRatings).length
+                  : 0;
+                const allRated = totalAyahs > 0 && ratedCount >= totalAyahs;
+
+                if (allRated) {
+                  return (
+                    <span className="px-2 py-0.5 text-xs font-semibold bg-success/15 text-success rounded-[var(--radius-sm)] font-sans flex items-center gap-1">
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+                      </svg>
+                      Reviewed
+                    </span>
+                  );
+                }
+                return (
+                  <span className="px-2 py-0.5 text-xs font-semibold bg-accent/15 text-accent rounded-[var(--radius-sm)] font-sans">
+                    {ratedCount > 0 ? `${ratedCount}/${totalAyahs} reviewed` : 'In review'}
+                  </span>
+                );
+              })()}
               {currentRating && (
-                <span className={`px-2 py-0.5 text-xs font-semibold rounded-full shadow-sm font-sans ${
-                  currentRating === 'easy' ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white' :
-                  currentRating === 'medium' ? 'bg-primary text-primary-foreground' :
-                  'bg-gradient-to-r from-rose-500 to-red-500 text-white'
+                <span className={`px-2 py-0.5 text-xs font-semibold rounded-[var(--radius-sm)] font-sans ${
+                  currentRating === 'easy' ? 'bg-success/15 text-success' :
+                  currentRating === 'medium' ? 'bg-accent/15 text-accent' :
+                  'bg-warning/15 text-warning'
                 }`}>
-                  {currentRating.charAt(0).toUpperCase() + currentRating.slice(1)}
+                  {currentRating === 'easy' ? 'Easy' : currentRating === 'medium' ? 'Medium' : 'Hard'}
                 </span>
               )}
               {hasSajdah && (
@@ -990,7 +1014,7 @@ export default function AyahCard({
             <div className="flex items-center justify-between p-6 border-b">
               <div className="flex items-center space-x-3">
                 <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                  Complete Review
+                  Finish Review
                 </h3>
                 <Badge variant="secondary" className="text-xs">
                   {formatAyahRange((() => {
@@ -1054,9 +1078,9 @@ export default function AyahCard({
               {/* Rating Selection */}
               <div className="space-y-4">
                 <div>
-                  <h4 className="text-lg font-semibold mb-2">How well did you recall this passage?</h4>
+                  <h4 className="text-lg font-semibold mb-2">How well did you remember it?</h4>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Select your recall quality to schedule the next review interval.
+                    This decides when you'll see this passage again.
                   </p>
                 </div>
                 {(() => {
@@ -1118,7 +1142,7 @@ export default function AyahCard({
                       >
                         <div>
                           <div className="font-medium">Easy</div>
-                          <div className="text-sm text-muted-foreground">Perfect recall, no mistakes</div>
+                          <div className="text-sm text-muted-foreground">Remembered it perfectly</div>
                         </div>
                         <Badge variant="outline" className="text-xs">
                           {easyInterval} day{easyInterval !== 1 ? 's' : ''}
@@ -1136,7 +1160,7 @@ export default function AyahCard({
                       >
                         <div>
                           <div className="font-medium">Medium</div>
-                          <div className="text-sm text-muted-foreground">Good recall with minor hesitation</div>
+                          <div className="text-sm text-muted-foreground">Mostly remembered it</div>
                         </div>
                         <Badge variant="outline" className="text-xs">
                           {mediumInterval} day{mediumInterval !== 1 ? 's' : ''}
@@ -1154,7 +1178,7 @@ export default function AyahCard({
                       >
                         <div>
                           <div className="font-medium">Hard</div>
-                          <div className="text-sm text-muted-foreground">Difficult recall, needed help</div>
+                          <div className="text-sm text-muted-foreground">Struggled to remember</div>
                         </div>
                         <Badge variant="outline" className="text-xs">
                           1 day

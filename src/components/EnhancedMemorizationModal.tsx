@@ -1,31 +1,48 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
-import { getSurah } from '@/lib/quranService';
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from '@/components/ui/dialog';
-import { useRouter, useSearchParams } from 'next/navigation';
-import QuranSelector from '@/components/QuranSelector';
+import { getSurah } from '@/lib/quranService';
+import { getSurahName, getAyahCount, SURAH_NAMES } from '@/lib/quran';
+import { useSearchParams } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import { BookPlus, X, FileText, BookOpen, Hash, SlidersHorizontal, Clock, CheckCircle2 } from 'lucide-react';
 
 interface EnhancedMemorizationModalProps {
   isOpen: boolean;
   currentPage: number;
   currentSurah: number;
   pageData: any;
-  selectedAyahs?: Set<{surah: number, ayah: number}>;
+  selectedAyahs?: Set<{ surah: number; ayah: number }>;
   onConfirm: (selections: any[], name: string, description?: string, memorizationLevel?: string, memorizationAge?: number) => void;
   onClose: () => void;
 }
 
-// Remove MEMORIZATION_LEVELS and memorizationLevel state
-// Remove knowledge level selection UI
-// In onConfirm, do not pass memorizationLevel
+const MEMORIZATION_AGE_OPTIONS = [
+  { value: 0, label: 'Just memorized today' },
+  { value: 1, label: '1 day ago' },
+  { value: 2, label: '2 days ago' },
+  { value: 3, label: '3 days ago' },
+  { value: 7, label: '1 week ago' },
+  { value: 14, label: '2 weeks ago' },
+  { value: 30, label: '1 month ago' },
+  { value: 60, label: '2 months ago' },
+  { value: 90, label: '3 months ago' },
+  { value: 180, label: '6 months ago' },
+  { value: 365, label: '1 year ago' },
+  { value: 730, label: '2+ years ago' },
+];
+
+const SELECTION_TYPES = [
+  { value: 'page' as const, label: 'Page', icon: FileText },
+  { value: 'surah' as const, label: 'Surah', icon: BookOpen },
+  { value: 'ayahs' as const, label: 'Ayahs', icon: Hash },
+  { value: 'custom' as const, label: 'Custom', icon: SlidersHorizontal },
+];
 
 export default function EnhancedMemorizationModal({
   isOpen,
@@ -34,57 +51,54 @@ export default function EnhancedMemorizationModal({
   pageData,
   selectedAyahs: externalSelectedAyahs,
   onConfirm,
-  onClose
+  onClose,
 }: EnhancedMemorizationModalProps) {
   const searchParams = useSearchParams();
-  // All useState and useEffect hooks must be at the top
+  const isAddReviewMode = !!searchParams.get('addReview');
+
   const [selectionType, setSelectionType] = useState<'surah' | 'page' | 'ayahs' | 'custom'>('page');
-  const [selectedAyahs, setSelectedAyahs] = useState<Set<{surah: number, ayah: number}>>(new Set());
+  const [selectedAyahs, setSelectedAyahs] = useState<Set<{ surah: number; ayah: number }>>(new Set());
   const [customRange, setCustomRange] = useState({ start: 1, end: 1 });
-  // Remove MEMORIZATION_LEVELS and memorizationLevel state
-  // Remove knowledge level selection UI
-  // In onConfirm, do not pass memorizationLevel
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [memorizationAge, setMemorizationAge] = useState<number>(0); // Days since first memorized
+  const [memorizationAge, setMemorizationAge] = useState<number>(0);
   const [fullSurahData, setFullSurahData] = useState<any>(null);
   const [loadingSurah, setLoadingSurah] = useState(false);
   const [surahContainerRef, setSurahContainerRef] = useState<HTMLDivElement | null>(null);
   const [nameEdited, setNameEdited] = useState(false);
   const [descriptionEdited, setDescriptionEdited] = useState(false);
   const [selectedSurah, setSelectedSurah] = useState<number | null>(null);
-  // Remove initialRating state
-  // Remove the entire Easy/Medium/Hard selector UI block
-  // In onConfirm, do not pass memorizationLevel
 
-  // Set selectionType to 'custom' if addReview param is present and modal is open
-  useEffect(() => {
-    if (isOpen && searchParams.get('addReview')) {
-      setSelectionType('custom');
-    }
-  }, [isOpen, searchParams]);
+  // Custom mode state (replaces QuranSelector integration)
+  const [customSurah, setCustomSurah] = useState(currentSurah || 1);
+  const [customAyahStart, setCustomAyahStart] = useState(1);
+  const [customAyahEnd, setCustomAyahEnd] = useState(1);
 
-  // Initialize modal state when it opens
+  // ─── Initialization ───
   useEffect(() => {
     if (!isOpen) return;
-    if (searchParams.get('addReview')) {
+    if (isAddReviewMode) {
       setSelectionType('custom');
-      return; // Skip other initialization
+      setCustomSurah(currentSurah || 1);
+      setCustomAyahStart(1);
+      setCustomAyahEnd(1);
+      return;
     }
-    if (pageData?.ayahs && pageData.ayahs.length > 0) {
-      const uniqueSurahs = Array.from(new Set(pageData.ayahs.map((ayah: any) => ayah.surah?.number))).filter((n): n is number => typeof n === 'number');
+    if (pageData?.ayahs?.length > 0) {
+      const uniqueSurahs = Array.from(new Set(pageData.ayahs.map((a: any) => a.surah?.number))).filter(
+        (n): n is number => typeof n === 'number',
+      );
       const defaultSurah = uniqueSurahs[0] ?? null;
       if (externalSelectedAyahs && externalSelectedAyahs.size > 0) {
         setSelectionType('ayahs');
         setSelectedAyahs(new Set(externalSelectedAyahs));
-        const firstSelectedAyah = Array.from(externalSelectedAyahs)[0];
-        const ayahObj = pageData.ayahs.find((a: any) => a.surah?.number === firstSelectedAyah.surah && a.numberInSurah === firstSelectedAyah.ayah);
-        const targetSurah = ayahObj?.surah?.number ?? defaultSurah;
-        setSelectedSurah(targetSurah);
+        const first = Array.from(externalSelectedAyahs)[0];
+        const ayahObj = pageData.ayahs.find(
+          (a: any) => a.surah?.number === first.surah && a.numberInSurah === first.ayah,
+        );
+        setSelectedSurah(ayahObj?.surah?.number ?? defaultSurah);
         const sorted = Array.from(externalSelectedAyahs).sort((a, b) => a.ayah - b.ayah);
-        const minAyah = sorted[0].ayah;
-        const maxAyah = sorted[sorted.length - 1].ayah;
-        setCustomRange({ start: minAyah, end: maxAyah });
+        setCustomRange({ start: sorted[0].ayah, end: sorted[sorted.length - 1].ayah });
       } else {
         setSelectionType('page');
         setSelectedSurah(defaultSurah);
@@ -92,89 +106,65 @@ export default function EnhancedMemorizationModal({
         setCustomRange({ start: 1, end: 1 });
       }
     }
-  }, [isOpen, pageData, externalSelectedAyahs, searchParams]);
+  }, [isOpen, pageData, externalSelectedAyahs, isAddReviewMode, currentSurah]);
 
-  // All variable and function declarations
-  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setName(e.target.value);
-    setNameEdited(true);
-  };
-  const handleDescriptionChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setDescription(e.target.value);
-    setDescriptionEdited(true);
-  };
-
-  // When selectedSurah changes, update ayah grid, range, and name/description if not edited
-  // But skip this during initialization when we have external selected ayahs
+  // Load full surah data when needed
   useEffect(() => {
     if (!isOpen || !selectedSurah) return;
-    
-    // Skip this effect if we have external selected ayahs (during initialization)
-    if (externalSelectedAyahs && externalSelectedAyahs.size > 0) {
-      return;
+    if (selectionType === 'ayahs' || selectionType === 'surah') {
+      loadFullSurah(selectedSurah);
     }
-    
-    if (selectionType === 'surah' && !nameEdited) {
-      setName(`Surah ${selectedSurah} - Entire Surah`);
-    }
-    if (selectionType === 'surah' && !descriptionEdited) {
-      setDescription('Memorization set for entire surah');
-    }
-    if (selectionType === 'ayahs' && !nameEdited) {
-      setName(`Surah ${selectedSurah} - Selected Ayahs`);
-    }
-    if (selectionType === 'ayahs' && !descriptionEdited) {
-      setDescription('Memorization set for selected ayahs');
-    }
-    // Reset ayah selection and range for new surah (only when no external selection)
-    if (selectionType === 'ayahs') {
-      const ayahsForSurah = (pageData?.ayahs || []).filter((ayah: any) => ayah.surah?.number === selectedSurah);
-      if (ayahsForSurah.length > 0) {
-        setCustomRange({ start: ayahsForSurah[0].numberInSurah, end: ayahsForSurah[ayahsForSurah.length - 1].numberInSurah });
-        setSelectedAyahs(new Set());
-      }
-    }
-  }, [selectedSurah, selectionType, isOpen, externalSelectedAyahs, pageData]);
+  }, [selectedSurah, selectionType, isOpen]);
 
-
-
-  // Update name/description when selectionType changes, unless user has edited
+  // Auto-generate name/description when selection changes (unless user edited)
   useEffect(() => {
     if (!isOpen) return;
-    if (selectionType === 'surah' && !nameEdited) {
-      setName(`Surah ${currentSurah} - Entire Surah`);
-    }
-    if (selectionType === 'surah' && !descriptionEdited) {
-      setDescription('Memorization set for entire surah');
-    }
-    if (selectionType === 'page' && !nameEdited) {
-      setName(`Page ${currentPage} - ${pageData?.surah?.name || `Surah ${currentSurah}`}`);
-    }
-    if (selectionType === 'page' && !descriptionEdited) {
-      setDescription(`Memorization set for page ${currentPage}`);
-    }
-    if (selectionType === 'ayahs' && !nameEdited) {
-      setName(`Surah ${currentSurah} - Selected Ayahs`);
-    }
-    if (selectionType === 'ayahs' && !descriptionEdited) {
-      setDescription('Memorization set for selected ayahs');
-    }
-  }, [selectionType, isOpen, currentPage, currentSurah, pageData, nameEdited, descriptionEdited]);
+    if (nameEdited && descriptionEdited) return;
 
-  // Scroll to current page ayahs when full surah data is loaded
-  useEffect(() => {
-    if (fullSurahData && !loadingSurah && isOpen) {
-      // Small delay to ensure the DOM is rendered
-      setTimeout(() => {
-        // If there are selected ayahs, scroll to the first selected ayah
-        if (selectedAyahs.size > 0) {
-          scrollToFirstSelectedAyah();
-        } else {
-          scrollToCurrentPageAyahs();
-        }
-      }, 100);
+    let autoName = '';
+    let autoDesc = '';
+    if (selectionType === 'page') {
+      autoName = `Page ${currentPage} — ${pageData?.surah?.name || pageData?.ayahs?.[0]?.surah?.englishName || `Surah ${currentSurah}`}`;
+      autoDesc = `Memorization set for page ${currentPage}`;
+    } else if (selectionType === 'surah' && fullSurahData) {
+      autoName = `Surah ${fullSurahData.englishName} — Entire Surah`;
+      autoDesc = `Memorization set for all ${fullSurahData.ayahs?.length || ''} ayahs of ${fullSurahData.englishName}`;
+    } else if (selectionType === 'ayahs' && selectedSurah) {
+      const surahName = fullSurahData?.englishName || getSurahName(selectedSurah);
+      autoName = `Surah ${surahName} — Selected Ayahs`;
+      autoDesc = `Memorization set for selected ayahs from ${surahName}`;
+    } else if (selectionType === 'custom') {
+      const surahName = getSurahName(customSurah);
+      const range = customAyahStart === customAyahEnd ? `Ayah ${customAyahStart}` : `Ayahs ${customAyahStart}-${customAyahEnd}`;
+      autoName = `Surah ${surahName} — ${range}`;
+      autoDesc = `Review set for Surah ${surahName}`;
     }
-  }, [fullSurahData, loadingSurah, isOpen, pageData, selectedAyahs]);
+    if (!nameEdited) setName(autoName);
+    if (!descriptionEdited) setDescription(autoDesc);
+  }, [
+    selectionType,
+    isOpen,
+    currentPage,
+    currentSurah,
+    pageData,
+    fullSurahData,
+    selectedSurah,
+    customSurah,
+    customAyahStart,
+    customAyahEnd,
+    nameEdited,
+    descriptionEdited,
+  ]);
+
+  // Scroll to selected/page ayahs when surah data loads
+  useEffect(() => {
+    if (!fullSurahData || loadingSurah || !isOpen) return;
+    const timer = setTimeout(() => {
+      if (selectedAyahs.size > 0) scrollToFirstSelectedAyah();
+      else scrollToCurrentPageAyahs();
+    }, 100);
+    return () => clearTimeout(timer);
+  }, [fullSurahData, loadingSurah, isOpen, selectedAyahs]);
 
   // Keep quick range in sync with grid selection
   useEffect(() => {
@@ -184,84 +174,7 @@ export default function EnhancedMemorizationModal({
     }
   }, [selectedAyahs, selectionType]);
 
-  // When selectedSurah or selectionType changes, load the full surah data for that surah
-  useEffect(() => {
-    if (!isOpen || !selectedSurah) return;
-    if (selectionType === 'ayahs' || selectionType === 'surah') {
-      loadFullSurah(selectedSurah);
-    }
-  }, [selectedSurah, selectionType, isOpen]);
-
-  // On modal open or surah change, set range to full surah if not in ayah selection mode
-  // useEffect(() => {
-  //   if (!isOpen || !selectedSurah || !fullSurahData?.ayahs) return;
-  //   if (selectionType !== 'ayahs') {
-  //     const surahAyahs = fullSurahData.ayahs.filter((a: any) => a.surah?.number === selectedSurah);
-  //     if (surahAyahs.length > 0) {
-  //       console.debug('effect: surah change or modal open (not ayahs mode)', { selectedSurah, range: [surahAyahs[0].numberInSurah, surahAyahs[surahAyahs.length - 1].numberInSurah] });
-  //       setCustomRange({ start: surahAyahs[0].numberInSurah, end: surahAyahs[surahAyahs.length - 1].numberInSurah });
-  //       setSelectedAyahs(new Set());
-  //     }
-  //   }
-  // }, [isOpen, selectedSurah, fullSurahData, selectionType]);
-
-  // In the ayah selection UI, count and highlight only selected ayahs for the selectedSurah
-  const selectedAyahsForSurah = Array.from(selectedAyahs).filter(ayah => {
-    if (!fullSurahData?.ayahs) return false;
-    return fullSurahData.ayahs.some((a: any) => a.numberInSurah === ayah.ayah);
-  });
-
-  // Get total count of all selected ayahs (from all surahs)
-  const totalSelectedAyahs = selectedAyahs.size;
-  // Get count of selected ayahs for the current surah only
-  const selectedAyahsForCurrentSurah = selectedAyahsForSurah.length;
-
-  // Selection type handler
-  const handleSelectionTypeChange = (value: 'surah' | 'page' | 'ayahs' | 'custom') => {
-    setSelectionType(value);
-  };
-
-  // Function to clear the selection
-  const clearSelection = () => {
-    setSelectedAyahs(new Set());
-    setCustomRange({ start: 1, end: 1 });
-    setNameEdited(false);
-    setDescriptionEdited(false);
-  };
-
-  // Function to select all ayahs for the current surah
-  const selectAllAyahs = () => {
-    if (!fullSurahData?.ayahs) return;
-    const ayahsForSurah = (fullSurahData.ayahs || []).filter((ayah: any) => ayah.surah?.number === selectedSurah);
-    if (ayahsForSurah.length > 0) {
-      setCustomRange({ start: ayahsForSurah[0].numberInSurah, end: ayahsForSurah[ayahsForSurah.length - 1].numberInSurah });
-      setSelectedAyahs(new Set(ayahsForSurah.map((ayah: any) => ({ surah: selectedSurah, ayah: ayah.numberInSurah }))));
-    }
-  };
-
-  // Function to handle ayah toggle
-  const handleAyahToggle = (ayah: { surah: number; ayah: number }) => {
-    setSelectedAyahs(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(ayah)) {
-        newSet.delete(ayah);
-      } else {
-        newSet.add(ayah);
-      }
-      return newSet;
-    });
-    setNameEdited(true);
-    setDescriptionEdited(true);
-  };
-
-  // Function to handle range change
-  const handleRangeChange = (type: 'start' | 'end', value: number) => {
-    setCustomRange(prev => ({ ...prev, [type]: value }));
-    setNameEdited(true);
-    setDescriptionEdited(true);
-  };
-
-  // Function to load full surah data
+  // ─── Handlers ───
   const loadFullSurah = async (surahNumber: number) => {
     setLoadingSurah(true);
     try {
@@ -272,474 +185,595 @@ export default function EnhancedMemorizationModal({
       setDescriptionEdited(false);
     } catch (error) {
       console.error('Error loading surah:', error);
-      // Optionally show an error message to the user
     } finally {
       setLoadingSurah(false);
     }
   };
 
-  // Function to scroll to the first selected ayah
+  const handleAyahToggle = (ayah: { surah: number; ayah: number }) => {
+    setSelectedAyahs((prev) => {
+      const next = new Set(prev);
+      if (next.has(ayah)) next.delete(ayah);
+      else next.add(ayah);
+      return next;
+    });
+    setNameEdited(true);
+    setDescriptionEdited(true);
+  };
+
+  const handleRangeChange = (type: 'start' | 'end', value: number) => {
+    setCustomRange((prev) => ({ ...prev, [type]: value }));
+    setNameEdited(true);
+    setDescriptionEdited(true);
+  };
+
+  const handleCustomSurahChange = (surah: number) => {
+    setCustomSurah(surah);
+    setCustomAyahStart(1);
+    setCustomAyahEnd(1);
+    setNameEdited(false);
+    setDescriptionEdited(false);
+  };
+
+  const clearSelection = () => {
+    setSelectedAyahs(new Set());
+    setCustomRange({ start: 1, end: 1 });
+    setNameEdited(false);
+    setDescriptionEdited(false);
+  };
+
+  const selectAllAyahs = () => {
+    if (!fullSurahData?.ayahs) return;
+    const ayahsForSurah = fullSurahData.ayahs.filter((a: any) => a.surah?.number === selectedSurah);
+    if (ayahsForSurah.length > 0) {
+      setCustomRange({
+        start: ayahsForSurah[0].numberInSurah,
+        end: ayahsForSurah[ayahsForSurah.length - 1].numberInSurah,
+      });
+      setSelectedAyahs(new Set(ayahsForSurah.map((a: any) => ({ surah: selectedSurah!, ayah: a.numberInSurah }))));
+    }
+  };
+
   const scrollToFirstSelectedAyah = () => {
     if (!surahContainerRef) return;
-    const firstSelectedAyah = Array.from(selectedAyahs)[0];
-    if (firstSelectedAyah) {
-      const ayahElement = surahContainerRef.querySelector(`[data-ayah="${firstSelectedAyah.ayah}"]`);
-      if (ayahElement) {
-        ayahElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+    const first = Array.from(selectedAyahs)[0];
+    if (first) {
+      const el = surahContainerRef.querySelector(`[data-ayah="${first.ayah}"]`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   };
 
-  // Function to scroll to the current page's ayahs
   const scrollToCurrentPageAyahs = () => {
     if (!surahContainerRef) return;
-    const currentPageAyahs = (pageData?.ayahs || []).filter((ayah: any) => ayah.surah?.number === selectedSurah);
-    if (currentPageAyahs.length > 0) {
-      const firstAyahElement = surahContainerRef.querySelector(`[data-ayah="${currentPageAyahs[0].numberInSurah}"]`);
-      if (firstAyahElement) {
-        firstAyahElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      }
+    const pageAyahs = (pageData?.ayahs || []).filter((a: any) => a.surah?.number === selectedSurah);
+    if (pageAyahs.length > 0) {
+      const el = surahContainerRef.querySelector(`[data-ayah="${pageAyahs[0].numberInSurah}"]`);
+      el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
     }
   };
 
-  // Function to handle confirm
-  const handleConfirm = () => {
-    if (selections.length === 0 || !name.trim()) {
-      alert('Please select ayahs and provide a name.');
-      return;
-    }
-    onConfirm(selections, name, description, undefined, memorizationAge);
-    onClose();
-  };
-
-  // Function to get the current selections for the modal
-  const getSelectedAyahsInfo = () => {
+  // ─── Selection computation ───
+  const selections = useMemo(() => {
     if (selectionType === 'surah') {
-      const surahAyahs = (pageData?.ayahs || []).filter((ayah: any) => ayah.surah?.number === selectedSurah);
-      if (!surahAyahs.length) return [];
-      const firstAyah = surahAyahs[0];
-      const lastAyah = surahAyahs[surahAyahs.length - 1];
-      return [{
-        surah: selectedSurah,
-        ayahStart: firstAyah.numberInSurah,
-        ayahEnd: lastAyah.numberInSurah,
-        surahName: firstAyah.surah?.name
-      }];
-    } else if (selectionType === 'page') {
-      if (!pageData?.ayahs || pageData.ayahs.length === 0) return [];
-      const firstAyah = pageData.ayahs[0];
-      const lastAyah = pageData.ayahs[pageData.ayahs.length - 1];
-      return [{
-        surah: firstAyah.surah?.number,
-        ayahStart: firstAyah.numberInSurah,
-        ayahEnd: lastAyah.numberInSurah,
-        surahName: firstAyah.surah?.name
-      }];
-    } else if (selectionType === 'custom') {
-      // For custom, use selectedAyahs and customRange
-      if (selectedAyahs.size === 0) return [];
-      const sorted = Array.from(selectedAyahs).sort((a, b) => a.ayah - b.ayah);
-      const minAyah = sorted[0].ayah;
-      const maxAyah = sorted[sorted.length - 1].ayah;
-      return [{
-        surah: selectedSurah,
-        ayahStart: minAyah,
-        ayahEnd: maxAyah,
-        surahName: fullSurahData?.name || ''
-      }];
-    } else {
-      // Ayah selection mode - handle multi-surah selections
-      if (selectedAyahs.size === 0) return [];
-      // Group selected ayahs by surah
-      const groupedBySurah: { [key: number]: { surah: number, ayah: number }[] } = {};
-      Array.from(selectedAyahs).forEach(sel => {
-        if (!groupedBySurah[sel.surah]) groupedBySurah[sel.surah] = [];
-        groupedBySurah[sel.surah].push(sel);
-      });
-      // Process each surah group
-      const selections: Array<{surah: number, ayahStart: number, ayahEnd: number, surahName: string}> = [];
-      for (const [surahNumber, ayahs] of Object.entries(groupedBySurah)) {
-        const sortedAyahs = ayahs.sort((a, b) => a.ayah - b.ayah);
-        // Group consecutive ayahs within each surah
-        const groups = [];
-        let start = sortedAyahs[0];
-        let end = sortedAyahs[0];
-        for (let i = 1; i < sortedAyahs.length; i++) {
-          if (sortedAyahs[i].ayah === end.ayah + 1) {
-            end = sortedAyahs[i];
-          } else {
-            groups.push({ start, end });
-            start = sortedAyahs[i];
-            end = sortedAyahs[i];
-          }
-        }
-        groups.push({ start, end });
-        // Add each group as a selection
-        groups.forEach(group => {
-          selections.push({
-            surah: Number(surahNumber),
-            ayahStart: group.start.ayah,
-            ayahEnd: group.end.ayah,
-            surahName: `Surah ${surahNumber}`
-          });
-        });
+      const surahAyahs = (pageData?.ayahs || []).filter((a: any) => a.surah?.number === selectedSurah);
+      if (!surahAyahs.length && fullSurahData?.ayahs) {
+        return [{
+          surah: selectedSurah,
+          ayahStart: 1,
+          ayahEnd: fullSurahData.ayahs.length,
+          surahName: fullSurahData.englishName || getSurahName(selectedSurah!),
+        }];
       }
-      return selections;
+      if (!surahAyahs.length) return [];
+      return [{
+        surah: selectedSurah,
+        ayahStart: surahAyahs[0].numberInSurah,
+        ayahEnd: surahAyahs[surahAyahs.length - 1].numberInSurah,
+        surahName: surahAyahs[0].surah?.englishName || getSurahName(selectedSurah!),
+      }];
     }
-  };
+    if (selectionType === 'page') {
+      if (!pageData?.ayahs?.length) return [];
+      const first = pageData.ayahs[0];
+      const last = pageData.ayahs[pageData.ayahs.length - 1];
+      return [{
+        surah: first.surah?.number,
+        ayahStart: first.numberInSurah,
+        ayahEnd: last.numberInSurah,
+        surahName: first.surah?.englishName || getSurahName(first.surah?.number),
+      }];
+    }
+    if (selectionType === 'custom') {
+      if (!customSurah) return [];
+      return [{
+        surah: customSurah,
+        ayahStart: Math.min(customAyahStart, customAyahEnd),
+        ayahEnd: Math.max(customAyahStart, customAyahEnd),
+        surahName: getSurahName(customSurah),
+      }];
+    }
+    // 'ayahs' mode — group by surah, merge consecutive
+    if (selectedAyahs.size === 0) return [];
+    const grouped: Record<number, { surah: number; ayah: number }[]> = {};
+    for (const sel of selectedAyahs) {
+      if (!grouped[sel.surah]) grouped[sel.surah] = [];
+      grouped[sel.surah].push(sel);
+    }
+    const result: Array<{ surah: number; ayahStart: number; ayahEnd: number; surahName: string }> = [];
+    for (const [surahNum, ayahs] of Object.entries(grouped)) {
+      const sorted = ayahs.sort((a, b) => a.ayah - b.ayah);
+      let start = sorted[0];
+      let end = sorted[0];
+      for (let i = 1; i < sorted.length; i++) {
+        if (sorted[i].ayah === end.ayah + 1) {
+          end = sorted[i];
+        } else {
+          result.push({
+            surah: Number(surahNum),
+            ayahStart: start.ayah,
+            ayahEnd: end.ayah,
+            surahName: getSurahName(Number(surahNum)),
+          });
+          start = sorted[i];
+          end = sorted[i];
+        }
+      }
+      result.push({
+        surah: Number(surahNum),
+        ayahStart: start.ayah,
+        ayahEnd: end.ayah,
+        surahName: getSurahName(Number(surahNum)),
+      });
+    }
+    return result;
+  }, [selectionType, pageData, selectedSurah, fullSurahData, customSurah, customAyahStart, customAyahEnd, selectedAyahs]);
 
-  const selections = getSelectedAyahsInfo();
+  const totalSelectedAyahs = selectedAyahs.size;
 
-  // Helper to merge and summarize selections
-  function summarizeSelections(selections: any[]) {
-    // Group by surah
-    const grouped: Record<string, Array<{start: number, end: number}>> = {};
-    selections.forEach(sel => {
+  const summarizeSelections = (sels: any[]) => {
+    const grouped: Record<string, Array<{ start: number; end: number }>> = {};
+    sels.forEach((sel) => {
       const surah = sel.surahName || `Surah ${sel.surah}`;
       const start = Math.min(sel.ayahStart, sel.ayahEnd);
       const end = Math.max(sel.ayahStart, sel.ayahEnd);
       if (!grouped[surah]) grouped[surah] = [];
       grouped[surah].push({ start, end });
     });
-    // Merge ranges for each surah
-    const merged: Record<string, Array<{start: number, end: number}>> = {};
+    const merged: Record<string, Array<{ start: number; end: number }>> = {};
     Object.entries(grouped).forEach(([surah, ranges]) => {
-      // Sort and merge
       const sorted = ranges.sort((a, b) => a.start - b.start);
-      const mergedRanges: Array<{start: number, end: number}> = [];
+      const mergedRanges: Array<{ start: number; end: number }> = [];
       for (const range of sorted) {
         if (!mergedRanges.length) {
           mergedRanges.push(range);
         } else {
           const last = mergedRanges[mergedRanges.length - 1];
-          if (range.start <= last.end + 1) {
-            last.end = Math.max(last.end, range.end);
-          } else {
-            mergedRanges.push(range);
-          }
+          if (range.start <= last.end + 1) last.end = Math.max(last.end, range.end);
+          else mergedRanges.push(range);
         }
       }
       merged[surah] = mergedRanges;
     });
-    // Render summary
     return Object.entries(merged).map(([surah, ranges]) => (
       <span key={surah}>
-        {surah} {ranges.map((r, i) => `${r.start}${r.start !== r.end ? `-${r.end}` : ''}${i < ranges.length - 1 ? ', ' : ''}`).join('')}
+        {surah}{' '}
+        {ranges.map((r, i) => `${r.start}${r.start !== r.end ? `-${r.end}` : ''}${i < ranges.length - 1 ? ', ' : ''}`).join('')}
       </span>
     ));
-  }
+  };
 
+  const handleConfirm = () => {
+    if (selections.length === 0 || !name.trim()) return;
+    onConfirm(selections, name, description, undefined, memorizationAge);
+    onClose();
+  };
+
+  const canConfirm = selections.length > 0 && name.trim().length > 0;
+
+  // Unique surahs on the current page (for surah sub-selector)
+  const pageSurahs = useMemo(() => {
+    if (!pageData?.ayahs) return [];
+    const seen = new Set<number>();
+    const result: Array<{ number: number; name: string }> = [];
+    for (const a of pageData.ayahs) {
+      if (a.surah?.number && !seen.has(a.surah.number)) {
+        seen.add(a.surah.number);
+        result.push({ number: a.surah.number, name: a.surah.name || a.surah.englishName || `Surah ${a.surah.number}` });
+      }
+    }
+    return result;
+  }, [pageData]);
+
+  const customMaxAyahs = getAyahCount(customSurah);
+
+  // ─── Render ───
   return (
-    <Dialog open={isOpen} onOpenChange={open => { if (!open) onClose(); }}>
-      <DialogContent className="max-w-2xl p-0 bg-transparent border-none shadow-none">
+    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
+      <DialogContent
+        className="max-w-2xl p-0 gap-0 rounded-[var(--radius-2xl)] overflow-hidden max-h-[90vh] flex flex-col"
+        showCloseButton={false}
+      >
         <DialogTitle className="sr-only">Add for Review</DialogTitle>
-        <DialogDescription className="sr-only">Select ayahs, pages, or surahs to add for memorization review</DialogDescription>
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-60 p-4">
-          <Card className="w-full max-w-2xl max-h-[90vh] shadow-2xl border flex flex-col pb-6">
-            {/* Header */}
-            <div className="flex items-center justify-between p-6 border-b">
-              <div className="flex items-center space-x-3">
-                <h3 className="text-xl font-bold text-gray-900 dark:text-gray-100">
-                  Select Content for Review
-                </h3>
-              </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onClose}
-                className="h-8 w-8 p-0"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </Button>
+        <DialogDescription className="sr-only">
+          Select ayahs, pages, or surahs to add for memorization review
+        </DialogDescription>
+
+        {/* ─── Header ─── */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border bg-card flex-shrink-0">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-[var(--radius-sm)] bg-accent/15 flex items-center justify-center flex-shrink-0">
+              <BookPlus className="w-5 h-5 text-accent" />
             </div>
+            <div>
+              <h3 className="text-base font-bold text-foreground leading-tight">Add for Review</h3>
+              <p className="text-xs text-muted-foreground mt-0.5">Choose what to memorize and track</p>
+            </div>
+          </div>
+          <Button variant="ghost" size="icon-sm" onClick={onClose} className="text-muted-foreground hover:text-foreground">
+            <X className="w-4 h-4" />
+          </Button>
+        </div>
 
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-              {/* Selection Type */}
-              <div className="space-y-2">
-                <Label>Selection Type</Label>
-                <Select value={selectionType} onValueChange={handleSelectionTypeChange}>
-                  <SelectTrigger>
-                    <SelectValue>
-                      {selectionType === 'surah' && 'Entire Surah'}
-                      {selectionType === 'page' && `Entire Page (${currentPage})`}
-                      {selectionType === 'ayahs' && 'Select Ayahs'}
-                      {selectionType === 'custom' && 'Custom...'}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="surah">Entire Surah</SelectItem>
-                    <SelectItem value="page">Entire Page ({currentPage})</SelectItem>
-                    <SelectItem value="ayahs">Select Ayahs</SelectItem>
-                    <SelectItem value="custom">Custom...</SelectItem>
-                  </SelectContent>
-                </Select>
+        {/* ─── Body (scrollable) ─── */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 bg-background">
+          {/* Selection Type — Segmented Control */}
+          <div className="grid grid-cols-4 gap-1 p-1 bg-muted rounded-[var(--radius)]">
+            {SELECTION_TYPES.map(({ value, label, icon: Icon }) => (
+              <button
+                key={value}
+                onClick={() => setSelectionType(value)}
+                className={cn(
+                  'flex flex-col items-center gap-1.5 py-2.5 px-1 rounded-[var(--radius-sm)] text-xs font-semibold transition-all duration-150',
+                  selectionType === value
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                <Icon className="w-4 h-4" />
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* ─── Mode-specific content ─── */}
+
+          {/* PAGE mode */}
+          {selectionType === 'page' && pageData?.ayahs?.length > 0 && (
+            <div className="rounded-[var(--radius-lg)] border border-border bg-card p-4 flex items-center gap-4">
+              <div className="w-12 h-12 rounded-[var(--radius)] bg-accent/10 flex items-center justify-center flex-shrink-0">
+                <FileText className="w-6 h-6 text-accent" />
               </div>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-foreground">Page {currentPage}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {pageSurahs.length} {pageSurahs.length === 1 ? 'surah' : 'surahs'} ·{' '}
+                  {pageData.ayahs.length} ayahs
+                </p>
+                <p className="text-xs text-muted-foreground truncate mt-0.5">
+                  {pageSurahs.map((s) => s.name).join(', ')}
+                </p>
+              </div>
+            </div>
+          )}
 
-              {/* Render QuranSelector for Custom mode */}
-              {selectionType === 'custom' ? (
-                <QuranSelector onAdd={onClose} hideSelectionType={true} hideInternalControls={true} memorizationAge={memorizationAge} setMemorizationAge={setMemorizationAge} />
-              ) : (
-                <>
-                  {/* Surah selection dropdown if multiple surahs on page */}
-                  {selectionType !== 'page' && pageData?.ayahs && Array.from(new Set(pageData.ayahs.map((a: any) => a.surah?.number))).length > 1 && (
-                    <div className="mb-2">
-                      <Label>Surah</Label>
-                      <Select value={selectedSurah?.toString() || ''} onValueChange={v => setSelectedSurah(Number(v))}>
-                        <SelectTrigger><SelectValue /></SelectTrigger>
-                        <SelectContent>
-                          {Array.from(new Set(pageData.ayahs.map((a: any) => a.surah?.number))).filter((n): n is number => typeof n === 'number').map((surahNum: number) => {
-                            const surah = pageData.ayahs.find((a: any) => a.surah?.number === surahNum)?.surah;
-                            return (
-                              <SelectItem key={surahNum} value={surahNum.toString()}>{surah?.name || `Surah ${surahNum}`}</SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
-
-                  {/* Surah Selection Summary */}
-                  {selectionType === 'surah' && fullSurahData && (
-                    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700 text-center">
-                      <div className="text-lg font-bold text-blue-700 dark:text-blue-200 mb-1">{fullSurahData.name}</div>
-                      <div className="text-sm text-blue-600 dark:text-blue-300 mb-1">{fullSurahData.englishName} ({fullSurahData.englishNameTranslation})</div>
-                      <div className="text-xs text-blue-500 dark:text-blue-400">{fullSurahData.ayahs.length} ayahs</div>
-                    </div>
-                  )}
-
-                  {/* Ayah Selection */}
-                  {selectionType === 'ayahs' && (
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <Label>Ayahs ({totalSelectedAyahs} selected)</Label>
-                        <div className="flex space-x-2">
-                          <Button variant="outline" size="sm" onClick={selectAllAyahs}>
-                            All Current Surah
-                          </Button>
-                          <Button variant="outline" size="sm" onClick={clearSelection}>
-                            Clear All
-                          </Button>
-                        </div>
-                      </div>
-                      
-                      {/* Show info about multi-surah selections */}
-                      {selections.length > 1 && (
-                        <div className="text-sm text-accent bg-accent/10 p-3 rounded-[var(--radius-sm)]">
-                          <div className="font-medium mb-1">Multi-Surah Selection</div>
-                          <div>You have selected ayahs from {selections.length} different surahs. Each surah will be created as a separate memorization item.</div>
-                        </div>
-                      )}
-
-                      {/* Quick Range Selection */}
-                      <div className="space-y-2">
-                        <Label className="text-sm font-medium">Quick Range Selection</Label>
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-xs" htmlFor="start-ayah-input">Start Ayah</Label>
-                            <Input
-                              id="start-ayah-input"
-                              type="number"
-                              min="1"
-                              max={fullSurahData?.ayahs?.length || pageData?.ayahs?.length || 1}
-                              value={customRange.start || ''}
-                              onChange={(e) => {
-                                const value = parseInt(e.target.value);
-                                if (!isNaN(value)) {
-                                  handleRangeChange('start', value);
-                                } else if (e.target.value === '') {
-                                  handleRangeChange('start', 1);
-                                }
-                              }}
-                              onFocus={(e) => e.target.select()}
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs" htmlFor="end-ayah-input">End Ayah</Label>
-                            <Input
-                              id="end-ayah-input"
-                              type="number"
-                              min={customRange.start || 1}
-                              max={fullSurahData?.ayahs?.length || pageData?.ayahs?.length || 1}
-                              value={customRange.end || ''}
-                              onChange={(e) => {
-                                const value = parseInt(e.target.value);
-                                if (!isNaN(value)) {
-                                  handleRangeChange('end', value);
-                                } else if (e.target.value === '') {
-                                  handleRangeChange('end', customRange.start || 1);
-                                }
-                              }}
-                              onFocus={(e) => e.target.select()}
-                            />
-                          </div>
-                        </div>
-                        <div className="text-xs text-muted-foreground text-center">
-                          Range inputs update in real-time as you select ayahs
-                        </div>
-                      </div>
-                      
-                      {/* All Surah Ayahs */}
-                      <div className="space-y-2">
-                        <div className="flex items-center space-x-2">
-                          <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                          <Label className="text-sm font-medium text-green-700 dark:text-green-300">
-                            All Surah Ayahs
-                          </Label>
-                          {loadingSurah && (
-                            <span className="text-xs text-muted-foreground">Loading...</span>
-                          )}
-                        </div>
-                        <div 
-                          ref={setSurahContainerRef}
-                          className="max-h-48 overflow-y-auto border border-green-200 dark:border-green-800 rounded-md p-2 bg-green-50/30 dark:bg-green-950/20"
-                        >
-                          {loadingSurah ? (
-                            <div className="flex items-center justify-center py-4">
-                              <div className="animate-spin rounded-full h-4 w-4 border-2 border-green-500 border-t-transparent"></div>
-                              <span className="ml-2 text-sm text-green-600 dark:text-green-400">Loading ayahs...</span>
-                            </div>
-                          ) : (
-                            <div className="grid grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-1">
-                              {(() => {
-                                const allAyahs = (fullSurahData?.ayahs || []).map((ayah: any) => ({ ...ayah, surah: { ...ayah.surah, number: selectedSurah } }));
-                                const pageAyahNumbers = new Set<{surah: number, ayah: number}>((pageData?.ayahs || []).filter((ayah: any) => ayah.surah?.number === selectedSurah).map((ayah: any) => ({ surah: selectedSurah, ayah: ayah.numberInSurah })));
-                                return allAyahs.map((ayah: any) => {
-                                  const isOnPage = Array.from(pageAyahNumbers).some(pageAyah => pageAyah.surah === selectedSurah && pageAyah.ayah === ayah.numberInSurah);
-                                  const isSelected = Array.from(selectedAyahs).some(sel => sel.surah === selectedSurah && sel.ayah === ayah.numberInSurah);
-                                  return (
-                                    <Button
-                                      key={ayah.number}
-                                      data-ayah={ayah.numberInSurah}
-                                      variant={isSelected ? "default" : "outline"}
-                                      size="sm"
-                                      onClick={() => selectedSurah && handleAyahToggle({ surah: selectedSurah, ayah: ayah.numberInSurah })}
-                                      className={`h-8 text-xs ${
-                                        isSelected
-                                          ? 'bg-green-700 text-white border-green-700 hover:bg-green-800'
-                                          : isOnPage
-                                          ? 'border-green-400 dark:border-green-500 bg-green-100/50 dark:bg-green-900/30'
-                                          : ''
-                                      }`}
-                                    >
-                                      {ayah.numberInSurah}
-                                    </Button>
-                                  );
-                                });
-                              })()}
-                            </div>
-                          )}
-                        </div>
-                        <div className="text-xs text-muted-foreground text-center">
-                          Ayahs on the current page are highlighted with a darker background
-                        </div>
-                      </div>
-
-
-                    </div>
-                  )}
-
-                  <Separator />
-
-                  {/* Name and Description */}
-                  <div className="space-y-2">
-                    <div className="space-y-1">
-                      <Label htmlFor="memorization-name">Name *</Label>
-                      <Input
-                        id="memorization-name"
-                        value={name}
-                        onChange={handleNameChange}
-                        placeholder="Enter name"
-                      />
-                    </div>
-                    
-                    <div className="space-y-1">
-                      <Label htmlFor="memorization-description">Description</Label>
-                      <Input
-                        id="memorization-description"
-                        value={description}
-                        onChange={handleDescriptionChange}
-                        placeholder="Optional description"
-                      />
-                    </div>
+          {/* SURAH mode */}
+          {selectionType === 'surah' && (
+            <div className="space-y-3">
+              {pageSurahs.length > 1 && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Surah</Label>
+                  <Select value={selectedSurah?.toString() || ''} onValueChange={(v) => setSelectedSurah(Number(v))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {pageSurahs.map((s) => (
+                        <SelectItem key={s.number} value={s.number.toString()}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              {fullSurahData && (
+                <div className="rounded-[var(--radius-lg)] border border-accent/20 bg-accent/5 p-4 text-center">
+                  <div className="text-lg font-bold text-accent mb-1">{fullSurahData.name}</div>
+                  <div className="text-sm text-foreground/80 mb-1">
+                    {fullSurahData.englishName} — {fullSurahData.englishNameTranslation}
                   </div>
-
-                  <Separator />
-
-                  {/* Initial Review Difficulty Selector */}
-                  {/* Remove MEMORIZATION_LEVELS and memorizationLevel state */}
-                  {/* Remove knowledge level selection UI */}
-                  {/* In onConfirm, do not pass memorizationLevel */}
-
-
-                </>
+                  <div className="text-xs text-muted-foreground">{fullSurahData.ayahs?.length || 0} ayahs</div>
+                </div>
               )}
             </div>
+          )}
 
-            {/* Sticky Memorization Age Section */}
-            <div className="sticky bottom-0 left-0 right-0 bg-white dark:bg-gray-800 p-4 border-t border-b z-20">
-              <div className="space-y-1">
-                <Label htmlFor="memorization-age">How long have you been memorizing this?</Label>
-                <Select value={memorizationAge.toString()} onValueChange={(value) => {
-                  const age = parseInt(value);
-                  setMemorizationAge(age);
-                }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select memorization age" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="0">Recently memorized</SelectItem>
-                    <SelectItem value="90">About 3+ months ago</SelectItem>
-                    <SelectItem value="180">About 6+ months ago</SelectItem>
-                  </SelectContent>
-                </Select>
-                <div className="text-xs text-muted-foreground">
-                  This helps determine appropriate review intervals. If you&apos;ve been memorizing this for a while, select the approximate time.
+          {/* AYAHS mode */}
+          {selectionType === 'ayahs' && (
+            <div className="space-y-4">
+              {/* Surah selector if multiple surahs on page */}
+              {pageSurahs.length > 1 && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Surah</Label>
+                  <Select value={selectedSurah?.toString() || ''} onValueChange={(v) => setSelectedSurah(Number(v))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {pageSurahs.map((s) => (
+                        <SelectItem key={s.number} value={s.number.toString()}>{s.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+
+              {/* Action bar */}
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-semibold text-foreground">
+                  {totalSelectedAyahs > 0 ? `${totalSelectedAyahs} selected` : 'No ayahs selected'}
+                </span>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm" onClick={selectAllAyahs}>Select all</Button>
+                  <Button variant="outline" size="sm" onClick={clearSelection} disabled={totalSelectedAyahs === 0}>
+                    Clear
+                  </Button>
                 </div>
               </div>
-            </div>
 
-            {/* Move the selection summary and Clear button to always appear above the sticky footer */}
-            <div className="flex items-center justify-between px-6 py-2 border-t bg-gray-50 dark:bg-gray-900/30">
-              <div className="flex items-center space-x-2">
-                <span className="font-semibold">{selections.length} selection{selections.length > 1 ? 's' : ''}</span>
-                <span className="text-sm text-muted-foreground">
-                  {summarizeSelections(selections)}
-                </span>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={clearSelection}
-                  className="h-6 px-2 text-xs"
+              {/* Multi-surah info */}
+              {selections.length > 1 && (
+                <div className="rounded-[var(--radius-sm)] bg-accent/10 border border-accent/20 px-3 py-2.5 text-xs text-accent-foreground">
+                  <span className="font-semibold">Multi-surah selection:</span> Each surah will be created as a separate
+                  review item.
+                </div>
+              )}
+
+              {/* Quick range */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                  Quick range
+                </Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">Start</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={fullSurahData?.ayahs?.length || 1}
+                      value={customRange.start || ''}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value);
+                        if (!isNaN(v)) handleRangeChange('start', v);
+                        else if (e.target.value === '') handleRangeChange('start', 1);
+                      }}
+                      onFocus={(e) => e.target.select()}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">End</Label>
+                    <Input
+                      type="number"
+                      min={customRange.start || 1}
+                      max={fullSurahData?.ayahs?.length || 1}
+                      value={customRange.end || ''}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value);
+                        if (!isNaN(v)) handleRangeChange('end', v);
+                        else if (e.target.value === '') handleRangeChange('end', customRange.start || 1);
+                      }}
+                      onFocus={(e) => e.target.select()}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Ayah grid */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-accent" />
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    All ayahs in surah
+                  </Label>
+                  {loadingSurah && <span className="text-xs text-muted-foreground">Loading…</span>}
+                </div>
+                <div
+                  ref={setSurahContainerRef}
+                  className="max-h-52 overflow-y-auto rounded-[var(--radius)] border border-border bg-muted/30 p-2"
                 >
-                  Clear
-                </Button>
+                  {loadingSurah ? (
+                    <div className="flex items-center justify-center py-6">
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-accent border-t-transparent" />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-1">
+                      {(fullSurahData?.ayahs || []).map((ayah: any) => {
+                        const isOnPage = (pageData?.ayahs || []).some(
+                          (pa: any) => pa.surah?.number === selectedSurah && pa.numberInSurah === ayah.numberInSurah,
+                        );
+                        const isSelected = Array.from(selectedAyahs).some(
+                          (s) => s.surah === selectedSurah && s.ayah === ayah.numberInSurah,
+                        );
+                        return (
+                          <button
+                            key={ayah.number}
+                            data-ayah={ayah.numberInSurah}
+                            onClick={() => selectedSurah && handleAyahToggle({ surah: selectedSurah, ayah: ayah.numberInSurah })}
+                            className={cn(
+                              'h-8 rounded-[var(--radius-xs)] text-xs font-semibold transition-all duration-100',
+                              isSelected
+                                ? 'bg-accent text-accent-foreground shadow-sm'
+                                : isOnPage
+                                  ? 'bg-accent/10 text-foreground hover:bg-accent/20'
+                                  : 'bg-transparent text-muted-foreground hover:bg-secondary',
+                            )}
+                          >
+                            {ayah.numberInSurah}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground text-center">
+                  Ayahs on the current page are highlighted
+                </p>
               </div>
             </div>
-            {/* Debug output for selection troubleshooting */}
-            {/* Remove the debug output <pre> block below the preview bar */}
+          )}
 
-            {/* Action Buttons (hide in custom mode, handled by QuranSelector) */}
-            {/* Always render the sticky footer with Add for Review and Cancel buttons */}
-            <div className="sticky bottom-0 left-0 right-0 bg-white dark:bg-gray-800 p-6 border-t flex gap-3 z-10">
-              <Button
-                onClick={selectionType === 'custom' ? () => {
-                  const addBtn = document.querySelector('[data-quranselector-add]') as HTMLElement | null;
-                  if (addBtn) addBtn.click();
-                } : handleConfirm}
-                disabled={selectionType !== 'custom' && (selections.length === 0 || !name.trim())}
-                className="flex-1"
-              >
-                Add for Review
-              </Button>
-              <Button variant="outline" onClick={onClose} className="flex-1">
-                Cancel
-              </Button>
+          {/* CUSTOM mode — built directly into the modal */}
+          {selectionType === 'custom' && (
+            <div className="space-y-4">
+              {/* Surah selector */}
+              <div className="space-y-1.5">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Surah</Label>
+                <Select value={customSurah.toString()} onValueChange={(v) => handleCustomSurahChange(parseInt(v))}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent className="max-h-72">
+                    {Object.values(SURAH_NAMES).map((s) => (
+                      <SelectItem key={s.number} value={s.number.toString()}>
+                        {s.number}. {s.name} ({s.ayahCount} ayahs)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Ayah range */}
+              <div className="space-y-2">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Ayah range</Label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">Start</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      max={customMaxAyahs}
+                      value={customAyahStart || ''}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value);
+                        if (!isNaN(v)) {
+                          setCustomAyahStart(v);
+                          if (v > customAyahEnd) setCustomAyahEnd(v);
+                          setNameEdited(false);
+                          setDescriptionEdited(false);
+                        }
+                      }}
+                      onFocus={(e) => e.target.select()}
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[11px] text-muted-foreground">End</Label>
+                    <Input
+                      type="number"
+                      min={customAyahStart || 1}
+                      max={customMaxAyahs}
+                      value={customAyahEnd || ''}
+                      onChange={(e) => {
+                        const v = parseInt(e.target.value);
+                        if (!isNaN(v)) {
+                          setCustomAyahEnd(v);
+                          setNameEdited(false);
+                          setDescriptionEdited(false);
+                        }
+                      }}
+                      onFocus={(e) => e.target.select()}
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  {getSurahName(customSurah)} has {customMaxAyahs} ayahs
+                </p>
+              </div>
+
+              {/* Preview chip */}
+              <div className="rounded-[var(--radius)] border border-border bg-muted/30 px-3 py-2.5 flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 text-accent flex-shrink-0" />
+                <span className="text-sm text-foreground font-medium">
+                  {getSurahName(customSurah)} {customAyahStart}
+                  {customAyahStart !== customAyahEnd ? `-${customAyahEnd}` : ''}
+                </span>
+              </div>
             </div>
-          </Card>
+          )}
+
+          {/* ─── Common fields: Name, Description, Memorization Age ─── */}
+          <div className="space-y-3 pt-2 border-t border-border">
+            <div className="space-y-1.5">
+              <Label htmlFor="memorization-name" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Name <span className="text-destructive">*</span>
+              </Label>
+              <Input
+                id="memorization-name"
+                value={name}
+                onChange={(e) => { setName(e.target.value); setNameEdited(true); }}
+                placeholder="Enter a name"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="memorization-description" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                Description
+              </Label>
+              <Input
+                id="memorization-description"
+                value={description}
+                onChange={(e) => { setDescription(e.target.value); setDescriptionEdited(true); }}
+                placeholder="Optional description"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="memorization-age" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5" />
+                How long have you been memorizing this?
+              </Label>
+              <Select
+                value={memorizationAge.toString()}
+                onValueChange={(v) => setMemorizationAge(parseInt(v))}
+              >
+                <SelectTrigger id="memorization-age">
+                  <SelectValue placeholder="Select memorization age" />
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {MEMORIZATION_AGE_OPTIONS.map((opt) => (
+                    <SelectItem key={opt.value} value={opt.value.toString()}>{opt.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                This helps determine appropriate review intervals.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ─── Footer (sticky) ─── */}
+        <div className="flex-shrink-0 border-t border-border bg-card">
+          {/* Selection summary */}
+          <div className="flex items-center justify-between px-5 py-2.5 border-b border-border bg-muted/30">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-sm font-bold text-foreground flex-shrink-0">
+                {selections.length} {selections.length === 1 ? 'selection' : 'selections'}
+              </span>
+              {selections.length > 0 && (
+                <span className="text-xs text-muted-foreground truncate">
+                      {summarizeSelections(selections)}
+                    </span>
+              )}
+            </div>
+            {selections.length > 0 && (
+              <Button variant="ghost" size="sm" onClick={clearSelection} className="h-7 px-2 text-xs flex-shrink-0">
+                Clear
+              </Button>
+            )}
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex gap-3 p-4">
+            <Button onClick={handleConfirm} disabled={!canConfirm} className="flex-1" size="lg">
+              <BookPlus className="w-4 h-4" />
+              Add for Review
+            </Button>
+            <Button variant="outline" onClick={onClose} size="lg">
+              Cancel
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
   );
-} 
+}

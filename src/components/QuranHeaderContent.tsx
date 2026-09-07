@@ -7,7 +7,6 @@ import { Card } from '@/components/ui/card';
 import { Slider } from '@/components/ui/slider';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Tooltip } from '@/components/ui/tooltip';
 import { ControlGroup } from '@/components/ui/control-group';
 import { RECITER_GROUPS, getReciterById } from '@/lib/recitations';
 import { loadFavoriteReciters, toggleFavoriteReciter } from '@/lib/storage';
@@ -405,17 +404,15 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
         {/* ── Group 2: Tools (display / tajweed / audio) ── */}
         <ControlGroup separated className="rounded-[var(--radius)]">
           {/* Display settings */}
-          <Tooltip label="Display settings" side="bottom">
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => setShowViewSettings(true)}
-              className="rounded-l-[var(--radius)] rounded-r-none"
-              aria-label="Display settings"
-            >
-              <Settings className="h-4 w-4" />
-            </Button>
-          </Tooltip>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setShowViewSettings(true)}
+            className="rounded-l-[var(--radius)] rounded-r-none"
+            aria-label="Display settings"
+          >
+            <Settings className="h-4 w-4" />
+          </Button>
 
           {/* Tajweed legend */}
           <TajweedLegend />

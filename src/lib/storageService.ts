@@ -394,7 +394,7 @@ export async function saveSelectedReciter(reciter: string): Promise<void> {
   } else {
     localStorageService.saveSelectedReciter(reciter);
   }
-  cache.invalidate('settings');
+  cache.invalidate('selected_reciter');
 }
 
 export async function loadSelectedReciter(): Promise<string> {
@@ -421,7 +421,7 @@ export async function saveHideMistakesSetting(hideMistakes: boolean): Promise<vo
   } else {
     localStorageService.saveHideMistakesSetting(hideMistakes);
   }
-  cache.invalidate('settings');
+  cache.invalidate('hide_mistakes');
 }
 
 export async function getHideMistakesSetting(): Promise<boolean> {
@@ -448,7 +448,7 @@ export async function saveLastPage(page: number): Promise<void> {
   } else {
     localStorageService.saveLastPage(page);
   }
-  cache.invalidate('settings');
+  cache.invalidate('last_page');
 }
 
 export async function loadLastPage(): Promise<number> {
@@ -485,7 +485,7 @@ export async function saveFontSettings(settings: {
   } else {
     localStorageService.saveFontSettings(settings);
   }
-  cache.invalidate('settings');
+  cache.invalidate('font_settings');
 }
 
 export async function loadFontSettings() {
