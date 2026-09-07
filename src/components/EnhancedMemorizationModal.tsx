@@ -82,10 +82,13 @@ export default function EnhancedMemorizationModal({
   const [customAyahStart, setCustomAyahStart] = useState(1);
   const [customAyahEnd, setCustomAyahEnd] = useState(1);
 
+  // Whether we have Quran page context (from the Quran reader)
+  const hasPageContext = !!(pageData?.ayahs?.length > 0);
+
   // ─── Initialization ───
   useEffect(() => {
     if (!isOpen) return;
-    if (isAddReviewMode) {
+    if (isAddReviewMode || !hasPageContext) {
       setSelectionType('custom');
       setCustomSurah(currentSurah || 1);
       setCustomAyahStart(1);
@@ -435,7 +438,8 @@ export default function EnhancedMemorizationModal({
 
         {/* ─── Body (scrollable) ─── */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5 bg-background">
-          {/* Selection Type — Segmented Control */}
+          {/* Selection Type — Segmented Control (only when on Quran page) */}
+          {hasPageContext && (
           <div className="grid grid-cols-4 gap-1 p-1 bg-muted rounded-[var(--radius)]">
             {SELECTION_TYPES.map(({ value, label, icon: Icon }) => (
               <button
@@ -453,6 +457,7 @@ export default function EnhancedMemorizationModal({
               </button>
             ))}
           </div>
+          )}
 
           {/* ─── Mode-specific content ─── */}
 

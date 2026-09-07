@@ -6,17 +6,18 @@ import { useRouter } from 'next/navigation';
 import { getAllMemorizationItems, updateMemorizationItem, removeMemorizationItem, cleanupDuplicateItems, getMistakesList, removeMistake, addMemorizationItem, batchUpdateMemorizationItems } from '@/lib/storageService';
 import { MistakeData } from '@/lib/supabase/database';
 import { generateMemorizationId, getTodayISODate } from '@/lib/utils';
-import { MemorizationItem, updateInterval, updateIntervalWithSettings, resetDailyCompletions, getDueItems, getUpcomingReviews } from '@/lib/spacedRepetition';
+import { MemorizationItem, updateInterval, updateIntervalWithSettings, resetDailyCompletions, getDueItems, getUpcomingReviews, createMemorizationItem } from '@/lib/spacedRepetition';
 import { ReviewSettings, getReviewSettings, saveReviewSettings, previewIntervals, ALGORITHM_INFO, AlgorithmType, DEFAULT_SETTINGS } from '@/lib/reviewAlgorithms';
 import { formatAyahRange, formatAyahRangeArabic, getSurahName, getSurahNameArabic } from '@/lib/quran';
 import { getSurahList, SurahListItem } from '@/lib/quranService';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronRight, Trash2, CheckCircle, Edit, Loader2, X, AlertTriangle, Calendar, Clock, BookOpen, Target, MoreVertical, Zap, Settings, Sparkles, GraduationCap } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, CheckCircle, Edit, Loader2, X, AlertTriangle, Calendar, Clock, BookOpen, Target, MoreVertical, Zap, Settings, Sparkles, GraduationCap, BookPlus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import AppHeader from '@/components/AppHeader';
 import ReviewCard from '@/components/ReviewCard';
+import EnhancedMemorizationModal from '@/components/EnhancedMemorizationModal';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -515,6 +516,7 @@ export default function Dashboard() {
   const [expandedDates, setExpandedDates] = useState<Record<string, boolean>>({});
   const [collapseAll, setCollapseAll] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
   const [reviewSettings, setReviewSettings] = useState<ReviewSettings>(DEFAULT_SETTINGS);
 
   // Load review settings on mount
@@ -741,6 +743,30 @@ export default function Dashboard() {
     setEditingItem(item);
   }, []);
 
+  const handleAddFromHome = useCallback(async (selections: any[], name: string, description?: string, _level?: string, memorizationAge?: number, isBeginner?: boolean) => {
+    try {
+      for (const sel of selections) {
+        const memorizationItem = await createMemorizationItem(
+          sel.surah,
+          sel.ayahStart,
+          sel.ayahEnd,
+          undefined,
+          undefined,
+          memorizationAge,
+        );
+        memorizationItem.name = name;
+        memorizationItem.description = description || '';
+        memorizationItem.tags = [];
+        memorizationItem.isBeginner = isBeginner || false;
+        if (isBeginner) memorizationItem.beginnerStartedAtReview = 0;
+        await addMemorizationItem(memorizationItem);
+      }
+      await loadAllData(false);
+    } catch (e) {
+      console.error('Failed to add from home:', e);
+    }
+  }, [loadAllData]);
+
   const handleSaveEdit = useCallback(async (updatedItem: MemorizationItem) => {
     try {
       setEditingItem(null);
@@ -896,15 +922,26 @@ export default function Dashboard() {
                   : 'Add a new passage to start tracking your memorization.'}
             </p>
           </div>
-          <button
-            onClick={() => setShowSettings(true)}
-            className="w-9 h-9 rounded-[var(--radius-sm)] border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors flex-shrink-0"
-            aria-label="Review settings"
-            title="Review method & beginner mode"
-            type="button"
-          >
-            <Settings className="w-4 h-4 text-muted-foreground" />
-          </button>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="w-9 h-9 rounded-[var(--radius-sm)] border border-accent/30 bg-accent/10 flex items-center justify-center hover:bg-accent/20 transition-colors"
+              aria-label="Add review"
+              title="Add a new passage"
+              type="button"
+            >
+              <BookPlus className="w-4 h-4 text-accent" />
+            </button>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="w-9 h-9 rounded-[var(--radius-sm)] border border-border bg-card flex items-center justify-center hover:bg-muted transition-colors"
+              aria-label="Review settings"
+              title="Review method & beginner mode"
+              type="button"
+            >
+              <Settings className="w-4 h-4 text-muted-foreground" />
+            </button>
+          </div>
         </div>
 
         {/* ─── Due Now (primary section) ─── */}
@@ -1093,11 +1130,9 @@ export default function Dashboard() {
               Add Quran passages you've memorized and the app will schedule smart reviews using spaced repetition to help you retain them long-term.
             </p>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
-              <Button asChild size="lg">
-                <Link href="/quran?addReview=1">
-                  <Target className="w-4 h-4" />
-                  Add Your First Review
-                </Link>
+              <Button size="lg" onClick={() => setShowAddModal(true)}>
+                <BookPlus className="w-4 h-4" />
+                Add Your First Review
               </Button>
               <Button asChild variant="outline" size="lg">
                 <Link href="/quran">
@@ -1137,6 +1172,16 @@ export default function Dashboard() {
             }}
           />
         )}
+
+        {/* ─── Add Review Modal (from home) ─── */}
+        <EnhancedMemorizationModal
+          isOpen={showAddModal}
+          currentPage={0}
+          currentSurah={0}
+          pageData={null}
+          onConfirm={handleAddFromHome}
+          onClose={() => setShowAddModal(false)}
+        />
 
         {/* ─── Delete Confirmation ─── */}
         <AlertDialog open={!!showDeleteConfirm} onOpenChange={() => setShowDeleteConfirm(null)}>
