@@ -14,7 +14,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ChevronDown, ChevronRight, Trash2, CheckCircle, Edit, Loader2, X, AlertTriangle, Calendar, Clock, BookOpen, Target, MoreVertical, Zap, Settings, Sparkles, GraduationCap } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
+import { cn } from '@/lib/utils';
 import AppHeader from '@/components/AppHeader';
 import ReviewCard from '@/components/ReviewCard';
 import {
@@ -288,6 +288,20 @@ interface EditItemFormProps {
   onCancel: () => void;
 }
 
+type FamiliarityLevel = 'new' | 'familiar' | 'confident';
+
+const FAMILIARITY_META: Record<FamiliarityLevel, { label: string; age: number; isBeginner: boolean; stability: number; difficulty: number }> = {
+  new:       { label: 'Newly memorized',   age: 0,  isBeginner: true,  stability: 1,   difficulty: 5 },
+  familiar:  { label: 'Somewhat familiar', age: 14, isBeginner: false, stability: 2.3, difficulty: 5 },
+  confident: { label: 'Well memorized',    age: 90, isBeginner: false, stability: 8.3, difficulty: 3 },
+};
+
+function deriveFamiliarity(item: MemorizationItem): FamiliarityLevel {
+  if (item.isBeginner) return 'new';
+  if ((item.memorizationAge ?? 0) >= 60 || (item.stability ?? 0) >= 7) return 'confident';
+  return 'familiar';
+}
+
 function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
   const [formData, setFormData] = useState({
     surah: item.surah,
@@ -299,6 +313,7 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
     isBeginner: item.isBeginner || false,
     reviewCount: item.reviewCount,
   });
+  const [familiarity, setFamiliarity] = useState<FamiliarityLevel>(deriveFamiliarity(item));
   const [formError, setFormError] = useState<string | null>(null);
   const wasBeginner = item.isBeginner || false;
 
@@ -328,12 +343,14 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
     const isDue = formData.nextReview <= todayISO;
     const completedToday = isDue ? undefined : item.completedToday;
 
-    // If beginner mode was just toggled ON (was off, now on), record the
-    // current review count so auto-disable counts from this point
-    const beginnerJustEnabled = formData.isBeginner && !wasBeginner;
+    // Apply familiarity selection to the item's memory state
+    const fam = FAMILIARITY_META[familiarity];
+    const beginnerJustEnabled = fam.isBeginner && !wasBeginner;
     const beginnerStartedAtReview = beginnerJustEnabled
       ? formData.reviewCount
-      : item.beginnerStartedAtReview;
+      : fam.isBeginner
+        ? item.beginnerStartedAtReview
+        : undefined;
 
     onSave({
       ...item,
@@ -341,6 +358,13 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
       id: newId,
       completedToday,
       beginnerStartedAtReview,
+      isBeginner: fam.isBeginner,
+      memorizationAge: fam.age,
+      // Only update stability/difficulty if the user changed familiarity
+      // from what the item already had — don't overwrite values the algorithm
+      // has been building if the user keeps the same level
+      stability: familiarity === deriveFamiliarity(item) ? item.stability : fam.stability,
+      difficulty: familiarity === deriveFamiliarity(item) ? item.difficulty : fam.difficulty,
     });
   };
 
@@ -419,18 +443,45 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
           />
           <p className="text-xs text-muted-foreground mt-1">Update this if you reviewed outside the app</p>
         </div>
-        <div className="flex items-center justify-between gap-3 p-3 rounded-[var(--radius-md)] border border-border bg-muted/20">
-          <div>
-            <label className="text-sm font-medium text-foreground flex items-center gap-1.5">
-              <GraduationCap className="w-3.5 h-3.5 text-accent" />
-              Still learning this passage
-            </label>
-            <p className="text-xs text-muted-foreground mt-0.5">Reviews happen more often until it's solid</p>
+        <div className="space-y-1.5">
+          <label className="block text-sm font-medium flex items-center gap-1.5">
+            <BookOpen className="w-3.5 h-3.5 text-accent" />
+            How well do you know this?
+          </label>
+          <div className="grid grid-cols-3 gap-1.5">
+            {(Object.keys(FAMILIARITY_META) as FamiliarityLevel[]).map((level) => {
+              const meta = FAMILIARITY_META[level];
+              const Icon = level === 'new' ? GraduationCap : level === 'familiar' ? BookOpen : CheckCircle;
+              return (
+                <button
+                  key={level}
+                  type="button"
+                  onClick={() => {
+                    setFamiliarity(level);
+                    setFormData({ ...formData, isBeginner: meta.isBeginner });
+                  }}
+                  className={cn(
+                    'flex flex-col items-center gap-1 p-2.5 rounded-[var(--radius-md)] border text-center transition-all',
+                    familiarity === level
+                      ? 'border-accent bg-accent/10 shadow-sm'
+                      : 'border-border bg-muted/20 hover:bg-muted/40',
+                  )}
+                >
+                  <Icon className={cn('w-4 h-4', familiarity === level ? 'text-accent' : 'text-muted-foreground')} />
+                  <span className={cn('text-xs font-semibold leading-tight', familiarity === level ? 'text-foreground' : 'text-foreground/80')}>
+                    {meta.label}
+                  </span>
+                </button>
+              );
+            })}
           </div>
-          <Switch
-            checked={formData.isBeginner}
-            onCheckedChange={(v) => setFormData({ ...formData, isBeginner: v })}
-          />
+          <p className="text-[11px] text-muted-foreground">
+            {familiarity === 'new'
+              ? 'Learning mode on — frequent reviews until it sticks.'
+              : familiarity === 'familiar'
+                ? 'Moderate intervals that adapt to your memory.'
+                : 'Longer intervals since you know it well.'}
+          </p>
         </div>
       <div className="flex gap-2 pt-4">
         <Button type="submit" className="flex-1">Save</Button>

@@ -6,7 +6,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { addMemorizationItem, updateMemorizationItem, getMemorizationItem, toggleMistake, saveHideMistakesSetting, saveLastPage, loadLastPage, saveSelectedReciter, saveFontSettings } from '@/lib/storageService';
 import { useOptimizedData } from '@/lib/hooks/useOptimizedData';
 import { MistakeData } from '@/lib/supabase/database';
-import { MemorizationItem, updateInterval, updateIndividualAyahRating, createMemorizationItem } from '@/lib/spacedRepetition';
+import { MemorizationItem, updateInterval, updateIntervalWithSettings, updateIndividualAyahRating, createMemorizationItem } from '@/lib/spacedRepetition';
+import { getReviewSettings } from '@/lib/reviewAlgorithms';
 import { getSurah, getQuranMeta, getPage, getAyah, fetchPageWithTranslation, SurahListItem } from '@/lib/quranService';
 import { DEFAULT_RECITER_ID, resolveReciterId, getAyahAudioPlan, getReciterById, AudioPlan } from '@/lib/recitations';
 import { generateMemorizationId } from '@/lib/utils';
@@ -1094,9 +1095,9 @@ function QuranPageContent() {
   const handleOverallRating = async (item: any) => {
     if (item && item.rating) {
       const rating = item.rating;
-      // Remove the rating field before passing to updateInterval
       const { rating: _rating, ...itemWithoutRating } = item;
-      const updatedItem = updateInterval(itemWithoutRating, rating);
+      const settings = getReviewSettings();
+      const updatedItem = updateIntervalWithSettings(itemWithoutRating, rating, settings);
       await updateMemorizationItem(updatedItem);
       await refreshData();
     }

@@ -10,8 +10,7 @@ import { getSurah } from '@/lib/quranService';
 import { getSurahName, getAyahCount, SURAH_NAMES } from '@/lib/quran';
 import { useSearchParams } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { BookPlus, X, FileText, BookOpen, Hash, SlidersHorizontal, Clock, CheckCircle2, GraduationCap } from 'lucide-react';
-import { Switch } from '@/components/ui/switch';
+import { BookPlus, X, FileText, BookOpen, Hash, SlidersHorizontal, CheckCircle2, GraduationCap } from 'lucide-react';
 
 interface EnhancedMemorizationModalProps {
   isOpen: boolean;
@@ -23,19 +22,27 @@ interface EnhancedMemorizationModalProps {
   onClose: () => void;
 }
 
-const MEMORIZATION_AGE_OPTIONS = [
-  { value: 0, label: 'Just memorized today' },
-  { value: 1, label: '1 day ago' },
-  { value: 2, label: '2 days ago' },
-  { value: 3, label: '3 days ago' },
-  { value: 7, label: '1 week ago' },
-  { value: 14, label: '2 weeks ago' },
-  { value: 30, label: '1 month ago' },
-  { value: 60, label: '2 months ago' },
-  { value: 90, label: '3 months ago' },
-  { value: 180, label: '6 months ago' },
-  { value: 365, label: '1 year ago' },
-  { value: 730, label: '2+ years ago' },
+type FamiliarityLevel = 'new' | 'familiar' | 'confident';
+
+const FAMILIARITY_OPTIONS: { value: FamiliarityLevel; label: string; desc: string; icon: typeof GraduationCap }[] = [
+  {
+    value: 'new',
+    label: 'Newly memorized',
+    desc: 'Just learned it, still getting comfortable',
+    icon: GraduationCap,
+  },
+  {
+    value: 'familiar',
+    label: 'Somewhat familiar',
+    desc: 'Know it but make some mistakes',
+    icon: BookOpen,
+  },
+  {
+    value: 'confident',
+    label: 'Well memorized',
+    desc: 'Confident, memorized a while ago',
+    icon: CheckCircle2,
+  },
 ];
 
 const SELECTION_TYPES = [
@@ -62,8 +69,7 @@ export default function EnhancedMemorizationModal({
   const [customRange, setCustomRange] = useState({ start: 1, end: 1 });
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
-  const [memorizationAge, setMemorizationAge] = useState<number>(0);
-  const [isBeginner, setIsBeginner] = useState<boolean>(false);
+  const [familiarity, setFamiliarity] = useState<FamiliarityLevel>('new');
   const [fullSurahData, setFullSurahData] = useState<any>(null);
   const [loadingSurah, setLoadingSurah] = useState(false);
   const [surahContainerRef, setSurahContainerRef] = useState<HTMLDivElement | null>(null);
@@ -366,7 +372,18 @@ export default function EnhancedMemorizationModal({
 
   const handleConfirm = () => {
     if (selections.length === 0 || !name.trim()) return;
-    onConfirm(selections, name, description, undefined, memorizationAge, isBeginner);
+    // Derive memorization age and beginner mode from familiarity level
+    const ageMap: Record<FamiliarityLevel, number> = {
+      new: 0,        // just memorized
+      familiar: 14,  // ~2 weeks
+      confident: 90, // ~3 months
+    };
+    const beginnerMap: Record<FamiliarityLevel, boolean> = {
+      new: true,
+      familiar: false,
+      confident: false,
+    };
+    onConfirm(selections, name, description, undefined, ageMap[familiarity], beginnerMap[familiarity]);
     onClose();
   };
 
@@ -719,43 +736,40 @@ export default function EnhancedMemorizationModal({
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="memorization-age" className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5" />
-                How long have you been memorizing this?
+              <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+                <BookOpen className="w-3.5 h-3.5" />
+                How well do you know this?
               </Label>
-              <Select
-                value={memorizationAge.toString()}
-                onValueChange={(v) => setMemorizationAge(parseInt(v))}
-              >
-                <SelectTrigger id="memorization-age">
-                  <SelectValue placeholder="Select memorization age" />
-                </SelectTrigger>
-                <SelectContent className="max-h-72">
-                  {MEMORIZATION_AGE_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value.toString()}>{opt.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-[11px] text-muted-foreground">
-                This helps determine appropriate review intervals.
-              </p>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between gap-3 p-3 rounded-[var(--radius-md)] border border-border bg-muted/20">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <GraduationCap className="w-3.5 h-3.5 text-accent" />
-                    <Label className="text-xs font-semibold text-foreground">Still learning this passage</Label>
-                  </div>
-                  <p className="text-[11px] text-muted-foreground mt-1">
-                    Reviews will happen more often to help it stick. Turns off automatically after you've reviewed it confidently a few times.
-                  </p>
-                </div>
-                <Switch
-                  checked={isBeginner}
-                  onCheckedChange={setIsBeginner}
-                />
+              <div className="grid grid-cols-3 gap-1.5">
+                {FAMILIARITY_OPTIONS.map(({ value, label, desc, icon: Icon }) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setFamiliarity(value)}
+                    className={cn(
+                      'flex flex-col items-center gap-1 p-2.5 rounded-[var(--radius-md)] border text-center transition-all duration-150',
+                      familiarity === value
+                        ? 'border-accent bg-accent/10 shadow-sm'
+                        : 'border-border bg-muted/20 hover:bg-muted/40',
+                    )}
+                  >
+                    <Icon className={cn('w-4 h-4', familiarity === value ? 'text-accent' : 'text-muted-foreground')} />
+                    <div className={cn(
+                      'text-xs font-semibold leading-tight',
+                      familiarity === value ? 'text-foreground' : 'text-foreground/80',
+                    )}>
+                      {label}
+                    </div>
+                  </button>
+                ))}
               </div>
+              <p className="text-[11px] text-muted-foreground">
+                {familiarity === 'new'
+                  ? 'Learning mode on — frequent reviews until it sticks.'
+                  : familiarity === 'familiar'
+                    ? 'Moderate intervals that adapt to your memory.'
+                    : 'Longer intervals since you know it well.'}
+              </p>
             </div>
           </div>
         </div>

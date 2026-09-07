@@ -399,19 +399,34 @@ export async function createMemorizationItem(
   const rukuReferences = await getRukuReferences();
   const rukuInfo = getRukuRange(surah, ayahStart, ayahEnd, rukuReferences);
   
-  // Set initial interval based on memorization age
+  // Set initial interval and FSRS memory state based on memorization age.
+  // The memorization age tells us how established the memory already is,
+  // which maps to an initial stability (how long until 90% recall).
   let initialInterval: number;
+  let initialStability: number;
+  let initialDifficulty: number;
   const age = memorizationAge || 0;
-  
+
   if (age <= 7) {
-    // New memorization phase - use medium interval (1 day)
+    // New memorization — memory is fragile, review soon
     initialInterval = 1;
+    initialStability = 1;
+    initialDifficulty = 5;
   } else if (age <= 14) {
-    // Consolidation phase - use medium interval (2 days)
+    // Consolidation phase — memory is forming, can wait a bit longer
     initialInterval = 2;
+    initialStability = 2.3; // FSRS w2 (Good initial stability)
+    initialDifficulty = 5;
+  } else if (age <= 30) {
+    // Early established — memory is somewhat stable
+    initialInterval = 4;
+    initialStability = 4;
+    initialDifficulty = 4;
   } else {
-    // Established memorization phase - use medium interval (5 days)
-    initialInterval = 5;
+    // Well established — memory is solid, can wait longer
+    initialInterval = 7;
+    initialStability = 8.3; // FSRS w3 (Easy initial stability)
+    initialDifficulty = 3;
   }
 
   const result = {
@@ -424,11 +439,13 @@ export async function createMemorizationItem(
     easeFactor: SPACED_REPETITION.INITIAL_EASE_FACTOR,
     reviewCount: 0,
     createdAt: today,
-    memorizationAge: memorizationAge || 0, // Default to 0 if not specified
+    memorizationAge: memorizationAge || 0,
     rukuStart: rukuInfo.startRuku,
     rukuEnd: rukuInfo.endRuku,
     rukuCount: rukuInfo.rukuCount,
     difficultyLevel: difficultyLevel as 'easy' | 'medium' | 'hard' | undefined,
+    stability: initialStability,
+    difficulty: initialDifficulty,
   };
   
   return result;
