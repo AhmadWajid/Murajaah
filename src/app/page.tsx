@@ -97,10 +97,14 @@ function ReviewRow({
 
       {/* Status badge */}
       {isDone ? (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold text-success bg-success/15 px-2 py-1 rounded-[var(--radius-sm)] flex-shrink-0">
+        <button
+          onClick={onReview}
+          className="inline-flex items-center gap-1 text-xs font-semibold text-success bg-success/15 px-2 py-1 rounded-[var(--radius-sm)] flex-shrink-0 hover:bg-success/25 transition-colors"
+          title="Open in Quran"
+        >
           <CheckCircle className="w-3 h-3" />
           Done
-        </span>
+        </button>
       ) : (
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {item.isBeginner && (
