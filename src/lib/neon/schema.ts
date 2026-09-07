@@ -72,6 +72,10 @@ export const userSettings = pgTable('user_settings', {
   showWordByWordTooltip: boolean('show_word_by_word_tooltip').default(false),
   mobileHeaderHidden: boolean('mobile_header_hidden').default(false),
   userTimezone: text('user_timezone'),
+  favoriteReciters: jsonb('favorite_reciters'),
+  reviewSettings: jsonb('review_settings'),
+  readingLayout: text('reading_layout').default('verse'),
+  hideWordsDelay: integer('hide_words_delay').default(500),
 });
 
 // ─── Storage Metadata ───

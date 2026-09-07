@@ -3,7 +3,7 @@
 import { Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
-import { addMemorizationItem, updateMemorizationItem, getMemorizationItem, toggleMistake, saveHideMistakesSetting, saveLastPage, loadLastPage, saveSelectedReciter, saveFontSettings } from '@/lib/storageService';
+import { addMemorizationItem, updateMemorizationItem, getMemorizationItem, toggleMistake, saveHideMistakesSetting, saveLastPage, loadLastPage, saveSelectedReciter, saveFontSettings, saveUISettings, saveReadingLayout } from '@/lib/storageService';
 import { useOptimizedData } from '@/lib/hooks/useOptimizedData';
 import { MistakeData } from '@/lib/storageService';
 import { MemorizationItem, updateInterval, updateIntervalWithSettings, updateIndividualAyahRating, createMemorizationItem } from '@/lib/spacedRepetition';
@@ -155,10 +155,11 @@ function QuranPageContent() {
     }
   }, []);
 
-  // Save reading layout to localStorage whenever it changes
+  // Save reading layout to localStorage and sync to DB whenever it changes
   useEffect(() => {
     if (isInitialized) {
       localStorage.setItem('quran-reading-layout', readingLayout);
+      saveReadingLayout(readingLayout);
     }
   }, [readingLayout, isInitialized]);
 
@@ -218,10 +219,12 @@ function QuranPageContent() {
     }
   }, []);
 
-  // Save to localStorage when changed
+  // Save to localStorage and sync to DB when changed
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('showWordByWordTooltip', showWordByWordTooltip ? 'true' : 'false');
+      // Sync to database if logged in
+      saveUISettings({ showWordByWordTooltip });
     }
   }, [showWordByWordTooltip]);
 

@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useTransition, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getAllMemorizationItems, updateMemorizationItem, removeMemorizationItem, cleanupDuplicateItems, getMistakesList, removeMistake, addMemorizationItem, batchUpdateMemorizationItems } from '@/lib/storageService';
+import { getAllMemorizationItems, updateMemorizationItem, removeMemorizationItem, cleanupDuplicateItems, getMistakesList, removeMistake, addMemorizationItem, batchUpdateMemorizationItems, saveReviewSettings as saveReviewSettingsDb } from '@/lib/storageService';
 import { MistakeData } from '@/lib/storageService';
 import { generateMemorizationId, getTodayISODate } from '@/lib/utils';
 import { MemorizationItem, updateInterval, updateIntervalWithSettings, resetDailyCompletions, getDueItems, getUpcomingReviews, createMemorizationItem } from '@/lib/spacedRepetition';
@@ -1326,6 +1326,7 @@ export default function Dashboard() {
             onSave={(newSettings) => {
               setReviewSettings(newSettings);
               saveReviewSettings(newSettings);
+              saveReviewSettingsDb(newSettings);
               setShowSettings(false);
             }}
           />
@@ -1346,6 +1347,25 @@ function ReviewSettingsModal({
   onSave: (settings: ReviewSettings) => void;
 }) {
   const [localSettings, setLocalSettings] = useState<ReviewSettings>(settings);
+  const [wordByWord, setWordByWord] = useState(false);
+
+  // Load word-by-word setting on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setWordByWord(localStorage.getItem('showWordByWordTooltip') === 'true');
+    }
+  }, []);
+
+  const toggleWordByWord = (value: boolean) => {
+    setWordByWord(value);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('showWordByWordTooltip', value ? 'true' : 'false');
+    }
+    // Also sync to DB
+    import('@/lib/storageService').then(({ saveUISettings }) => {
+      saveUISettings({ showWordByWordTooltip: value });
+    });
+  };
 
   return (
     <div
@@ -1429,6 +1449,38 @@ function ReviewSettingsModal({
                   You can mark individual passages as "still learning" when you add or edit them. This keeps reviews frequent (daily or every 2 days) until you've reviewed it confidently several times — then it automatically switches to normal scheduling. Use this for passages you just memorized or ones you keep struggling with.
                 </p>
               </div>
+            </div>
+          </div>
+
+          {/* Word-by-word tooltip toggle */}
+          <div className="pt-4 border-t border-border">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-start gap-3 flex-1">
+                <div className="w-8 h-8 rounded-[var(--radius-sm)] bg-accent/15 flex items-center justify-center flex-shrink-0">
+                  <BookOpen className="w-4 h-4 text-accent" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground">Word-by-word translation</p>
+                  <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                    Tap any Arabic word in the Quran to see its translation. Useful for learning word meanings while reading.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={wordByWord}
+                onClick={() => toggleWordByWord(!wordByWord)}
+                className={`relative inline-flex h-6 w-11 flex-shrink-0 items-center rounded-full transition-colors ${
+                  wordByWord ? 'bg-accent' : 'bg-muted'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-sm transition-transform ${
+                    wordByWord ? 'translate-x-5' : 'translate-x-0.5'
+                  }`}
+                />
+              </button>
             </div>
           </div>
         </div>

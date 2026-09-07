@@ -602,6 +602,113 @@ export async function loadUISettings() {
 }
 
 // =============================================
+// FAVORITE RECITERS (syncable)
+// =============================================
+
+export async function loadFavoriteReciters(): Promise<string[]> {
+  if (await isAuthenticated()) {
+    try {
+      const s = await fetchSettings();
+      return s?.favoriteReciters ?? [];
+    } catch {
+      return localStorageService.loadFavoriteReciters();
+    }
+  }
+  return localStorageService.loadFavoriteReciters();
+}
+
+export async function saveFavoriteReciters(ids: string[]): Promise<void> {
+  if (await isAuthenticated()) {
+    const current = await fetchSettings();
+    await saveSettingsToDb({ ...current, favoriteReciters: ids });
+  } else {
+    localStorageService.saveFavoriteReciters(ids);
+  }
+}
+
+export async function toggleFavoriteReciter(reciterId: string): Promise<string[]> {
+  const current = await loadFavoriteReciters();
+  const next = current.includes(reciterId)
+    ? current.filter(id => id !== reciterId)
+    : [...current, reciterId];
+  await saveFavoriteReciters(next);
+  return next;
+}
+
+// =============================================
+// REVIEW SETTINGS (syncable)
+// =============================================
+
+export async function loadReviewSettings<T>(): Promise<T | null> {
+  if (await isAuthenticated()) {
+    try {
+      const s = await fetchSettings();
+      return (s?.reviewSettings as T) ?? null;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+export async function saveReviewSettings(settings: any): Promise<void> {
+  if (await isAuthenticated()) {
+    const current = await fetchSettings();
+    await saveSettingsToDb({ ...current, reviewSettings: settings });
+  }
+  // Always save to localStorage too (the reviewAlgorithms module reads from there)
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('mquran_review_settings', JSON.stringify(settings));
+  }
+}
+
+// =============================================
+// READING LAYOUT & HIDE WORDS (syncable)
+// =============================================
+
+export async function loadReadingLayout(): Promise<string | null> {
+  if (await isAuthenticated()) {
+    try {
+      const s = await fetchSettings();
+      return s?.readingLayout ?? 'verse';
+    } catch {
+      return null;
+    }
+  }
+  if (typeof window === 'undefined') return null;
+  return localStorage.getItem('quran-reading-layout');
+}
+
+export async function saveReadingLayout(layout: string): Promise<void> {
+  if (await isAuthenticated()) {
+    const current = await fetchSettings();
+    await saveSettingsToDb({ ...current, readingLayout: layout });
+  }
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('quran-reading-layout', layout);
+  }
+}
+
+export async function loadHideWordsDelay(): Promise<number | null> {
+  if (await isAuthenticated()) {
+    try {
+      const s = await fetchSettings();
+      return s?.hideWordsDelay ?? 500;
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+export async function saveHideWordsDelay(delay: number): Promise<void> {
+  if (await isAuthenticated()) {
+    const current = await fetchSettings();
+    await saveSettingsToDb({ ...current, hideWordsDelay: delay });
+  }
+}
+
+// =============================================
 // DATA ANALYTICS
 // =============================================
 

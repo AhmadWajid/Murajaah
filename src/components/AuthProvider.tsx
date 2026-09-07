@@ -1,6 +1,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { usePathname } from 'next/navigation';
 import { clearAuthCache } from '@/lib/storageService';
 
 interface AuthUser {
@@ -37,6 +38,7 @@ interface AuthProviderProps {
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const pathname = usePathname();
 
   const refreshUser = useCallback(async () => {
     try {
@@ -51,9 +53,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
+  // Check auth on mount AND whenever the route changes
   useEffect(() => {
     refreshUser();
-  }, [refreshUser]);
+  }, [refreshUser, pathname]);
 
   const signOut = useCallback(async () => {
     await fetch('/api/auth/signout', { method: 'POST' });

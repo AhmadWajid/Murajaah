@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { AlertCircle, Loader2, BookOpen } from 'lucide-react';
+import { useAuth } from '@/components/AuthProvider';
 
 type AuthMode = 'login' | 'signup';
 
 export default function AuthPage() {
   const router = useRouter();
+  const { user, refreshUser } = useAuth();
   const [mode, setMode] = useState<AuthMode>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -20,11 +22,8 @@ export default function AuthPage() {
 
   // Redirect if already authenticated
   useEffect(() => {
-    fetch('/api/auth/me')
-      .then(res => res.json())
-      .then(data => { if (data.user) router.push('/'); })
-      .catch(() => {});
-  }, [router]);
+    if (user) router.push('/');
+  }, [user, router]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -49,6 +48,7 @@ export default function AuthPage() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to create account');
+        await refreshUser();
         router.push('/');
       } else {
         const res = await fetch('/api/auth/signin', {
@@ -58,6 +58,7 @@ export default function AuthPage() {
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || 'Failed to sign in');
+        await refreshUser();
         router.push('/');
       }
     } catch (error: any) {

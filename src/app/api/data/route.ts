@@ -175,6 +175,10 @@ export async function GET(request: NextRequest) {
           showWordByWordTooltip: s.showWordByWordTooltip,
           mobileHeaderHidden: s.mobileHeaderHidden,
           userTimezone: s.userTimezone,
+          favoriteReciters: s.favoriteReciters,
+          reviewSettings: s.reviewSettings,
+          readingLayout: s.readingLayout,
+          hideWordsDelay: s.hideWordsDelay,
         },
       });
     }
@@ -340,6 +344,10 @@ export async function POST(request: NextRequest) {
         showWordByWordTooltip: s.showWordByWordTooltip,
         mobileHeaderHidden: s.mobileHeaderHidden,
         userTimezone: s.userTimezone,
+        favoriteReciters: s.favoriteReciters,
+        reviewSettings: s.reviewSettings,
+        readingLayout: s.readingLayout,
+        hideWordsDelay: s.hideWordsDelay,
       };
 
       if (existing.length > 0) {

@@ -30,28 +30,29 @@ export default function AppHeader({ pageType, onRefresh, quranHeaderComponent }:
   const [overflowOpen, setOverflowOpen] = useState(false);
   const [quranToolbarOpen, setQuranToolbarOpen] = useState(true);
   const [syncOpen, setSyncOpen] = useState(false);
+  const compact = pageType === 'quran';
 
-  const AccountControl = ({ compact = false }: { compact?: boolean }) =>
-    user ? (
-      <Tooltip label="Sign out">
-        <Button
-          variant="ghost"
-          size={compact ? 'icon-sm' : 'sm'}
-          onClick={signOut}
-          aria-label="Sign out"
-        >
-          <LogOut className="h-4 w-4" />
-          {!compact && <span>Sign out</span>}
-        </Button>
-      </Tooltip>
-    ) : (
-      <Button variant="outline" size={compact ? 'icon-sm' : 'sm'} asChild aria-label="Sign in">
-        <Link href="/auth">
-          <User className="h-4 w-4" />
-          {!compact && <span>Sign in</span>}
-        </Link>
+  // Show loading state until we know the auth status
+  const accountControl = user ? (
+    <Tooltip label="Sign out">
+      <Button
+        variant="ghost"
+        size={compact ? 'icon-sm' : 'sm'}
+        onClick={() => signOut()}
+        aria-label="Sign out"
+      >
+        <LogOut className="h-4 w-4" />
+        {!compact && <span>Sign out</span>}
       </Button>
-    );
+    </Tooltip>
+  ) : (
+    <Button variant="outline" size={compact ? 'icon-sm' : 'sm'} asChild aria-label="Sign in">
+      <Link href="/auth">
+        <User className="h-4 w-4" />
+        {!compact && <span>Sign in</span>}
+      </Link>
+    </Button>
+  );
 
   return (
     <header className="sticky top-0 z-50 border-b border-border bg-background/80 backdrop-blur-md">
@@ -208,7 +209,7 @@ export default function AppHeader({ pageType, onRefresh, quranHeaderComponent }:
                 </Button>
               </Tooltip>
             )}
-            <AccountControl compact={pageType === 'quran'} />
+            {accountControl}
           </div>
         </div>
       </div>

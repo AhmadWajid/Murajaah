@@ -9,7 +9,8 @@ import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { ControlGroup } from '@/components/ui/control-group';
 import { RECITER_GROUPS, getReciterById } from '@/lib/recitations';
-import { loadFavoriteReciters, toggleFavoriteReciter } from '@/lib/storage';
+import { loadFavoriteReciters as loadFavoriteRecitersSync, toggleFavoriteReciter as toggleFavoriteReciterSync } from '@/lib/storage';
+import { loadFavoriteReciters, toggleFavoriteReciter } from '@/lib/storageService';
 import {
   ChevronLeft,
   ChevronRight,
@@ -145,7 +146,7 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
 
   useEffect(() => {
     if (showReciterSelector && audioTab === 'reciters') {
-      setFavoriteReciters(loadFavoriteReciters());
+      loadFavoriteReciters().then(setFavoriteReciters).catch(() => setFavoriteReciters(loadFavoriteRecitersSync()));
       const t = setTimeout(() => {
         selectedReciterRef.current?.scrollIntoView({ block: 'center', behavior: 'instant' });
       }, 80);
@@ -999,7 +1000,7 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                           <button
                             type="button"
                             onClick={() => {
-                              setFavoriteReciters(toggleFavoriteReciter(reciter.id));
+                              toggleFavoriteReciter(reciter.id).then(setFavoriteReciters).catch(() => setFavoriteReciters(toggleFavoriteReciterSync(reciter.id)));
                             }}
                             className="size-7 flex items-center justify-center rounded-[var(--radius-xs)] text-accent hover:bg-accent/10 transition-colors flex-shrink-0"
                             title="Remove from favorites"
@@ -1053,7 +1054,7 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                           <button
                             type="button"
                             onClick={() => {
-                              setFavoriteReciters(toggleFavoriteReciter(reciter.id));
+                              toggleFavoriteReciter(reciter.id).then(setFavoriteReciters).catch(() => setFavoriteReciters(toggleFavoriteReciterSync(reciter.id)));
                             }}
                             className={`size-7 flex items-center justify-center rounded-[var(--radius-xs)] transition-colors flex-shrink-0 ${
                               isFav
