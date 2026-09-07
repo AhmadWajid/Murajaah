@@ -283,8 +283,8 @@ export default function EnhancedMemorizationModal({
   // ─── Selection computation ───
   const selections = useMemo(() => {
     if (selectionType === 'surah') {
-      const surahAyahs = (pageData?.ayahs || []).filter((a: any) => a.surah?.number === selectedSurah);
-      if (!surahAyahs.length && fullSurahData?.ayahs) {
+      // Always use full surah data, not just the ayahs on the current page
+      if (fullSurahData?.ayahs?.length) {
         return [{
           surah: selectedSurah,
           ayahStart: 1,
@@ -292,6 +292,8 @@ export default function EnhancedMemorizationModal({
           surahName: fullSurahData.englishName || getSurahName(selectedSurah!),
         }];
       }
+      // Fallback: if full surah data isn't loaded yet, use page ayahs
+      const surahAyahs = (pageData?.ayahs || []).filter((a: any) => a.surah?.number === selectedSurah);
       if (!surahAyahs.length) return [];
       return [{
         surah: selectedSurah,
