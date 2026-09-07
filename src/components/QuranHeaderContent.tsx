@@ -26,6 +26,7 @@ import {
   Info,
   Keyboard,
   Star,
+  Bookmark,
 } from 'lucide-react';
 import { getLanguagesWithTranslations } from '@/lib/quranService';
 import { getNextMistakeInVerseOrder, getPreviousMistakeInVerseOrder } from '@/lib/storageService';
@@ -72,6 +73,8 @@ interface QuranHeaderContentProps {
   onHideWordsDelayChange: (delay: number) => void;
   readingLayout: 'verse';
   onReadingLayoutChange: (layout: 'verse') => void;
+  isPageBookmarked?: boolean;
+  onTogglePageBookmark?: () => void;
 }
 
 export default function QuranHeaderContent(props: QuranHeaderContentProps) {
@@ -106,6 +109,8 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
     mistakes = {},
     onLanguageChange,
     onTranslationChange,
+    isPageBookmarked = false,
+    onTogglePageBookmark,
   } = props;
 
   const [showViewSettings, setShowViewSettings] = useState(false);
@@ -301,6 +306,20 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                 aria-label={`Page ${currentPage} of ${totalPages}`}
               />
               <span className="text-[11px] font-medium text-muted-foreground select-none whitespace-nowrap">/ {totalPages}</span>
+              {onTogglePageBookmark && (
+                <button
+                  onClick={onTogglePageBookmark}
+                  className={`size-7 flex items-center justify-center rounded-[var(--radius-sm)] transition-colors ${
+                    isPageBookmarked
+                      ? 'text-accent hover:bg-accent/10'
+                      : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                  }`}
+                  title={isPageBookmarked ? 'Remove bookmark' : 'Bookmark this page'}
+                  aria-label={isPageBookmarked ? 'Remove bookmark' : 'Bookmark this page'}
+                >
+                  <Bookmark className={`h-4 w-4 ${isPageBookmarked ? 'fill-accent' : ''}`} />
+                </button>
+              )}
             </div>
 
             <button

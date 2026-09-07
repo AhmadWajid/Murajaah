@@ -84,3 +84,16 @@ export const storageMetadata = pgTable('storage_metadata', {
   lastSync: timestamp('last_sync').defaultNow(),
   version: text('version').default('1'),
 });
+
+// ─── Bookmarks ───
+export const bookmarks = pgTable('bookmarks', {
+  id: varchar('id', { length: 36 }).primaryKey(),
+  userId: varchar('user_id', { length: 36 }).notNull(),
+  type: text('type').notNull(), // 'page' | 'ayah'
+  page: integer('page'),
+  surah: integer('surah'),
+  ayah: integer('ayah'),
+  label: text('label'), // optional custom label
+  surahName: text('surah_name'), // cached surah name for display
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+});

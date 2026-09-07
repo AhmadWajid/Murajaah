@@ -889,3 +889,128 @@ export async function syncMerge(): Promise<{ items: MemorizationItem[]; mistakes
 
   return { items: data.items || [], mistakes: data.mistakes || {} };
 }
+
+// =============================================
+// BOOKMARKS
+// =============================================
+
+export interface Bookmark {
+  id: string;
+  type: 'page' | 'ayah';
+  page?: number | null;
+  surah?: number | null;
+  ayah?: number | null;
+  label?: string | null;
+  surahName?: string | null;
+  createdAt?: string;
+}
+
+const BOOKMARKS_KEY = 'mquran_bookmarks';
+
+function loadLocalBookmarks(): Bookmark[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(BOOKMARKS_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLocalBookmarks(bookmarks: Bookmark[]): void {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(BOOKMARKS_KEY, JSON.stringify(bookmarks));
+}
+
+export async function getBookmarks(): Promise<Bookmark[]> {
+  if (await isAuthenticated()) {
+    try {
+      const res = await fetch('/api/data?type=bookmarks');
+      const data = await res.json();
+      return data.bookmarks || [];
+    } catch {
+      return loadLocalBookmarks();
+    }
+  }
+  return loadLocalBookmarks();
+}
+
+export async function addBookmark(bookmark: Omit<Bookmark, 'id' | 'createdAt'>): Promise<Bookmark | null> {
+  if (await isAuthenticated()) {
+    try {
+      const res = await fetch('/api/data', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ op: 'addBookmark', ...bookmark }),
+      });
+      const data = await res.json();
+      return data.bookmark;
+    } catch {
+      return null;
+    }
+  }
+  // Local fallback
+  const local = loadLocalBookmarks();
+  // Check if already exists
+  const exists = local.find(b =>
+    b.type === bookmark.type &&
+    b.page === bookmark.page &&
+    b.surah === bookmark.surah &&
+    b.ayah === bookmark.ayah
+  );
+  if (exists) return exists;
+  const newBookmark: Bookmark = {
+    ...bookmark,
+    id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    createdAt: new Date().toISOString(),
+  };
+  saveLocalBookmarks([...local, newBookmark]);
+  return newBookmark;
+}
+
+export async function removeBookmark(id: string): Promise<void> {
+  if (await isAuthenticated()) {
+    await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'removeBookmark', id }),
+    });
+    return;
+  }
+  const local = loadLocalBookmarks();
+  saveLocalBookmarks(local.filter(b => b.id !== id));
+}
+
+export async function removeBookmarkByTarget(
+  type: 'page' | 'ayah',
+  target: { page?: number; surah?: number; ayah?: number }
+): Promise<void> {
+  if (await isAuthenticated()) {
+    await fetch('/api/data', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ op: 'removeBookmarkByTarget', type, ...target }),
+    });
+    return;
+  }
+  const local = loadLocalBookmarks();
+  saveLocalBookmarks(local.filter(b =>
+    !(b.type === type &&
+      b.page === target.page &&
+      b.surah === target.surah &&
+      b.ayah === target.ayah)
+  ));
+}
+
+export async function isBookmarked(
+  type: 'page' | 'ayah',
+  target: { page?: number; surah?: number; ayah?: number }
+): Promise<boolean> {
+  const bookmarks = await getBookmarks();
+  return bookmarks.some(b =>
+    b.type === type &&
+    b.page === target.page &&
+    b.surah === target.surah &&
+    b.ayah === target.ayah
+  );
+}

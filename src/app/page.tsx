@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useTransition, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { getAllMemorizationItems, updateMemorizationItem, removeMemorizationItem, cleanupDuplicateItems, getMistakesList, removeMistake, addMemorizationItem, batchUpdateMemorizationItems, saveReviewSettings as saveReviewSettingsDb } from '@/lib/storageService';
+import { getAllMemorizationItems, updateMemorizationItem, removeMemorizationItem, cleanupDuplicateItems, getMistakesList, removeMistake, addMemorizationItem, batchUpdateMemorizationItems, saveReviewSettings as saveReviewSettingsDb, getBookmarks, removeBookmark, Bookmark as BookmarkType } from '@/lib/storageService';
 import { MistakeData } from '@/lib/storageService';
 import { generateMemorizationId, getTodayISODate } from '@/lib/utils';
 import { MemorizationItem, updateInterval, updateIntervalWithSettings, resetDailyCompletions, getDueItems, getUpcomingReviews, createMemorizationItem } from '@/lib/spacedRepetition';
@@ -13,7 +13,7 @@ import { getSurahList, SurahListItem } from '@/lib/quranService';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ChevronDown, ChevronRight, Trash2, CheckCircle, Edit, Loader2, X, AlertTriangle, Calendar, Clock, BookOpen, Target, MoreVertical, Zap, Settings, Sparkles, GraduationCap, BookPlus } from 'lucide-react';
+import { ChevronDown, ChevronRight, Trash2, CheckCircle, Edit, Loader2, X, AlertTriangle, Calendar, Clock, BookOpen, Target, MoreVertical, Zap, Settings, Sparkles, GraduationCap, BookPlus, Bookmark } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import AppHeader from '@/components/AppHeader';
 import ReviewCard from '@/components/ReviewCard';
@@ -589,10 +589,16 @@ export default function Dashboard() {
   const [showSettings, setShowSettings] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
   const [reviewSettings, setReviewSettings] = useState<ReviewSettings>(DEFAULT_SETTINGS);
+  const [bookmarks, setBookmarks] = useState<BookmarkType[]>([]);
 
   // Load review settings on mount
   useEffect(() => {
     setReviewSettings(getReviewSettings());
+  }, []);
+
+  // Load bookmarks on mount
+  useEffect(() => {
+    getBookmarks().then(setBookmarks).catch(() => {});
   }, []);
 
   // Optimized data loading with caching
@@ -1186,6 +1192,52 @@ export default function Dashboard() {
                     />
                   );
                 })}
+            </div>
+          </section>
+        )}
+
+        {/* ─── Bookmarks ─── */}
+        {bookmarks.length > 0 && (
+          <section className="mb-8">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+              <Bookmark className="w-3.5 h-3.5 text-accent" />
+              Bookmarks ({bookmarks.length})
+            </h2>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+              {[...bookmarks]
+                .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+                .map((bm) => (
+                  <div
+                    key={bm.id}
+                    className="group relative flex items-center gap-3 rounded-[var(--radius-lg)] border border-border bg-card p-3 hover:border-accent/30 hover:bg-accent/[0.03] transition-all cursor-pointer"
+                    onClick={() => router.push(`/quran?page=${bm.page || 1}`)}
+                  >
+                    <div className="w-9 h-9 rounded-[var(--radius-sm)] bg-accent/10 flex items-center justify-center flex-shrink-0">
+                      <Bookmark className="w-4 h-4 text-accent fill-accent" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">
+                        {bm.surahName || `Page ${bm.page}`}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {bm.type === 'page' ? `Page ${bm.page}` : `${bm.surah}:${bm.ayah}`}
+                      </p>
+                    </div>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        removeBookmark(bm.id).then(() => {
+                          setBookmarks(prev => prev.filter(b => b.id !== bm.id));
+                        });
+                      }}
+                      className="size-7 flex items-center justify-center rounded-[var(--radius-sm)] text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
+                      title="Remove bookmark"
+                      aria-label="Remove bookmark"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
             </div>
           </section>
         )}

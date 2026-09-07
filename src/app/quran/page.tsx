@@ -3,7 +3,7 @@
 import { Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
-import { addMemorizationItem, updateMemorizationItem, getMemorizationItem, toggleMistake, saveHideMistakesSetting, saveLastPage, loadLastPage, saveSelectedReciter, saveFontSettings, saveUISettings, saveReadingLayout } from '@/lib/storageService';
+import { addMemorizationItem, updateMemorizationItem, getMemorizationItem, toggleMistake, saveHideMistakesSetting, saveLastPage, loadLastPage, saveSelectedReciter, saveFontSettings, saveUISettings, saveReadingLayout, getBookmarks, addBookmark, removeBookmarkByTarget, Bookmark as BookmarkType } from '@/lib/storageService';
 import { useOptimizedData } from '@/lib/hooks/useOptimizedData';
 import { MistakeData } from '@/lib/storageService';
 import { MemorizationItem, updateInterval, updateIntervalWithSettings, updateIndividualAyahRating, createMemorizationItem } from '@/lib/spacedRepetition';
@@ -197,6 +197,10 @@ function QuranPageContent() {
   // Remove showWordTranslation and onToggleWordTranslation state and props
   // Remove all references to showWordTranslation and onToggleWordTranslation in QuranHeader and QuranContent
 
+  // Bookmark state
+  const [bookmarks, setBookmarks] = useState<BookmarkType[]>([]);
+  const [isPageBookmarked, setIsPageBookmarked] = useState(false);
+
   // Modal states
   const [showRevisionInput, setShowRevisionInput] = useState(false);
   const [revisionInput, setRevisionInput] = useState('');
@@ -231,18 +235,29 @@ function QuranPageContent() {
   // Initialize the component - handle URL parameters vs last page
   useEffect(() => {
     if (isInitialized) return;
-    
+
     const ayahParam = searchParams.get('ayah');
     const reviewParam = searchParams.get('review');
     const surahParam = searchParams.get('surah');
-    
+    const pageParam = searchParams.get('page');
+
     // If there are specific navigation parameters, use them
     if (ayahParam || reviewParam || surahParam) {
       // Let the existing URL parameter handling logic work
       setIsInitialized(true);
       return;
     }
-    
+
+    // If there's a page param (e.g., from a bookmark), navigate to it
+    if (pageParam) {
+      const pageNum = parseInt(pageParam);
+      if (!isNaN(pageNum) && pageNum >= 1 && pageNum <= TOTAL_QURAN_PAGES) {
+        setCurrentPage(pageNum);
+        setIsInitialized(true);
+        return;
+      }
+    }
+
     // Otherwise, load the last page the user was on
     const loadInitialPage = async () => {
       try {
@@ -325,6 +340,35 @@ function QuranPageContent() {
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   }, [currentPage, isInitialized]);
+
+  // Load bookmarks on mount
+  useEffect(() => {
+    getBookmarks().then(setBookmarks).catch(() => {});
+  }, []);
+
+  // Update isPageBookmarked when bookmarks or currentPage change
+  useEffect(() => {
+    setIsPageBookmarked(bookmarks.some(b => b.type === 'page' && b.page === currentPage));
+  }, [bookmarks, currentPage]);
+
+  const handleTogglePageBookmark = useCallback(async () => {
+    const exists = bookmarks.find(b => b.type === 'page' && b.page === currentPage);
+    if (exists) {
+      await removeBookmarkByTarget('page', { page: currentPage });
+      setBookmarks(prev => prev.filter(b => !(b.type === 'page' && b.page === currentPage)));
+    } else {
+      // Get surah name from page data if available
+      const surahName = pageData?.ayahs?.[0]?.surah?.englishName || `Page ${currentPage}`;
+      await addBookmark({ type: 'page', page: currentPage, surahName });
+      setBookmarks(prev => [...prev, {
+        id: `temp-${Date.now()}`,
+        type: 'page' as const,
+        page: currentPage,
+        surahName,
+        createdAt: new Date().toISOString(),
+      }]);
+    }
+  }, [bookmarks, currentPage, pageData]);
 
   // Detect reviews whenever page data or memorization items change
   useEffect(() => {
@@ -1551,6 +1595,8 @@ function QuranPageContent() {
             mistakes={mistakes}
             readingLayout={readingLayout}
             onReadingLayoutChange={setReadingLayout}
+            isPageBookmarked={isPageBookmarked}
+            onTogglePageBookmark={handleTogglePageBookmark}
           />
         }
       />

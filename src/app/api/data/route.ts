@@ -22,7 +22,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/neon/client';
-import { memorizationItems, mistakes, userSettings, storageMetadata } from '@/lib/neon/schema';
+import { memorizationItems, mistakes, userSettings, storageMetadata, bookmarks } from '@/lib/neon/schema';
 import { getSessionFromCookie, generateId } from '@/lib/auth';
 import { eq, and, asc, desc } from 'drizzle-orm';
 import { MemorizationItem } from '@/lib/spacedRepetition';
@@ -208,6 +208,13 @@ export async function GET(request: NextRequest) {
         }
       });
       return NextResponse.json({ dailyReviews: Object.values(dailyData).sort((a, b) => a.date.localeCompare(b.date)) });
+    }
+
+    if (type === 'bookmarks') {
+      const rows = await db.select().from(bookmarks)
+        .where(eq(bookmarks.userId, session.userId))
+        .orderBy(desc(bookmarks.createdAt));
+      return NextResponse.json({ bookmarks: rows });
     }
 
     return NextResponse.json({ error: 'Unknown type' }, { status: 400 });
@@ -498,6 +505,83 @@ export async function POST(request: NextRequest) {
         items: mergedItems.map(dbToItem),
         mistakes: mistakesRecord,
       });
+    }
+
+    // ─── Bookmarks ───
+    if (op === 'addBookmark') {
+      const { type, page, surah, ayah, label, surahName } = body;
+      // Check if bookmark already exists (unique per user+target)
+      const existing = await db.select().from(bookmarks)
+        .where(and(
+          eq(bookmarks.userId, session.userId),
+          eq(bookmarks.type, type),
+          page ? eq(bookmarks.page, page) : undefined,
+          surah ? eq(bookmarks.surah, surah) : undefined,
+          ayah ? eq(bookmarks.ayah, ayah) : undefined,
+        ))
+        .limit(1);
+      if (existing.length > 0) {
+        return NextResponse.json({ bookmark: existing[0] });
+      }
+      const id = generateId();
+      await db.insert(bookmarks).values({
+        id,
+        userId: session.userId,
+        type,
+        page: page || null,
+        surah: surah || null,
+        ayah: ayah || null,
+        label: label || null,
+        surahName: surahName || null,
+      });
+      return NextResponse.json({ bookmark: { id, userId: session.userId, type, page, surah, ayah, label, surahName } });
+    }
+
+    if (op === 'removeBookmark') {
+      const { id } = body;
+      await db.delete(bookmarks)
+        .where(and(eq(bookmarks.id, id), eq(bookmarks.userId, session.userId)));
+      return NextResponse.json({ success: true });
+    }
+
+    if (op === 'removeBookmarkByTarget') {
+      const { type, page, surah, ayah } = body;
+      await db.delete(bookmarks)
+        .where(and(
+          eq(bookmarks.userId, session.userId),
+          eq(bookmarks.type, type),
+          page ? eq(bookmarks.page, page) : undefined,
+          surah ? eq(bookmarks.surah, surah) : undefined,
+          ayah ? eq(bookmarks.ayah, ayah) : undefined,
+        ));
+      return NextResponse.json({ success: true });
+    }
+
+    if (op === 'clearAllBookmarks') {
+      await db.delete(bookmarks).where(eq(bookmarks.userId, session.userId));
+      return NextResponse.json({ success: true });
+    }
+
+    if (op === 'saveBookmarks') {
+      // Replace all bookmarks (used for sync)
+      await db.delete(bookmarks).where(eq(bookmarks.userId, session.userId));
+      const items = body.bookmarks as any[];
+      if (items.length > 0) {
+        await db.insert(bookmarks).values(
+          items.map(b => ({
+            id: b.id || generateId(),
+            userId: session.userId,
+            type: b.type,
+            page: b.page || null,
+            surah: b.surah || null,
+            ayah: b.ayah || null,
+            label: b.label || null,
+            surahName: b.surahName || null,
+            createdAt: b.createdAt ? new Date(b.createdAt) : new Date(),
+          }))
+        );
+      }
+      return NextResponse.json({ success: true });
     }
 
     return NextResponse.json({ error: 'Unknown operation' }, { status: 400 });
