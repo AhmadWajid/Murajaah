@@ -1,8 +1,8 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { usePathname } from 'next/navigation';
-import { clearAuthCache } from '@/lib/storageService';
+import { clearAuthCache, syncSettingsFromDb } from '@/lib/storageService';
 
 interface AuthUser {
   id: string;
@@ -39,13 +39,27 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<AuthUser | null>(null);
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
+  const syncedSettingsFor = useRef<string | null>(null);
 
   const refreshUser = useCallback(async () => {
     try {
       const res = await fetch('/api/auth/me');
       const data = await res.json();
-      setUser(data.user || null);
+      const newUser = data.user || null;
+      setUser(newUser);
       clearAuthCache();
+
+      // When a user logs in (or is already logged in on mount), sync all
+      // settings from DB → localStorage once per user session. After this,
+      // every page just reads from localStorage and gets the right values
+      // — no per-page auth checks needed.
+      if (newUser && syncedSettingsFor.current !== newUser.id) {
+        syncedSettingsFor.current = newUser.id;
+        syncSettingsFromDb().catch((e) => console.warn('Settings sync failed:', e));
+      }
+      if (!newUser) {
+        syncedSettingsFor.current = null;
+      }
     } catch {
       setUser(null);
     } finally {
@@ -62,6 +76,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     await fetch('/api/auth/signout', { method: 'POST' });
     setUser(null);
     clearAuthCache();
+    syncedSettingsFor.current = null;
   }, []);
 
   const value = {

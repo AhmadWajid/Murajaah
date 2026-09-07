@@ -6,7 +6,7 @@ import { MistakeData } from '@/lib/storageService';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Plus, X } from 'lucide-react';
+import { Plus, X, Bookmark } from 'lucide-react';
 import SelectedAyahsModal from './SelectedAyahsModal';
 import { TajweedAyahText } from './TajweedAyahText';
 import { TajweedWord, TAJWEED_COLORS, TOPIC_COLORS, TOPIC_TAILWIND_COLORS, getTajweedTooltip } from '@/lib/tajweedService';
@@ -163,6 +163,10 @@ interface QuranContentProps {
   activeAyah?: { surah: number; ayah: number } | null;
   onActiveAyahChange?: (ayah: { surah: number; ayah: number } | null) => void;
   playingAyah?: { surah: number; ayah: number } | null;
+  isPageBookmarked?: boolean;
+  onTogglePageBookmark?: () => void;
+  isAyahBookmarked?: (surah: number, ayah: number) => boolean;
+  onToggleAyahBookmark?: (surah: number, ayah: number) => void;
 }
 
 export default function QuranContent({
@@ -204,6 +208,10 @@ export default function QuranContent({
   activeAyah = null,
   onActiveAyahChange,
   playingAyah = null,
+  isPageBookmarked = false,
+  onTogglePageBookmark,
+  isAyahBookmarked,
+  onToggleAyahBookmark,
 }: QuranContentProps) {
   const [showSelectedAyahsModal, setShowSelectedAyahsModal] = useState(false);
   const isMobile = useIsMobile();
@@ -958,9 +966,25 @@ export default function QuranContent({
                         );
                       })()}
                     </div>
-                    <span className="text-xs font-semibold text-accent/60 dark:text-accent/50 tracking-wide font-sans flex-shrink-0">
-                      Page {currentPage}
-                    </span>
+                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                      {onTogglePageBookmark && (
+                        <button
+                          onClick={onTogglePageBookmark}
+                          className={`size-7 flex items-center justify-center rounded-[var(--radius-sm)] transition-colors ${
+                            isPageBookmarked
+                              ? 'text-accent hover:bg-accent/10'
+                              : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                          }`}
+                          title={isPageBookmarked ? 'Remove bookmark' : 'Bookmark this page'}
+                          aria-label={isPageBookmarked ? 'Remove bookmark' : 'Bookmark this page'}
+                        >
+                          <Bookmark className={`h-3.5 w-3.5 ${isPageBookmarked ? 'fill-accent' : ''}`} />
+                        </button>
+                      )}
+                      <span className="text-xs font-semibold text-accent/60 dark:text-accent/50 tracking-wide font-sans">
+                        Page {currentPage}
+                      </span>
+                    </div>
                   </div>
 
                   {/* Current Page Content */}
@@ -1017,6 +1041,8 @@ export default function QuranContent({
                               borderless={true}
                               layoutMode={layoutMode}
                               isCurrentlyPlaying={!!playingAyah && playingAyah.surah === surahNumber && playingAyah.ayah === ayahNumber}
+                              isAyahBookmarked={isAyahBookmarked?.(surahNumber, ayahNumber) ?? false}
+                              onToggleAyahBookmark={onToggleAyahBookmark ? () => onToggleAyahBookmark(surahNumber, ayahNumber) : undefined}
                             />
                           </div>
                         );
@@ -1122,6 +1148,8 @@ export default function QuranContent({
                               borderless={true}
                               layoutMode={layoutMode}
                               isCurrentlyPlaying={!!playingAyah && playingAyah.surah === surahNumber && playingAyah.ayah === ayahNumber}
+                              isAyahBookmarked={isAyahBookmarked?.(surahNumber, ayahNumber) ?? false}
+                              onToggleAyahBookmark={onToggleAyahBookmark ? () => onToggleAyahBookmark(surahNumber, ayahNumber) : undefined}
                             />
                           );
                         })
@@ -1171,9 +1199,25 @@ export default function QuranContent({
                       );
                     })()}
                   </div>
-                  <span className="text-xs font-semibold text-accent/60 dark:text-accent/50 tracking-wide font-sans flex-shrink-0">
-                    {pageData?.number ? `Page ${pageData.number}` : ''}
-                  </span>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    {onTogglePageBookmark && (
+                      <button
+                        onClick={onTogglePageBookmark}
+                        className={`size-7 flex items-center justify-center rounded-[var(--radius-sm)] transition-colors ${
+                          isPageBookmarked
+                            ? 'text-accent hover:bg-accent/10'
+                            : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                        }`}
+                        title={isPageBookmarked ? 'Remove bookmark' : 'Bookmark this page'}
+                        aria-label={isPageBookmarked ? 'Remove bookmark' : 'Bookmark this page'}
+                      >
+                        <Bookmark className={`h-3.5 w-3.5 ${isPageBookmarked ? 'fill-accent' : ''}`} />
+                      </button>
+                    )}
+                    <span className="text-xs font-semibold text-accent/60 dark:text-accent/50 tracking-wide font-sans">
+                      {pageData?.number ? `Page ${pageData.number}` : ''}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Single Page Content */}
@@ -1230,6 +1274,8 @@ export default function QuranContent({
                             borderless={true}
                             layoutMode={layoutMode}
                             isCurrentlyPlaying={!!playingAyah && playingAyah.surah === surahNumber && playingAyah.ayah === ayahNumber}
+                            isAyahBookmarked={isAyahBookmarked?.(surahNumber, ayahNumber) ?? false}
+                            onToggleAyahBookmark={onToggleAyahBookmark ? () => onToggleAyahBookmark(surahNumber, ayahNumber) : undefined}
                           />
                         </div>
                       );

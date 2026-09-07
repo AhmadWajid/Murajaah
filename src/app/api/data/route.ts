@@ -394,10 +394,11 @@ export async function POST(request: NextRequest) {
 
     // ─── Sync: upload local data to DB (overwrite DB with local) ───
     if (op === 'syncUploadLocal') {
-      const { items, mistakes: localMistakes } = body;
+      const { items, mistakes: localMistakes, bookmarks: localBookmarks } = body;
       // Clear all DB data for this user, then insert local data
       await db.delete(memorizationItems).where(eq(memorizationItems.userId, session.userId));
       await db.delete(mistakes).where(eq(mistakes.userId, session.userId));
+      await db.delete(bookmarks).where(eq(bookmarks.userId, session.userId));
 
       if (items && Array.isArray(items)) {
         for (const item of items) {
@@ -418,6 +419,20 @@ export async function POST(request: NextRequest) {
           }
         }
       }
+      if (localBookmarks && Array.isArray(localBookmarks)) {
+        for (const bm of localBookmarks) {
+          await db.insert(bookmarks).values({
+            id: bm.id || generateId(),
+            userId: session.userId,
+            type: bm.type,
+            page: bm.page ?? null,
+            surah: bm.surah ?? null,
+            ayah: bm.ayah ?? null,
+            label: bm.surahName || bm.label || null,
+            createdAt: bm.createdAt || new Date().toISOString(),
+          }).onConflictDoNothing();
+        }
+      }
       return NextResponse.json({ success: true });
     }
 
@@ -428,6 +443,9 @@ export async function POST(request: NextRequest) {
         .orderBy(asc(memorizationItems.createdAt));
       const mistakeRows = await db.select().from(mistakes)
         .where(eq(mistakes.userId, session.userId));
+      const bookmarkRows = await db.select().from(bookmarks)
+        .where(eq(bookmarks.userId, session.userId))
+        .orderBy(desc(bookmarks.createdAt));
 
       const mistakesRecord: Record<string, any> = {};
       mistakeRows.forEach(r => {
@@ -437,12 +455,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         items: itemRows.map(dbToItem),
         mistakes: mistakesRecord,
+        bookmarks: bookmarkRows.map(r => ({
+          id: r.id,
+          type: r.type,
+          page: r.page,
+          surah: r.surah,
+          ayah: r.ayah,
+          surahName: r.label,
+          createdAt: r.createdAt,
+        })),
       });
     }
 
     // ─── Sync: merge local into DB (keep newest version of each item) ───
     if (op === 'syncMerge') {
-      const { items: localItems, mistakes: localMistakes } = body;
+      const { items: localItems, mistakes: localMistakes, bookmarks: localBookmarks } = body;
 
       // Get existing DB items
       const dbRows = await db.select().from(memorizationItems)
@@ -490,12 +517,40 @@ export async function POST(request: NextRequest) {
         }
       }
 
+      // Merge bookmarks — add local bookmarks that don't exist in DB
+      if (localBookmarks && Array.isArray(localBookmarks)) {
+        const dbBookmarkRows = await db.select().from(bookmarks)
+          .where(eq(bookmarks.userId, session.userId));
+        const dbBookmarkKeys = new Set(dbBookmarkRows.map(r =>
+          `${r.type}:${r.page ?? ''}:${r.surah ?? ''}:${r.ayah ?? ''}`
+        ));
+
+        for (const bm of localBookmarks) {
+          const key = `${bm.type}:${bm.page ?? ''}:${bm.surah ?? ''}:${bm.ayah ?? ''}`;
+          if (!dbBookmarkKeys.has(key)) {
+            await db.insert(bookmarks).values({
+              id: bm.id || generateId(),
+              userId: session.userId,
+              type: bm.type,
+              page: bm.page ?? null,
+              surah: bm.surah ?? null,
+              ayah: bm.ayah ?? null,
+              label: bm.surahName || bm.label || null,
+              createdAt: bm.createdAt || new Date().toISOString(),
+            }).onConflictDoNothing();
+          }
+        }
+      }
+
       // Return the merged result
       const mergedItems = await db.select().from(memorizationItems)
         .where(eq(memorizationItems.userId, session.userId))
         .orderBy(asc(memorizationItems.createdAt));
       const mergedMistakes = await db.select().from(mistakes)
         .where(eq(mistakes.userId, session.userId));
+      const mergedBookmarks = await db.select().from(bookmarks)
+        .where(eq(bookmarks.userId, session.userId))
+        .orderBy(desc(bookmarks.createdAt));
       const mistakesRecord: Record<string, any> = {};
       mergedMistakes.forEach(r => {
         mistakesRecord[`${r.surah}:${r.ayah}`] = { timestamp: r.timestamp, surah: r.surah, ayah: r.ayah };
@@ -504,6 +559,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         items: mergedItems.map(dbToItem),
         mistakes: mistakesRecord,
+        bookmarks: mergedBookmarks.map(r => ({
+          id: r.id,
+          type: r.type,
+          page: r.page,
+          surah: r.surah,
+          ayah: r.ayah,
+          surahName: r.label,
+          createdAt: r.createdAt,
+        })),
       });
     }
 

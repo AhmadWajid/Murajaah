@@ -370,6 +370,29 @@ function QuranPageContent() {
     }
   }, [bookmarks, currentPage, pageData]);
 
+  const handleToggleAyahBookmark = useCallback(async (surah: number, ayah: number) => {
+    const exists = bookmarks.find(b => b.type === 'ayah' && b.surah === surah && b.ayah === ayah);
+    if (exists) {
+      await removeBookmarkByTarget('ayah', { surah, ayah });
+      setBookmarks(prev => prev.filter(b => !(b.type === 'ayah' && b.surah === surah && b.ayah === ayah)));
+    } else {
+      const surahName = pageData?.ayahs?.find((a: any) => a?.surah?.number === surah)?.surah?.englishName || `Surah ${surah}`;
+      await addBookmark({ type: 'ayah', surah, ayah, surahName });
+      setBookmarks(prev => [...prev, {
+        id: `temp-${Date.now()}`,
+        type: 'ayah' as const,
+        surah,
+        ayah,
+        surahName,
+        createdAt: new Date().toISOString(),
+      }]);
+    }
+  }, [bookmarks, pageData]);
+
+  const isAyahBookmarked = useCallback((surah: number, ayah: number) => {
+    return bookmarks.some(b => b.type === 'ayah' && b.surah === surah && b.ayah === ayah);
+  }, [bookmarks]);
+
   // Detect reviews whenever page data or memorization items change
   useEffect(() => {
     const loadReviews = async () => {
@@ -1668,6 +1691,10 @@ function QuranPageContent() {
         activeAyah={activeAyah}
         onActiveAyahChange={setActiveAyah}
         playingAyah={isPlaying ? currentPlayingAyah : null}
+        isPageBookmarked={isPageBookmarked}
+        onTogglePageBookmark={handleTogglePageBookmark}
+        isAyahBookmarked={isAyahBookmarked}
+        onToggleAyahBookmark={handleToggleAyahBookmark}
       />
 
       {/* Audio Player */}

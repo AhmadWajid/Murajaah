@@ -1,12 +1,17 @@
 /**
- * Storage Service - Unified interface for localStorage and Neon database
- * Uses API routes for database operations when authenticated.
- * Falls back to localStorage when not authenticated.
+ * Storage Service — Unified write-through data layer
+ *
+ * Architecture:
+ *   - All writes go to localStorage first (optimistic, instant UI feedback)
+ *   - If authenticated, the same write also syncs to Neon via API
+ *   - All reads prefer DB when authenticated, fall back to localStorage
+ *   - Adding a new entity only requires: a local function + an API function
+ *
+ * This eliminates the repeated "if auth { fetch + localStorage } else { localStorage }"
+ * pattern that was duplicated for every operation.
  */
 
 import { MemorizationItem } from './spacedRepetition';
-
-// Import localStorage functions (fallback)
 import * as localStorageService from './storage';
 
 export interface MistakeData {
@@ -53,32 +58,97 @@ export function clearAuthCache() {
 // CACHE MANAGEMENT (no-op stubs for backward compat)
 // =============================================
 
-export function invalidateCache(_pattern?: string): void {
-  // No-op — the old Supabase layer had an in-memory cache.
-  // The new API-based approach fetches fresh data each time.
+export function invalidateCache(_pattern?: string): void {}
+export function clearCache(): void {}
+
+// =============================================
+// CORE HELPERS — the heart of the write-through layer
+// =============================================
+
+/** POST to /api/data with automatic error checking */
+async function apiPost(body: Record<string, any>): Promise<Response> {
+  const res = await fetch('/api/data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res;
 }
 
-export function clearCache(): void {
-  // No-op
+/** POST to /api/data and discard the response (for fire-and-forget writes) */
+async function apiWrite(body: Record<string, any>): Promise<void> {
+  await apiPost(body);
 }
 
-async function withFallback<T>(
+/** GET from /api/data with automatic error checking */
+async function apiGet(query: string): Promise<any> {
+  const res = await fetch(`/api/data?${query}`);
+  if (!res.ok) throw new Error(`API error: ${res.status}`);
+  return res.json();
+}
+
+/**
+ * Write-through: writes to localStorage immediately, then syncs to DB if authenticated.
+ * - Local write always succeeds (optimistic — UI is instantly updated)
+ * - DB failure is logged but does NOT roll back local (sync modal will catch it later)
+ */
+async function writeThrough(
+  localFn: () => void,
+  apiFn?: () => Promise<void>,
+): Promise<void> {
+  localFn();
+  if (apiFn && await isAuthenticated()) {
+    try {
+      await apiFn();
+    } catch (error) {
+      console.warn('[storage] DB sync failed, local write succeeded:', error);
+    }
+  }
+}
+
+/**
+ * Write-through with result: writes locally first, then if authenticated,
+ * calls the API and syncs the authoritative result back to localStorage.
+ * Falls back to local result if API fails.
+ */
+async function writeThroughResult<T>(
+  localFn: () => T,
   apiFn: () => Promise<T>,
-  localStorageFn: () => T,
-  defaultValue?: T
+  syncLocal: (apiResult: T) => void,
+): Promise<T> {
+  const localResult = localFn();
+  if (await isAuthenticated()) {
+    try {
+      const apiResult = await apiFn();
+      syncLocal(apiResult);
+      return apiResult;
+    } catch (error) {
+      console.warn('[storage] DB sync failed, using local result:', error);
+    }
+  }
+  return localResult;
+}
+
+/**
+ * Read-through: reads from DB if authenticated, falls back to localStorage.
+ * If DB read fails, falls back to localStorage gracefully.
+ */
+async function readThrough<T>(
+  apiFn: () => Promise<T>,
+  localFn: () => T,
+  defaultValue?: T,
 ): Promise<T> {
   try {
     if (await isAuthenticated()) {
       return await apiFn();
-    } else {
-      return localStorageFn();
     }
+    return localFn();
   } catch (error) {
-    console.warn('Database operation failed, falling back to localStorage:', error);
+    console.warn('[storage] DB read failed, falling back to localStorage:', error);
     try {
-      return localStorageFn();
+      return localFn();
     } catch (localError) {
-      console.error('Both database and localStorage failed:', localError);
       if (defaultValue !== undefined) return defaultValue;
       throw localError;
     }
@@ -86,35 +156,144 @@ async function withFallback<T>(
 }
 
 // =============================================
+// SETTINGS — internal helpers
+// =============================================
+
+let cachedSettings: any | null | undefined;
+
+async function fetchSettings(): Promise<any | null> {
+  if (cachedSettings !== undefined) {
+    return cachedSettings;
+  }
+  try {
+    const data = await apiGet('type=settings');
+    cachedSettings = data.settings || null;
+  } catch {
+    cachedSettings = null;
+  }
+  return cachedSettings;
+}
+
+function invalidateSettingsCache() {
+  cachedSettings = undefined;
+}
+
+async function saveSettingsToDb(settings: any): Promise<void> {
+  await apiPost({ op: 'saveSettings', settings });
+  cachedSettings = settings; // update cache
+}
+
+/**
+ * Sync ALL settings from DB → localStorage in one shot.
+ * Called once when auth state changes (login/signup).
+ * After this runs, every localStorage-based read picks up the DB values,
+ * so no individual page needs to check auth or load settings from DB.
+ *
+ * Returns true if settings were synced, false if not authenticated or no settings found.
+ */
+export async function syncSettingsFromDb(): Promise<boolean> {
+  if (!(await isAuthenticated())) return false;
+  try {
+    invalidateSettingsCache();
+    const s = await fetchSettings();
+    if (!s) return false;
+
+    if (typeof window === 'undefined') return true;
+
+    // Reciter
+    if (s.selectedReciter) localStorage.setItem('mquran_selected_reciter', s.selectedReciter);
+    // Favorite reciters
+    if (s.favoriteReciters) localStorage.setItem('mquran_favorite_reciters', JSON.stringify(s.favoriteReciters));
+    // Hide mistakes
+    localStorage.setItem('quran-hide-mistakes', JSON.stringify(s.hideMistakes ?? false));
+    // Last page
+    localStorage.setItem('quran-last-page', JSON.stringify(s.lastPage ?? 1));
+    // Font settings (all visual/reading prefs bundled)
+    localStorage.setItem('quran-font-settings', JSON.stringify({
+      arabicFontSize: s.arabicFontSize ?? 24,
+      translationFontSize: s.translationFontSize ?? 20,
+      fontTargetArabic: s.fontTargetArabic ?? true,
+      fontSize: s.fontSize ?? 24,
+      padding: s.padding ?? 16,
+      layoutMode: s.layoutMode ?? 'single',
+      selectedLanguage: s.selectedLanguage ?? 'en',
+      selectedTranslation: s.selectedTranslation ?? 'en.hilali',
+      enableTajweed: s.enableTajweed ?? true,
+    }));
+    // Audio settings
+    if (s.audioLoopMode) localStorage.setItem('mquran_audio_loop_mode', s.audioLoopMode);
+    if (s.audioCustomLoop) localStorage.setItem('mquran_audio_custom_loop', JSON.stringify(s.audioCustomLoop));
+    if (s.audioPlaybackSpeed) localStorage.setItem('mquran_audio_playback_speed', String(s.audioPlaybackSpeed));
+    // UI settings
+    if (s.showWordByWordTooltip !== undefined) localStorage.setItem('showWordByWordTooltip', s.showWordByWordTooltip ? 'true' : 'false');
+    if (s.mobileHeaderHidden !== undefined) localStorage.setItem('mobileHeaderHidden', s.mobileHeaderHidden.toString());
+    if (s.userTimezone) localStorage.setItem('userTimeZone', s.userTimezone);
+    // Review settings
+    if (s.reviewSettings) localStorage.setItem('mquran_review_settings', JSON.stringify(s.reviewSettings));
+    // Reading layout
+    if (s.readingLayout) localStorage.setItem('quran-reading-layout', s.readingLayout);
+
+    return true;
+  } catch (error) {
+    console.warn('[storage] Failed to sync settings from DB:', error);
+    return false;
+  }
+}
+
+/**
+ * Save a single setting field: writes to localStorage, merges into settings
+ * object, and syncs to DB if authenticated.
+ */
+async function saveSetting(
+  settingsKey: string,
+  value: any,
+  localFn: () => void,
+): Promise<void> {
+  localFn();
+  if (await isAuthenticated()) {
+    try {
+      const current = await fetchSettings();
+      const updated = { ...current, [settingsKey]: value };
+      await saveSettingsToDb(updated);
+    } catch (error) {
+      console.warn('[storage] Settings sync failed:', error);
+    }
+  }
+}
+
+/** Read a single setting field from DB if authenticated, else localStorage */
+async function readSetting<T>(
+  settingsKey: string,
+  defaultValue: T,
+  localFn: () => T,
+): Promise<T> {
+  if (await isAuthenticated()) {
+    try {
+      const s = await fetchSettings();
+      return (s?.[settingsKey] as T) ?? defaultValue;
+    } catch {
+      return defaultValue;
+    }
+  }
+  return localFn();
+}
+
+// =============================================
 // MEMORIZATION ITEMS
 // =============================================
 
 export async function addMemorizationItem(item: MemorizationItem): Promise<void> {
-  if (await isAuthenticated()) {
-    await fetch('/api/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op: 'addItem', item }),
-    });
-    // Keep localStorage in sync so compareLocalAndDb doesn't show a mismatch
-    localStorageService.addMemorizationItem(item);
-  } else {
-    localStorageService.addMemorizationItem(item);
-  }
+  await writeThrough(
+    () => localStorageService.addMemorizationItem(item),
+    () => apiWrite({ op: 'addItem', item }),
+  );
 }
 
 export async function updateMemorizationItem(item: MemorizationItem): Promise<void> {
-  if (await isAuthenticated()) {
-    await fetch('/api/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op: 'updateItem', item }),
-    });
-    // Keep localStorage in sync
-    localStorageService.updateMemorizationItem(item);
-  } else {
-    localStorageService.updateMemorizationItem(item);
-  }
+  await writeThrough(
+    () => localStorageService.updateMemorizationItem(item),
+    () => apiWrite({ op: 'updateItem', item }),
+  );
 }
 
 export async function updateMemorizationItemWithIndividualRating(
@@ -123,37 +302,27 @@ export async function updateMemorizationItemWithIndividualRating(
   rating: 'easy' | 'medium' | 'hard'
 ): Promise<void> {
   if (await isAuthenticated()) {
-    // Fetch the item, update it, and save back
-    const res = await fetch(`/api/data?type=items&id=${encodeURIComponent(itemId)}`);
-    const data = await res.json();
-    if (!data.item) throw new Error('Item not found');
+    try {
+      const data = await apiGet(`type=items&id=${encodeURIComponent(itemId)}`);
+      if (!data.item) throw new Error('Item not found');
 
-    const { updateIndividualAyahRating } = await import('./spacedRepetition');
-    const result = updateIndividualAyahRating(data.item, ayahNumber, rating);
+      const { updateIndividualAyahRating } = await import('./spacedRepetition');
+      const result = updateIndividualAyahRating(data.item, ayahNumber, rating);
 
-    if (result.shouldSplit && result.newItems) {
-      // Remove original and add splits
-      await fetch('/api/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ op: 'removeItem', id: itemId }),
-      });
-      localStorageService.removeMemorizationItem(itemId);
-      for (const newItem of result.newItems) {
-        await fetch('/api/data', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ op: 'addItem', item: newItem }),
-        });
-        localStorageService.addMemorizationItem(newItem);
+      if (result.shouldSplit && result.newItems) {
+        await apiPost({ op: 'removeItem', id: itemId });
+        localStorageService.removeMemorizationItem(itemId);
+        for (const newItem of result.newItems) {
+          await apiPost({ op: 'addItem', item: newItem });
+          localStorageService.addMemorizationItem(newItem);
+        }
+      } else {
+        await apiPost({ op: 'updateItem', item: result.updatedItem });
+        localStorageService.updateMemorizationItem(result.updatedItem);
       }
-    } else {
-      await fetch('/api/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ op: 'updateItem', item: result.updatedItem }),
-      });
-      localStorageService.updateMemorizationItem(result.updatedItem);
+    } catch (error) {
+      console.warn('[storage] Individual rating sync failed, using local:', error);
+      localStorageService.updateMemorizationItemWithIndividualRating(itemId, ayahNumber, rating);
     }
   } else {
     localStorageService.updateMemorizationItemWithIndividualRating(itemId, ayahNumber, rating);
@@ -161,53 +330,39 @@ export async function updateMemorizationItemWithIndividualRating(
 }
 
 export async function removeMemorizationItem(id: string): Promise<void> {
-  if (await isAuthenticated()) {
-    await fetch('/api/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op: 'removeItem', id }),
-    });
-    localStorageService.removeMemorizationItem(id);
-  } else {
-    localStorageService.removeMemorizationItem(id);
-  }
+  await writeThrough(
+    () => localStorageService.removeMemorizationItem(id),
+    () => apiWrite({ op: 'removeItem', id }),
+  );
 }
 
 export async function getAllMemorizationItems(): Promise<MemorizationItem[]> {
-  return withFallback(
+  return readThrough(
     async () => {
-      const res = await fetch('/api/data?type=items');
-      const data = await res.json();
+      const data = await apiGet('type=items');
       return data.items || [];
     },
     () => localStorageService.getAllMemorizationItems(),
-    []
+    [],
   );
 }
 
 export async function getMemorizationItem(id: string): Promise<MemorizationItem | null> {
-  return withFallback(
+  return readThrough(
     async () => {
-      const res = await fetch(`/api/data?type=items&id=${encodeURIComponent(id)}`);
-      const data = await res.json();
+      const data = await apiGet(`type=items&id=${encodeURIComponent(id)}`);
       return data.item || null;
     },
     () => localStorageService.getMemorizationItem(id),
-    null
+    null,
   );
 }
 
 export async function clearAllData(): Promise<void> {
-  if (await isAuthenticated()) {
-    await fetch('/api/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op: 'clearAllItems' }),
-    });
-    localStorageService.clearAllData();
-  } else {
-    localStorageService.clearAllData();
-  }
+  await writeThrough(
+    () => localStorageService.clearAllData(),
+    () => apiWrite({ op: 'clearAllItems' }),
+  );
 }
 
 export async function exportData(): Promise<string> {
@@ -237,120 +392,91 @@ export function migrateDateFormats(): void {
 // =============================================
 
 export async function getMistakes(): Promise<Record<string, MistakeData | boolean>> {
-  return withFallback(
+  return readThrough(
     async () => {
-      const res = await fetch('/api/data?type=mistakes');
-      const data = await res.json();
+      const data = await apiGet('type=mistakes');
       return data.mistakes || {};
     },
     () => localStorageService.getMistakes(),
-    {}
+    {},
   );
 }
 
 export async function saveMistakes(mistakes: Record<string, MistakeData | boolean>): Promise<void> {
-  if (await isAuthenticated()) {
-    const dbMistakes: Record<string, MistakeData> = {};
-    Object.entries(mistakes).forEach(([key, value]) => {
-      if (typeof value === 'object' && value !== null && 'timestamp' in value) {
-        dbMistakes[key] = value as MistakeData;
-      } else if (typeof value === 'boolean' && value === true) {
-        const [surah, ayah] = key.split(':').map(Number);
-        dbMistakes[key] = { timestamp: new Date().toISOString(), surah, ayah };
-      }
-    });
-    await fetch('/api/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op: 'saveMistakes', mistakes: dbMistakes }),
-    });
-    // Keep localStorage in sync
-    localStorageService.saveMistakes(mistakes);
-  } else {
-    localStorageService.saveMistakes(mistakes);
-  }
+  const dbMistakes: Record<string, MistakeData> = {};
+  Object.entries(mistakes).forEach(([key, value]) => {
+    if (typeof value === 'object' && value !== null && 'timestamp' in value) {
+      dbMistakes[key] = value as MistakeData;
+    } else if (typeof value === 'boolean' && value === true) {
+      const [surah, ayah] = key.split(':').map(Number);
+      dbMistakes[key] = { timestamp: new Date().toISOString(), surah, ayah };
+    }
+  });
+  await writeThrough(
+    () => localStorageService.saveMistakes(mistakes),
+    () => apiWrite({ op: 'saveMistakes', mistakes: dbMistakes }),
+  );
 }
 
 export async function toggleMistake(surahNumber: number, ayahNumber: number): Promise<Record<string, MistakeData | boolean>> {
-  if (await isAuthenticated()) {
-    const res = await fetch('/api/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op: 'toggleMistake', surah: surahNumber, ayah: ayahNumber }),
-    });
-    const data = await res.json();
-    const mistakes = data.mistakes || {};
-    // Keep localStorage in sync
-    localStorageService.saveMistakes(mistakes);
-    return mistakes;
-  }
-  return localStorageService.toggleMistake(surahNumber, ayahNumber);
+  return writeThroughResult(
+    () => localStorageService.toggleMistake(surahNumber, ayahNumber),
+    async () => {
+      const data = await apiPost({ op: 'toggleMistake', surah: surahNumber, ayah: ayahNumber }).then(r => r.json());
+      return data.mistakes || {};
+    },
+    (apiMistakes) => localStorageService.saveMistakes(apiMistakes),
+  );
 }
 
 export async function showMistake(surahNumber: number, ayahNumber: number): Promise<Record<string, MistakeData | boolean>> {
-  if (await isAuthenticated()) {
-    const res = await fetch('/api/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op: 'toggleMistake', surah: surahNumber, ayah: ayahNumber }),
-    });
-    const data = await res.json();
-    const mistakes = data.mistakes || {};
-    localStorageService.saveMistakes(mistakes);
-    return mistakes;
-  }
-  return localStorageService.showMistake(surahNumber, ayahNumber);
+  return writeThroughResult(
+    () => localStorageService.showMistake(surahNumber, ayahNumber),
+    async () => {
+      const data = await apiPost({ op: 'toggleMistake', surah: surahNumber, ayah: ayahNumber }).then(r => r.json());
+      return data.mistakes || {};
+    },
+    (apiMistakes) => localStorageService.saveMistakes(apiMistakes),
+  );
 }
 
 export async function removeMistake(surahNumber: number, ayahNumber: number): Promise<Record<string, MistakeData | boolean>> {
-  if (await isAuthenticated()) {
-    const res = await fetch('/api/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op: 'removeMistake', surah: surahNumber, ayah: ayahNumber }),
-    });
-    const data = await res.json();
-    const mistakes = data.mistakes || {};
-    localStorageService.saveMistakes(mistakes);
-    return mistakes;
-  }
-  return localStorageService.removeMistake(surahNumber, ayahNumber);
+  return writeThroughResult(
+    () => localStorageService.removeMistake(surahNumber, ayahNumber),
+    async () => {
+      const data = await apiPost({ op: 'removeMistake', surah: surahNumber, ayah: ayahNumber }).then(r => r.json());
+      return data.mistakes || {};
+    },
+    (apiMistakes) => localStorageService.saveMistakes(apiMistakes),
+  );
 }
 
 export async function clearAllMistakes(): Promise<void> {
-  if (await isAuthenticated()) {
-    await fetch('/api/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op: 'clearAllMistakes' }),
-    });
-    localStorageService.clearAllMistakes();
-  } else {
-    localStorageService.clearAllMistakes();
-  }
+  await writeThrough(
+    () => localStorageService.clearAllMistakes(),
+    () => apiWrite({ op: 'clearAllMistakes' }),
+  );
 }
 
 export async function getMistakesList(): Promise<MistakeData[]> {
-  return withFallback(
+  return readThrough(
     async () => {
-      const res = await fetch('/api/data?type=mistakesList');
-      const data = await res.json();
+      const data = await apiGet('type=mistakesList');
       return data.mistakes || [];
     },
     () => localStorageService.getMistakesList(),
-    []
+    [],
   );
 }
 
 export async function getMistakesInVerseOrder(): Promise<MistakeData[]> {
-  return withFallback(
+  return readThrough(
     async () => {
-      const res = await fetch('/api/data?type=mistakesVerseOrder');
-      const data = await res.json();
+      const data = await apiGet('type=mistakesVerseOrder');
       return data.mistakes || [];
     },
     () => localStorageService.getMistakesInVerseOrder(),
-    []
+    [],
   );
 }
 
@@ -381,76 +507,33 @@ export async function getPreviousMistakeInVerseOrder(
 }
 
 // =============================================
-// SETTINGS
+// SETTINGS — public API
 // =============================================
 
-async function fetchSettings(): Promise<any | null> {
-  const res = await fetch('/api/data?type=settings');
-  const data = await res.json();
-  return data.settings || null;
-}
-
-async function saveSettingsToDb(settings: any): Promise<void> {
-  await fetch('/api/data', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ op: 'saveSettings', settings }),
-  });
-}
+const DEFAULT_RECITER = 'Ayman_Sowaid_64kbps';
 
 export async function saveSelectedReciter(reciter: string): Promise<void> {
-  if (await isAuthenticated()) {
-    const current = await fetchSettings();
-    await saveSettingsToDb({ ...current, selectedReciter: reciter });
-  }
-  // Always keep localStorage in sync
-  localStorageService.saveSelectedReciter(reciter);
+  await saveSetting('selectedReciter', reciter, () => localStorageService.saveSelectedReciter(reciter));
 }
 
 export async function loadSelectedReciter(): Promise<string> {
-  if (await isAuthenticated()) {
-    try {
-      const s = await fetchSettings();
-      return s?.selectedReciter || 'Ayman_Sowaid_64kbps';
-    } catch { return 'Ayman_Sowaid_64kbps'; }
-  }
-  return localStorageService.loadSelectedReciter();
+  return readSetting('selectedReciter', DEFAULT_RECITER, () => localStorageService.loadSelectedReciter());
 }
 
 export async function saveHideMistakesSetting(hideMistakes: boolean): Promise<void> {
-  if (await isAuthenticated()) {
-    const current = await fetchSettings();
-    await saveSettingsToDb({ ...current, hideMistakes });
-  }
-  localStorageService.saveHideMistakesSetting(hideMistakes);
+  await saveSetting('hideMistakes', hideMistakes, () => localStorageService.saveHideMistakesSetting(hideMistakes));
 }
 
 export async function getHideMistakesSetting(): Promise<boolean> {
-  if (await isAuthenticated()) {
-    try {
-      const s = await fetchSettings();
-      return s?.hideMistakes ?? false;
-    } catch { return false; }
-  }
-  return localStorageService.getHideMistakesSetting();
+  return readSetting('hideMistakes', false, () => localStorageService.getHideMistakesSetting());
 }
 
 export async function saveLastPage(page: number): Promise<void> {
-  if (await isAuthenticated()) {
-    const current = await fetchSettings();
-    await saveSettingsToDb({ ...current, lastPage: page });
-  }
-  localStorageService.saveLastPage(page);
+  await saveSetting('lastPage', page, () => localStorageService.saveLastPage(page));
 }
 
 export async function loadLastPage(): Promise<number> {
-  if (await isAuthenticated()) {
-    try {
-      const s = await fetchSettings();
-      return s?.lastPage ?? 1;
-    } catch { return 1; }
-  }
-  return localStorageService.loadLastPage();
+  return readSetting('lastPage', 1, () => localStorageService.loadLastPage());
 }
 
 export async function saveFontSettings(settings: {
@@ -464,45 +547,52 @@ export async function saveFontSettings(settings: {
   selectedTranslation?: string;
   enableTajweed?: boolean;
 }): Promise<void> {
-  if (await isAuthenticated()) {
-    const current = await fetchSettings();
-    await saveSettingsToDb({
-      ...current,
-      arabicFontSize: settings.arabicFontSize,
-      translationFontSize: settings.translationFontSize,
-      fontTargetArabic: settings.fontTargetArabic,
-      fontSize: settings.fontSize,
-      padding: settings.padding,
-      layoutMode: settings.layoutMode,
-      selectedLanguage: settings.selectedLanguage,
-      selectedTranslation: settings.selectedTranslation,
-      enableTajweed: settings.enableTajweed,
-    });
-  }
+  // Write all font settings to localStorage
   localStorageService.saveFontSettings(settings);
+  // Sync the individual fields to DB
+  if (await isAuthenticated()) {
+    try {
+      const current = await fetchSettings();
+      await saveSettingsToDb({
+        ...current,
+        arabicFontSize: settings.arabicFontSize,
+        translationFontSize: settings.translationFontSize,
+        fontTargetArabic: settings.fontTargetArabic,
+        fontSize: settings.fontSize,
+        padding: settings.padding,
+        layoutMode: settings.layoutMode,
+        selectedLanguage: settings.selectedLanguage,
+        selectedTranslation: settings.selectedTranslation,
+        enableTajweed: settings.enableTajweed,
+      });
+    } catch (error) {
+      console.warn('[storage] Font settings sync failed:', error);
+    }
+  }
 }
 
 export async function loadFontSettings() {
+  const defaults = {
+    arabicFontSize: 24, translationFontSize: 20, fontTargetArabic: true,
+    fontSize: 24, padding: 16, layoutMode: 'single' as const,
+    selectedLanguage: 'en', selectedTranslation: 'en.hilali', enableTajweed: true,
+  };
   if (await isAuthenticated()) {
     try {
       const s = await fetchSettings();
       return {
-        arabicFontSize: s?.arabicFontSize ?? 24,
-        translationFontSize: s?.translationFontSize ?? 20,
-        fontTargetArabic: s?.fontTargetArabic ?? true,
-        fontSize: s?.fontSize ?? 24,
-        padding: s?.padding ?? 16,
-        layoutMode: (s?.layoutMode as 'spread' | 'single') ?? 'single',
-        selectedLanguage: s?.selectedLanguage ?? 'en',
-        selectedTranslation: s?.selectedTranslation ?? 'en.hilali',
-        enableTajweed: s?.enableTajweed ?? true,
+        arabicFontSize: s?.arabicFontSize ?? defaults.arabicFontSize,
+        translationFontSize: s?.translationFontSize ?? defaults.translationFontSize,
+        fontTargetArabic: s?.fontTargetArabic ?? defaults.fontTargetArabic,
+        fontSize: s?.fontSize ?? defaults.fontSize,
+        padding: s?.padding ?? defaults.padding,
+        layoutMode: (s?.layoutMode as 'spread' | 'single') ?? defaults.layoutMode,
+        selectedLanguage: s?.selectedLanguage ?? defaults.selectedLanguage,
+        selectedTranslation: s?.selectedTranslation ?? defaults.selectedTranslation,
+        enableTajweed: s?.enableTajweed ?? defaults.enableTajweed,
       };
     } catch {
-      return {
-        arabicFontSize: 24, translationFontSize: 20, fontTargetArabic: true,
-        fontSize: 24, padding: 16, layoutMode: 'single' as const,
-        selectedLanguage: 'en', selectedTranslation: 'en.hilali', enableTajweed: true,
-      };
+      return defaults;
     }
   }
   return localStorageService.loadFontSettings();
@@ -517,46 +607,48 @@ export async function saveAudioSettings(settings: {
   customLoop?: any;
   playbackSpeed?: number;
 }): Promise<void> {
+  // Write to localStorage
+  if (typeof window !== 'undefined') {
+    if (settings.loopMode !== undefined) localStorage.setItem('mquran_audio_loop_mode', settings.loopMode);
+    if (settings.customLoop !== undefined) localStorage.setItem('mquran_audio_custom_loop', JSON.stringify(settings.customLoop));
+    if (settings.playbackSpeed !== undefined) localStorage.setItem('mquran_audio_playback_speed', String(settings.playbackSpeed));
+  }
+  // Sync to DB
   if (await isAuthenticated()) {
-    const current = await fetchSettings();
-    await saveSettingsToDb({
-      ...current,
-      audioLoopMode: settings.loopMode,
-      audioCustomLoop: settings.customLoop,
-      audioPlaybackSpeed: settings.playbackSpeed,
-    });
-  }
-  // Always keep localStorage in sync
-  if (settings.loopMode !== undefined && typeof window !== 'undefined') {
-    localStorage.setItem('mquran_audio_loop_mode', settings.loopMode);
-  }
-  if (settings.customLoop !== undefined && typeof window !== 'undefined') {
-    localStorage.setItem('mquran_audio_custom_loop', JSON.stringify(settings.customLoop));
-  }
-  if (settings.playbackSpeed !== undefined && typeof window !== 'undefined') {
-    localStorage.setItem('mquran_audio_playback_speed', String(settings.playbackSpeed));
+    try {
+      const current = await fetchSettings();
+      await saveSettingsToDb({
+        ...current,
+        audioLoopMode: settings.loopMode,
+        audioCustomLoop: settings.customLoop,
+        audioPlaybackSpeed: settings.playbackSpeed,
+      });
+    } catch (error) {
+      console.warn('[storage] Audio settings sync failed:', error);
+    }
   }
 }
 
 export async function loadAudioSettings() {
+  const defaults = { loopMode: 'none', customLoop: {}, playbackSpeed: 1.0 };
   if (await isAuthenticated()) {
     try {
       const s = await fetchSettings();
       return {
-        loopMode: s?.audioLoopMode ?? 'none',
-        customLoop: s?.audioCustomLoop ?? {},
-        playbackSpeed: s?.audioPlaybackSpeed ?? 1.0,
+        loopMode: s?.audioLoopMode ?? defaults.loopMode,
+        customLoop: s?.audioCustomLoop ?? defaults.customLoop,
+        playbackSpeed: s?.audioPlaybackSpeed ?? defaults.playbackSpeed,
       };
     } catch {
-      return { loopMode: 'none', customLoop: {}, playbackSpeed: 1.0 };
+      return defaults;
     }
   }
-  if (typeof window === 'undefined') return { loopMode: 'none', customLoop: {}, playbackSpeed: 1.0 };
-  const loopMode = localStorage.getItem('mquran_audio_loop_mode') || 'none';
-  const customLoopStr = localStorage.getItem('mquran_audio_custom_loop');
-  const customLoop = customLoopStr ? JSON.parse(customLoopStr) : {};
-  const playbackSpeed = parseFloat(localStorage.getItem('mquran_audio_playback_speed') || '1');
-  return { loopMode, customLoop, playbackSpeed };
+  if (typeof window === 'undefined') return defaults;
+  return {
+    loopMode: localStorage.getItem('mquran_audio_loop_mode') || defaults.loopMode,
+    customLoop: JSON.parse(localStorage.getItem('mquran_audio_custom_loop') || '{}'),
+    playbackSpeed: parseFloat(localStorage.getItem('mquran_audio_playback_speed') || '1'),
+  };
 }
 
 export async function saveUISettings(settings: {
@@ -564,41 +656,43 @@ export async function saveUISettings(settings: {
   mobileHeaderHidden?: boolean;
   userTimeZone?: string;
 }): Promise<void> {
+  // Write to localStorage
+  if (typeof window !== 'undefined') {
+    if (settings.showWordByWordTooltip !== undefined) localStorage.setItem('showWordByWordTooltip', settings.showWordByWordTooltip ? 'true' : 'false');
+    if (settings.mobileHeaderHidden !== undefined) localStorage.setItem('mobileHeaderHidden', settings.mobileHeaderHidden.toString());
+    if (settings.userTimeZone !== undefined) localStorage.setItem('userTimeZone', settings.userTimeZone);
+  }
+  // Sync to DB
   if (await isAuthenticated()) {
-    const current = await fetchSettings();
-    await saveSettingsToDb({
-      ...current,
-      showWordByWordTooltip: settings.showWordByWordTooltip,
-      mobileHeaderHidden: settings.mobileHeaderHidden,
-      userTimezone: settings.userTimeZone,
-    });
-  } else {
-    if (settings.showWordByWordTooltip !== undefined && typeof window !== 'undefined') {
-      localStorage.setItem('showWordByWordTooltip', settings.showWordByWordTooltip ? 'true' : 'false');
-    }
-    if (settings.mobileHeaderHidden !== undefined && typeof window !== 'undefined') {
-      localStorage.setItem('mobileHeaderHidden', settings.mobileHeaderHidden.toString());
-    }
-    if (settings.userTimeZone !== undefined && typeof window !== 'undefined') {
-      localStorage.setItem('userTimeZone', settings.userTimeZone);
+    try {
+      const current = await fetchSettings();
+      await saveSettingsToDb({
+        ...current,
+        showWordByWordTooltip: settings.showWordByWordTooltip,
+        mobileHeaderHidden: settings.mobileHeaderHidden,
+        userTimezone: settings.userTimeZone,
+      });
+    } catch (error) {
+      console.warn('[storage] UI settings sync failed:', error);
     }
   }
 }
 
 export async function loadUISettings() {
+  const defaults = { showWordByWordTooltip: false, mobileHeaderHidden: false, userTimeZone: null as string | null };
   if (await isAuthenticated()) {
     try {
       const s = await fetchSettings();
       return {
-        showWordByWordTooltip: s?.showWordByWordTooltip ?? false,
-        mobileHeaderHidden: s?.mobileHeaderHidden ?? false,
-        userTimeZone: s?.userTimezone ?? null,
+        showWordByWordTooltip: s?.showWordByWordTooltip ?? defaults.showWordByWordTooltip,
+        mobileHeaderHidden: s?.mobileHeaderHidden ?? defaults.mobileHeaderHidden,
+        userTimeZone: s?.userTimezone ?? defaults.userTimeZone,
       };
     } catch {
-      return { showWordByWordTooltip: false, mobileHeaderHidden: false, userTimeZone: null };
+      return defaults;
     }
   }
-  if (typeof window === 'undefined') return { showWordByWordTooltip: false, mobileHeaderHidden: false, userTimeZone: null };
+  if (typeof window === 'undefined') return defaults;
   return {
     showWordByWordTooltip: localStorage.getItem('showWordByWordTooltip') === 'true',
     mobileHeaderHidden: localStorage.getItem('mobileHeaderHidden') === 'true',
@@ -611,24 +705,11 @@ export async function loadUISettings() {
 // =============================================
 
 export async function loadFavoriteReciters(): Promise<string[]> {
-  if (await isAuthenticated()) {
-    try {
-      const s = await fetchSettings();
-      return s?.favoriteReciters ?? [];
-    } catch {
-      return localStorageService.loadFavoriteReciters();
-    }
-  }
-  return localStorageService.loadFavoriteReciters();
+  return readSetting<string[]>('favoriteReciters', [], () => localStorageService.loadFavoriteReciters());
 }
 
 export async function saveFavoriteReciters(ids: string[]): Promise<void> {
-  if (await isAuthenticated()) {
-    const current = await fetchSettings();
-    await saveSettingsToDb({ ...current, favoriteReciters: ids });
-  } else {
-    localStorageService.saveFavoriteReciters(ids);
-  }
+  await saveSetting('favoriteReciters', ids, () => localStorageService.saveFavoriteReciters(ids));
 }
 
 export async function toggleFavoriteReciter(reciterId: string): Promise<string[]> {
@@ -653,17 +734,24 @@ export async function loadReviewSettings<T>(): Promise<T | null> {
       return null;
     }
   }
-  return null;
+  if (typeof window === 'undefined') return null;
+  const raw = localStorage.getItem('mquran_review_settings');
+  return raw ? JSON.parse(raw) : null;
 }
 
 export async function saveReviewSettings(settings: any): Promise<void> {
-  if (await isAuthenticated()) {
-    const current = await fetchSettings();
-    await saveSettingsToDb({ ...current, reviewSettings: settings });
-  }
-  // Always save to localStorage too (the reviewAlgorithms module reads from there)
+  // Always save to localStorage (the reviewAlgorithms module reads from there)
   if (typeof window !== 'undefined') {
     localStorage.setItem('mquran_review_settings', JSON.stringify(settings));
+  }
+  // Sync to DB
+  if (await isAuthenticated()) {
+    try {
+      const current = await fetchSettings();
+      await saveSettingsToDb({ ...current, reviewSettings: settings });
+    } catch (error) {
+      console.warn('[storage] Review settings sync failed:', error);
+    }
   }
 }
 
@@ -685,12 +773,16 @@ export async function loadReadingLayout(): Promise<string | null> {
 }
 
 export async function saveReadingLayout(layout: string): Promise<void> {
-  if (await isAuthenticated()) {
-    const current = await fetchSettings();
-    await saveSettingsToDb({ ...current, readingLayout: layout });
-  }
   if (typeof window !== 'undefined') {
     localStorage.setItem('quran-reading-layout', layout);
+  }
+  if (await isAuthenticated()) {
+    try {
+      const current = await fetchSettings();
+      await saveSettingsToDb({ ...current, readingLayout: layout });
+    } catch (error) {
+      console.warn('[storage] Reading layout sync failed:', error);
+    }
   }
 }
 
@@ -707,10 +799,7 @@ export async function loadHideWordsDelay(): Promise<number | null> {
 }
 
 export async function saveHideWordsDelay(delay: number): Promise<void> {
-  if (await isAuthenticated()) {
-    const current = await fetchSettings();
-    await saveSettingsToDb({ ...current, hideWordsDelay: delay });
-  }
+  await saveSetting('hideWordsDelay', delay, () => {});
 }
 
 // =============================================
@@ -718,14 +807,13 @@ export async function saveHideWordsDelay(delay: number): Promise<void> {
 // =============================================
 
 export async function getDailyReviewData(days: number = 30): Promise<DailyReviewData[]> {
-  return withFallback(
+  return readThrough(
     async () => {
-      const res = await fetch(`/api/data?type=dailyReviews&days=${days}`);
-      const data = await res.json();
+      const data = await apiGet(`type=dailyReviews&days=${days}`);
       return data.dailyReviews || [];
     },
     () => localStorageService.getDailyReviewData(days),
-    []
+    [],
   );
 }
 
@@ -734,19 +822,11 @@ export async function getDailyReviewData(days: number = 30): Promise<DailyReview
 // =============================================
 
 export async function batchUpdateMemorizationItems(items: MemorizationItem[]): Promise<void> {
-  if (await isAuthenticated()) {
-    await Promise.all(items.map(item => updateMemorizationItem(item)));
-  } else {
-    items.forEach(item => localStorageService.updateMemorizationItem(item));
-  }
+  await Promise.all(items.map(item => updateMemorizationItem(item)));
 }
 
 export async function batchAddMemorizationItems(items: MemorizationItem[]): Promise<void> {
-  if (await isAuthenticated()) {
-    await Promise.all(items.map(item => addMemorizationItem(item)));
-  } else {
-    items.forEach(item => localStorageService.addMemorizationItem(item));
-  }
+  await Promise.all(items.map(item => addMemorizationItem(item)));
 }
 
 // =============================================
@@ -758,11 +838,7 @@ export async function migrateToDatabase(): Promise<void> {
   try {
     const items = localStorageService.getAllMemorizationItems();
     const mistakes = localStorageService.getMistakes();
-    await fetch('/api/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op: 'migrate', items, mistakes }),
-    });
+    await apiPost({ op: 'migrate', items, mistakes });
     console.log('Successfully migrated data to database');
   } catch (error) {
     console.error('Failed to migrate data to database:', error);
@@ -780,25 +856,24 @@ export interface SyncComparison {
   localMistakes: number;
   dbMistakes: number;
   hasMismatch: boolean;
-  // Items only in local (not in DB)
   localOnlyItems: number;
-  // Items only in DB (not in local)
   dbOnlyItems: number;
-  // Items in both but with different data
   differentItems: number;
 }
 
 export async function compareLocalAndDb(): Promise<SyncComparison> {
   const localItems = localStorageService.getAllMemorizationItems();
   const localMistakes = localStorageService.getMistakes();
+  const localBookmarks = loadLocalBookmarks();
 
-  const res = await fetch('/api/data?type=items');
-  const dbData = await res.json();
+  const dbData = await apiGet('type=items');
   const dbItems: MemorizationItem[] = dbData.items || [];
 
-  const dbMistakesRes = await fetch('/api/data?type=mistakes');
-  const dbMistakesData = await dbMistakesRes.json();
+  const dbMistakesData = await apiGet('type=mistakes');
   const dbMistakesRecord = dbMistakesData.mistakes || {};
+
+  const dbBookmarksData = await apiGet('type=bookmarks');
+  const dbBookmarks: Bookmark[] = dbBookmarksData.bookmarks || [];
 
   const localIds = new Set(localItems.map(i => i.id));
   const dbIds = new Set(dbItems.map(i => i.id));
@@ -806,7 +881,6 @@ export async function compareLocalAndDb(): Promise<SyncComparison> {
   const localOnlyItems = localItems.filter(i => !dbIds.has(i.id)).length;
   const dbOnlyItems = dbItems.filter(i => !localIds.has(i.id)).length;
 
-  // Count items that exist in both but differ
   let differentItems = 0;
   for (const localItem of localItems) {
     const dbItem = dbItems.find(i => i.id === localItem.id);
@@ -823,10 +897,22 @@ export async function compareLocalAndDb(): Promise<SyncComparison> {
   const localMistakeKeys = Object.keys(localMistakes);
   const dbMistakeKeys = Object.keys(dbMistakesRecord);
 
+  const localBmKeys = new Set(localBookmarks.map(b =>
+    `${b.type}:${b.page ?? ''}:${b.surah ?? ''}:${b.ayah ?? ''}`
+  ));
+  const dbBmKeys = new Set(dbBookmarks.map(b =>
+    `${b.type}:${b.page ?? ''}:${b.surah ?? ''}:${b.ayah ?? ''}`
+  ));
+  const bookmarksMismatch =
+    localBookmarks.length !== dbBookmarks.length ||
+    [...localBmKeys].some(k => !dbBmKeys.has(k)) ||
+    [...dbBmKeys].some(k => !localBmKeys.has(k));
+
   const hasMismatch =
     localOnlyItems > 0 || dbOnlyItems > 0 || differentItems > 0 ||
     localMistakeKeys.length !== dbMistakeKeys.length ||
-    localMistakeKeys.some(k => !dbMistakesRecord[k]);
+    localMistakeKeys.some(k => !dbMistakesRecord[k]) ||
+    bookmarksMismatch;
 
   return {
     localItems: localItems.length,
@@ -843,22 +929,13 @@ export async function compareLocalAndDb(): Promise<SyncComparison> {
 export async function syncUploadLocalToDb(): Promise<void> {
   const items = localStorageService.getAllMemorizationItems();
   const mistakes = localStorageService.getMistakes();
-  await fetch('/api/data', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ op: 'syncUploadLocal', items, mistakes }),
-  });
+  const localBookmarks = loadLocalBookmarks();
+  await apiPost({ op: 'syncUploadLocal', items, mistakes, bookmarks: localBookmarks });
 }
 
 export async function syncDownloadDbToLocal(): Promise<void> {
-  const res = await fetch('/api/data', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ op: 'syncDownloadDb' }),
-  });
-  const data = await res.json();
+  const data = await apiPost({ op: 'syncDownloadDb' }).then(r => r.json());
 
-  // Overwrite localStorage with DB data
   if (data.items && Array.isArray(data.items)) {
     localStorageService.clearAllData();
     for (const item of data.items) {
@@ -867,21 +944,19 @@ export async function syncDownloadDbToLocal(): Promise<void> {
   }
   if (data.mistakes) {
     localStorageService.saveMistakes(data.mistakes);
+  }
+  if (data.bookmarks) {
+    saveLocalBookmarks(data.bookmarks);
   }
 }
 
 export async function syncMerge(): Promise<{ items: MemorizationItem[]; mistakes: Record<string, any> }> {
   const items = localStorageService.getAllMemorizationItems();
   const mistakes = localStorageService.getMistakes();
+  const localBookmarks = loadLocalBookmarks();
 
-  const res = await fetch('/api/data', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ op: 'syncMerge', items, mistakes }),
-  });
-  const data = await res.json();
+  const data = await apiPost({ op: 'syncMerge', items, mistakes, bookmarks: localBookmarks }).then(r => r.json());
 
-  // Update localStorage with merged result
   if (data.items && Array.isArray(data.items)) {
     localStorageService.clearAllData();
     for (const item of data.items) {
@@ -890,6 +965,9 @@ export async function syncMerge(): Promise<{ items: MemorizationItem[]; mistakes
   }
   if (data.mistakes) {
     localStorageService.saveMistakes(data.mistakes);
+  }
+  if (data.bookmarks) {
+    saveLocalBookmarks(data.bookmarks);
   }
 
   return { items: data.items || [], mistakes: data.mistakes || {} };
@@ -928,35 +1006,34 @@ function saveLocalBookmarks(bookmarks: Bookmark[]): void {
 }
 
 export async function getBookmarks(): Promise<Bookmark[]> {
-  if (await isAuthenticated()) {
-    try {
-      const res = await fetch('/api/data?type=bookmarks');
-      const data = await res.json();
-      return data.bookmarks || [];
-    } catch {
-      return loadLocalBookmarks();
-    }
-  }
-  return loadLocalBookmarks();
+  return readThrough(
+    async () => {
+      const data = await apiGet('type=bookmarks');
+      const bookmarks = data.bookmarks || [];
+      saveLocalBookmarks(bookmarks); // keep local in sync
+      return bookmarks;
+    },
+    () => loadLocalBookmarks(),
+    [],
+  );
 }
 
 export async function addBookmark(bookmark: Omit<Bookmark, 'id' | 'createdAt'>): Promise<Bookmark | null> {
   if (await isAuthenticated()) {
     try {
-      const res = await fetch('/api/data', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ op: 'addBookmark', ...bookmark }),
-      });
-      const data = await res.json();
-      return data.bookmark;
-    } catch {
-      return null;
+      const data = await apiPost({ op: 'addBookmark', ...bookmark }).then(r => r.json());
+      const newBookmark = data.bookmark;
+      if (newBookmark) {
+        const local = loadLocalBookmarks();
+        saveLocalBookmarks([...local, newBookmark]);
+      }
+      return newBookmark;
+    } catch (error) {
+      console.warn('[storage] Bookmark add sync failed, using local:', error);
     }
   }
   // Local fallback
   const local = loadLocalBookmarks();
-  // Check if already exists
   const exists = local.find(b =>
     b.type === bookmark.type &&
     b.page === bookmark.page &&
@@ -974,37 +1051,25 @@ export async function addBookmark(bookmark: Omit<Bookmark, 'id' | 'createdAt'>):
 }
 
 export async function removeBookmark(id: string): Promise<void> {
-  if (await isAuthenticated()) {
-    await fetch('/api/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op: 'removeBookmark', id }),
-    });
-    return;
-  }
-  const local = loadLocalBookmarks();
-  saveLocalBookmarks(local.filter(b => b.id !== id));
+  await writeThrough(
+    () => saveLocalBookmarks(loadLocalBookmarks().filter(b => b.id !== id)),
+    () => apiWrite({ op: 'removeBookmark', id }),
+  );
 }
 
 export async function removeBookmarkByTarget(
   type: 'page' | 'ayah',
   target: { page?: number; surah?: number; ayah?: number }
 ): Promise<void> {
-  if (await isAuthenticated()) {
-    await fetch('/api/data', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ op: 'removeBookmarkByTarget', type, ...target }),
-    });
-    return;
-  }
-  const local = loadLocalBookmarks();
-  saveLocalBookmarks(local.filter(b =>
-    !(b.type === type &&
-      b.page === target.page &&
-      b.surah === target.surah &&
-      b.ayah === target.ayah)
-  ));
+  await writeThrough(
+    () => saveLocalBookmarks(loadLocalBookmarks().filter(b =>
+      !(b.type === type &&
+        b.page === target.page &&
+        b.surah === target.surah &&
+        b.ayah === target.ayah)
+    )),
+    () => apiWrite({ op: 'removeBookmarkByTarget', type, ...target }),
+  );
 }
 
 export async function isBookmarked(

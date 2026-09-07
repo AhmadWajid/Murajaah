@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { MistakeData } from '@/lib/storageService';
 import { TajweedAyahText } from './TajweedAyahText';
 import { useIsMobile } from '@/lib/hooks/useIsMobile';
@@ -117,6 +117,8 @@ interface AyahCardProps {
   borderless?: boolean;
   layoutMode?: 'spread' | 'single';
   isCurrentlyPlaying?: boolean;
+  isAyahBookmarked?: boolean;
+  onToggleAyahBookmark?: () => void;
 }
 
 export default function AyahCard({
@@ -152,11 +154,15 @@ export default function AyahCard({
   borderless = false,
   layoutMode = 'single',
   isCurrentlyPlaying = false,
+  isAyahBookmarked = false,
+  onToggleAyahBookmark,
 }: AyahCardProps) {
   // Local state for immediate visual feedback
   const [localMistakeState, setLocalMistakeState] = useState<Record<string, boolean>>({});
   const [isMistakeLoading, setIsMistakeLoading] = useState(false);
   const [qpcFontReady, setQpcFontReady] = useState(false);
+  const [showOverflowMenu, setShowOverflowMenu] = useState(false);
+  const overflowRef = useRef<HTMLDivElement>(null);
 
   // Load QPC font for Bismillah and Arabic surah name
   useEffect(() => {
@@ -176,14 +182,26 @@ export default function AyahCard({
   // Tafsir modal state
   const [showTafsir, setShowTafsir] = useState(false);
   const [tafsirData, setTafsirData] = useState<any>(null);
+
+  // Close overflow menu on outside click
+  useEffect(() => {
+    if (!showOverflowMenu) return;
+    const handler = (e: MouseEvent) => {
+      if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) {
+        setShowOverflowMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showOverflowMenu]);
   const [selectedAuthor, setSelectedAuthor] = useState<string | null>(null);
   const [loadingTafsir, setLoadingTafsir] = useState(false);
 
   // (Modal close is handled by the overlay onClick + close button)
   
-  const handleMistakeToggle = async (e: React.MouseEvent) => {
-    e.stopPropagation();
-    
+  const handleMistakeToggle = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+
     if (isMistakeLoading) return; // Prevent multiple clicks
     
     const newMistakeState = !hasMistake;
@@ -443,6 +461,7 @@ export default function AyahCard({
 
   const actionButtons = (
     <>
+      {/* Primary: Play Audio */}
       <button
         className="flex items-center justify-center rounded-full w-8 h-8 sm:w-9 sm:h-9 text-accent bg-accent/8 hover:bg-accent/15 dark:bg-accent/10 dark:hover:bg-accent/20 border border-accent/10 transition-all duration-200 hover:scale-108 active:scale-95"
         onClick={(e) => {
@@ -456,74 +475,128 @@ export default function AyahCard({
         </svg>
       </button>
 
-      {isLastAyahOfCompleteReview() && (
-        <div className="relative">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              setShowReviewRatingDropdown(true);
-            }}
-            className="flex items-center justify-center rounded-full w-8 h-8 sm:w-9 sm:h-9 text-accent bg-accent/8 hover:bg-accent/15 dark:bg-accent/10 dark:hover:bg-accent/20 border border-accent/10 transition-all duration-200 hover:scale-105 active:scale-95"
-            title="Finish Review"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-          </button>
-        </div>
-      )}
-
-      {onToggleMistake && (
+      {/* Primary: Bookmark */}
+      {onToggleAyahBookmark && (
         <button
           className={`flex items-center justify-center rounded-full w-8 h-8 sm:w-9 sm:h-9 border transition-all duration-200 hover:scale-105 active:scale-95 ${
-            hasMistake
-              ? 'text-red-600 dark:text-red-400 bg-red-500/10 hover:bg-red-500/15 dark:bg-red-400/10 dark:hover:bg-red-400/20 border-red-500/15 dark:border-red-400/15'
-              : 'text-gray-500 dark:text-gray-400 bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.05] dark:hover:bg-white/[0.08] border-black/[0.06] dark:border-white/[0.06]'
-          } ${isMistakeLoading ? 'opacity-50 cursor-not-allowed' : ''}`}
-          onClick={handleMistakeToggle}
-          disabled={isMistakeLoading}
-          title={hasMistake ? 'Remove mistake mark' : 'Mark as mistake'}
+            isAyahBookmarked
+              ? 'text-accent bg-accent/10 hover:bg-accent/15 dark:bg-accent/15 dark:hover:bg-accent/20 border-accent/20'
+              : 'text-muted-foreground bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.05] dark:hover:bg-white/[0.08] border-black/[0.06] dark:border-white/[0.06]'
+          }`}
+          onClick={(e) => {
+            e.stopPropagation();
+            onToggleAyahBookmark();
+          }}
+          title={isAyahBookmarked ? 'Remove bookmark' : 'Bookmark this ayah'}
+          aria-label={isAyahBookmarked ? 'Remove bookmark' : 'Bookmark this ayah'}
         >
-          {isMistakeLoading ? (
-            <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
-          ) : (
-            <svg className="w-4 h-4" fill={hasMistake ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          )}
+          <svg className="w-4 h-4" fill={isAyahBookmarked ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+          </svg>
         </button>
       )}
 
-      <button
-        className="flex items-center justify-center rounded-full w-8 h-8 sm:w-9 sm:h-9 text-teal-600 dark:text-teal-400 bg-teal-500/8 hover:bg-teal-500/15 dark:bg-teal-400/10 dark:hover:bg-teal-400/20 border border-teal-500/10 dark:border-teal-400/10 transition-all duration-200 hover:scale-105 active:scale-95"
-        onClick={(e) => {
-          e.stopPropagation();
-          setShowTajweedBreakdown(true);
-        }}
-        title="Tajweed rules — أحكام التجويد"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h10M4 18h13" />
-          <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
-          <circle cx="21" cy="18" r="1.5" fill="currentColor" stroke="none" />
-        </svg>
-      </button>
+      {/* Primary: Finish Review (only when relevant) */}
+      {isLastAyahOfCompleteReview() && (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowReviewRatingDropdown(true);
+          }}
+          className="flex items-center justify-center rounded-full w-8 h-8 sm:w-9 sm:h-9 text-accent bg-accent/8 hover:bg-accent/15 dark:bg-accent/10 dark:hover:bg-accent/20 border border-accent/10 transition-all duration-200 hover:scale-105 active:scale-95"
+          title="Finish Review"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+        </button>
+      )}
 
-      <button
-        className="flex items-center justify-center rounded-full w-8 h-8 sm:w-9 sm:h-9 text-accent bg-accent/8 hover:bg-accent/15 dark:bg-accent/10 dark:hover:bg-accent/20 border border-accent/10 transition-all duration-200 hover:scale-105 active:scale-95"
-        onClick={(e) => {
-          e.stopPropagation();
-          handleTafsirClick();
-        }}
-        title="View Tafsir"
-      >
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 19.5A2.5 2.5 0 016.5 17H20"></path>
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4.5A2.5 2.5 0 016.5 7H20v13H6.5A2.5 2.5 0 014 17.5v-13z"></path>
-        </svg>
-      </button>
+      {/* Overflow menu for secondary actions */}
+      <div className="relative" ref={overflowRef}>
+        <button
+          className={`flex items-center justify-center rounded-full w-8 h-8 sm:w-9 sm:h-9 border transition-all duration-200 hover:scale-105 active:scale-95 ${
+            showOverflowMenu || hasMistake
+              ? 'text-foreground bg-black/[0.06] dark:bg-white/[0.08] border-black/[0.08] dark:border-white/[0.08]'
+              : 'text-muted-foreground bg-black/[0.03] hover:bg-black/[0.06] dark:bg-white/[0.05] dark:hover:bg-white/[0.08] border-black/[0.06] dark:border-white/[0.06]'
+          }`}
+          onClick={(e) => {
+            e.stopPropagation();
+            setShowOverflowMenu(prev => !prev);
+          }}
+          title="More actions"
+          aria-label="More actions"
+        >
+          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+            <circle cx="5" cy="12" r="1.5" />
+            <circle cx="12" cy="12" r="1.5" />
+            <circle cx="19" cy="12" r="1.5" />
+          </svg>
+        </button>
+
+        {showOverflowMenu && (
+          <div
+            className="absolute right-0 top-full mt-1 z-30 min-w-[180px] rounded-[var(--radius-lg)] border border-border bg-card shadow-xl py-1 animate-fade-in-up"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {onToggleMistake && (
+              <button
+                className={`w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-secondary transition-colors text-left ${
+                  hasMistake ? 'text-red-600 dark:text-red-400' : 'text-foreground'
+                }`}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleMistakeToggle();
+                  setShowOverflowMenu(false);
+                }}
+                disabled={isMistakeLoading}
+              >
+                {isMistakeLoading ? (
+                  <svg className="w-4 h-4 animate-spin" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                ) : (
+                  <svg className="w-4 h-4 flex-shrink-0" fill={hasMistake ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                )}
+                <span>{hasMistake ? 'Remove mistake' : 'Mark as mistake'}</span>
+              </button>
+            )}
+
+            <button
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-teal-600 dark:text-teal-400 hover:bg-secondary transition-colors text-left"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowTajweedBreakdown(true);
+                setShowOverflowMenu(false);
+              }}
+            >
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h10M4 18h13" />
+                <circle cx="19" cy="12" r="1.5" fill="currentColor" stroke="none" />
+                <circle cx="21" cy="18" r="1.5" fill="currentColor" stroke="none" />
+              </svg>
+              <span>Tajweed rules</span>
+            </button>
+
+            <button
+              className="w-full flex items-center gap-2.5 px-3 py-2 text-sm text-foreground hover:bg-secondary transition-colors text-left"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleTafsirClick();
+                setShowOverflowMenu(false);
+              }}
+            >
+              <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 19.5A2.5 2.5 0 016.5 17H20"></path>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4.5A2.5 2.5 0 016.5 7H20v13H6.5A2.5 2.5 0 014 17.5v-13z"></path>
+              </svg>
+              <span>View Tafsir</span>
+            </button>
+          </div>
+        )}
+      </div>
     </>
   );
 

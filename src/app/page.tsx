@@ -797,15 +797,17 @@ export default function Dashboard() {
 
   const handleDeleteAllMistakesInSurah = useCallback(async (surahNumber: number) => {
     try {
+      // Get the mistakes for this surah from current state BEFORE optimistic update
+      const surahMistakes = mistakes.filter(m => m.surah === surahNumber);
+
       // Optimistic update - remove all mistakes for this surah from UI immediately
-      setMistakes(prevMistakes => 
+      setMistakes(prevMistakes =>
         prevMistakes.filter(mistake => mistake.surah !== surahNumber)
       );
-      
+
       setShowMistakeDeleteConfirm(null);
-      
-      // Delete from storage in background
-      const surahMistakes = groupedMistakes[surahNumber] || [];
+
+      // Delete each mistake from storage
       for (const mistake of surahMistakes) {
         await removeMistake(surahNumber, mistake.ayah);
       }
@@ -814,7 +816,7 @@ export default function Dashboard() {
       // Reload data on error to ensure consistency
       await loadAllData(false);
     }
-  }, [loadAllData]);
+  }, [mistakes, loadAllData]);
 
   const handleEdit = useCallback((item: MemorizationItem) => {
     setEditingItem(item);
@@ -1210,7 +1212,13 @@ export default function Dashboard() {
                   <div
                     key={bm.id}
                     className="group relative flex items-center gap-3 rounded-[var(--radius-lg)] border border-border bg-card p-3 hover:border-accent/30 hover:bg-accent/[0.03] transition-all cursor-pointer"
-                    onClick={() => router.push(`/quran?page=${bm.page || 1}`)}
+                    onClick={() => {
+                      if (bm.type === 'ayah' && bm.surah && bm.ayah) {
+                        router.push(`/quran?ayah=${bm.surah}:${bm.ayah}`);
+                      } else {
+                        router.push(`/quran?page=${bm.page || 1}`);
+                      }
+                    }}
                   >
                     <div className="w-9 h-9 rounded-[var(--radius-sm)] bg-accent/10 flex items-center justify-center flex-shrink-0">
                       <Bookmark className="w-4 h-4 text-accent fill-accent" />
