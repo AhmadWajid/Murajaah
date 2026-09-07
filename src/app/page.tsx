@@ -83,8 +83,12 @@ function ReviewRow({
         {item.surah}
       </div>
 
-      {/* Passage info */}
-      <div className="flex-1 min-w-0">
+      {/* Passage info — clickable to open in Quran */}
+      <button
+        onClick={onReview}
+        className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
+        title="Open in Quran"
+      >
         <div className="flex items-center gap-2">
           <span className="font-semibold text-sm text-foreground truncate">{englishName}</span>
           <span className="font-arabic text-accent text-base flex-shrink-0" dir="rtl">{arabicName}</span>
@@ -93,18 +97,14 @@ function ReviewRow({
           {ayahLabel} · {item.interval}d · {item.reviewCount} {item.reviewCount === 1 ? 'review' : 'reviews'}
           {item.isBeginner && ' · Learning'}
         </p>
-      </div>
+      </button>
 
       {/* Status badge */}
       {isDone ? (
-        <button
-          onClick={onReview}
-          className="inline-flex items-center gap-1 text-xs font-semibold text-success bg-success/15 px-2 py-1 rounded-[var(--radius-sm)] flex-shrink-0 hover:bg-success/25 transition-colors"
-          title="Open in Quran"
-        >
+        <span className="inline-flex items-center gap-1 text-xs font-semibold text-success bg-success/15 px-2 py-1 rounded-[var(--radius-sm)] flex-shrink-0">
           <CheckCircle className="w-3 h-3" />
           Done
-        </button>
+        </span>
       ) : (
         <div className="flex items-center gap-1.5 flex-shrink-0">
           {item.isBeginner && (
