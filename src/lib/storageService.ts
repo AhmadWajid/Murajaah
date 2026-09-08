@@ -228,6 +228,8 @@ export async function syncSettingsFromDb(): Promise<boolean> {
     if (s.showWordByWordTooltip !== undefined) localStorage.setItem('showWordByWordTooltip', s.showWordByWordTooltip ? 'true' : 'false');
     if (s.mobileHeaderHidden !== undefined) localStorage.setItem('mobileHeaderHidden', s.mobileHeaderHidden.toString());
     if (s.userTimezone) localStorage.setItem('userTimeZone', s.userTimezone);
+    if (s.hideWords !== undefined) localStorage.setItem('hideWords', s.hideWords ? 'true' : 'false');
+    if (s.hideWordsDelay !== undefined) localStorage.setItem('hideWordsDelay', String(s.hideWordsDelay));
     // Review settings
     if (s.reviewSettings) localStorage.setItem('mquran_review_settings', JSON.stringify(s.reviewSettings));
     // Reading layout
@@ -655,12 +657,16 @@ export async function saveUISettings(settings: {
   showWordByWordTooltip?: boolean;
   mobileHeaderHidden?: boolean;
   userTimeZone?: string;
+  hideWords?: boolean;
+  hideWordsDelay?: number;
 }): Promise<void> {
   // Write to localStorage
   if (typeof window !== 'undefined') {
     if (settings.showWordByWordTooltip !== undefined) localStorage.setItem('showWordByWordTooltip', settings.showWordByWordTooltip ? 'true' : 'false');
     if (settings.mobileHeaderHidden !== undefined) localStorage.setItem('mobileHeaderHidden', settings.mobileHeaderHidden.toString());
     if (settings.userTimeZone !== undefined) localStorage.setItem('userTimeZone', settings.userTimeZone);
+    if (settings.hideWords !== undefined) localStorage.setItem('hideWords', settings.hideWords ? 'true' : 'false');
+    if (settings.hideWordsDelay !== undefined) localStorage.setItem('hideWordsDelay', String(settings.hideWordsDelay));
   }
   // Sync to DB
   if (await isAuthenticated()) {
@@ -671,6 +677,8 @@ export async function saveUISettings(settings: {
         showWordByWordTooltip: settings.showWordByWordTooltip,
         mobileHeaderHidden: settings.mobileHeaderHidden,
         userTimezone: settings.userTimeZone,
+        hideWords: settings.hideWords,
+        hideWordsDelay: settings.hideWordsDelay,
       });
     } catch (error) {
       console.warn('[storage] UI settings sync failed:', error);
@@ -679,7 +687,7 @@ export async function saveUISettings(settings: {
 }
 
 export async function loadUISettings() {
-  const defaults = { showWordByWordTooltip: false, mobileHeaderHidden: false, userTimeZone: null as string | null };
+  const defaults = { showWordByWordTooltip: false, mobileHeaderHidden: false, userTimeZone: null as string | null, hideWords: false, hideWordsDelay: 500 };
   if (await isAuthenticated()) {
     try {
       const s = await fetchSettings();
@@ -687,6 +695,8 @@ export async function loadUISettings() {
         showWordByWordTooltip: s?.showWordByWordTooltip ?? defaults.showWordByWordTooltip,
         mobileHeaderHidden: s?.mobileHeaderHidden ?? defaults.mobileHeaderHidden,
         userTimeZone: s?.userTimezone ?? defaults.userTimeZone,
+        hideWords: s?.hideWords ?? defaults.hideWords,
+        hideWordsDelay: s?.hideWordsDelay ?? defaults.hideWordsDelay,
       };
     } catch {
       return defaults;
@@ -697,6 +707,8 @@ export async function loadUISettings() {
     showWordByWordTooltip: localStorage.getItem('showWordByWordTooltip') === 'true',
     mobileHeaderHidden: localStorage.getItem('mobileHeaderHidden') === 'true',
     userTimeZone: localStorage.getItem('userTimeZone'),
+    hideWords: localStorage.getItem('hideWords') === 'true',
+    hideWordsDelay: parseInt(localStorage.getItem('hideWordsDelay') || '500', 10),
   };
 }
 

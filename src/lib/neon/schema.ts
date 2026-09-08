@@ -75,6 +75,7 @@ export const userSettings = pgTable('user_settings', {
   favoriteReciters: jsonb('favorite_reciters'),
   reviewSettings: jsonb('review_settings'),
   readingLayout: text('reading_layout').default('verse'),
+  hideWords: boolean('hide_words').default(false),
   hideWordsDelay: integer('hide_words_delay').default(500),
 });
 

@@ -232,6 +232,32 @@ function QuranPageContent() {
     }
   }, [showWordByWordTooltip]);
 
+  // Load hideWords + hideWordsDelay from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const savedHideWords = localStorage.getItem('hideWords');
+      if (savedHideWords !== null) setHideWords(savedHideWords === 'true');
+      const savedHideWordsDelay = localStorage.getItem('hideWordsDelay');
+      if (savedHideWordsDelay !== null) setHideWordsDelay(parseInt(savedHideWordsDelay, 10));
+    }
+  }, []);
+
+  // Save hideWords to localStorage and sync to DB when changed
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('hideWords', hideWords ? 'true' : 'false');
+      saveUISettings({ hideWords });
+    }
+  }, [hideWords]);
+
+  // Save hideWordsDelay to localStorage and sync to DB when changed
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('hideWordsDelay', String(hideWordsDelay));
+      saveUISettings({ hideWordsDelay });
+    }
+  }, [hideWordsDelay]);
+
   // Initialize the component - handle URL parameters vs last page
   useEffect(() => {
     if (isInitialized) return;

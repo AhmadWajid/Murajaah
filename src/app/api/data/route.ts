@@ -178,6 +178,7 @@ export async function GET(request: NextRequest) {
           favoriteReciters: s.favoriteReciters,
           reviewSettings: s.reviewSettings,
           readingLayout: s.readingLayout,
+          hideWords: s.hideWords,
           hideWordsDelay: s.hideWordsDelay,
         },
       });
@@ -354,6 +355,7 @@ export async function POST(request: NextRequest) {
         favoriteReciters: s.favoriteReciters,
         reviewSettings: s.reviewSettings,
         readingLayout: s.readingLayout,
+        hideWords: s.hideWords,
         hideWordsDelay: s.hideWordsDelay,
       };
 
