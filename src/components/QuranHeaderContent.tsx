@@ -101,6 +101,10 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
     onToggleFontTarget,
     hideMistakes = false,
     onToggleHideMistakes,
+    hideWords = false,
+    onToggleHideWords,
+    hideWordsDelay = 500,
+    onHideWordsDelayChange,
     showWordByWordTooltip = true,
     onToggleWordByWordTooltip,
     currentAyah = 1,
@@ -897,6 +901,30 @@ export default function QuranHeaderContent(props: QuranHeaderContentProps) {
                   <div className="flex items-center justify-between py-1">
                     <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Hide Mistakes (Self-Test)</Label>
                     <Switch checked={hideMistakes} onCheckedChange={onToggleHideMistakes} />
+                  </div>
+                )}
+
+                {onToggleHideWords && (
+                  <div className="flex items-center justify-between py-1">
+                    <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Hide Words (Self-Test)</Label>
+                    <Switch checked={hideWords} onCheckedChange={onToggleHideWords} />
+                  </div>
+                )}
+
+                {hideWords && onHideWordsDelayChange && (
+                  <div className="space-y-2 py-1 pl-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Reveal Delay</Label>
+                      <span className="text-xs font-semibold text-accent bg-accent/10 px-2 py-0.5 rounded-full">{hideWordsDelay}ms</span>
+                    </div>
+                    <Slider
+                      min={0}
+                      max={3000}
+                      step={100}
+                      value={[hideWordsDelay]}
+                      onValueChange={([val]) => onHideWordsDelayChange(val)}
+                      className="w-full"
+                    />
                   </div>
                 )}
 

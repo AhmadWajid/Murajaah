@@ -809,6 +809,11 @@ export default function QuranContent({
                             }}
                             onMouseEnter={() => handleWordMouseEnter15(String(wordId), wordSurah, wordAyah, word)}
                             onMouseLeave={() => handleWordMouseLeave15(String(wordId))}
+                            onTouchStart={(e) => {
+                              e.preventDefault();
+                              handleWordMouseEnter15(String(wordId), wordSurah, wordAyah, word);
+                              handleWordMouseLeave15(String(wordId));
+                            }}
                             data-tooltip-id={showWordByWordTooltip && translation && shouldShowTranslationTooltip ? WORD_TRANSLATION_TOOLTIP_ID_15 : undefined}
                             data-tooltip-content={showWordByWordTooltip && translation && shouldShowTranslationTooltip ? translation : undefined}
                             className={`inline cursor-pointer select-none transition-all duration-200 px-0.5 rounded-sm relative font-arabic arabic-text uthmanic-hafs ${
