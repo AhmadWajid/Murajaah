@@ -22,6 +22,14 @@ interface EnhancedMemorizationModalProps {
   onClose: () => void;
 }
 
+// Helper: convert { surah, ayah } to a string key for Set storage
+// (Set.has() uses reference equality for objects, so we use string keys)
+const ayahKey = (surah: number, ayah: number) => `${surah}:${ayah}`;
+const parseAyahKey = (key: string): { surah: number; ayah: number } => {
+  const [surah, ayah] = key.split(':').map(Number);
+  return { surah, ayah };
+};
+
 type FamiliarityLevel = 'new' | 'familiar' | 'confident';
 
 const FAMILIARITY_OPTIONS: { value: FamiliarityLevel; label: string; desc: string; icon: typeof GraduationCap }[] = [
@@ -65,7 +73,9 @@ export default function EnhancedMemorizationModal({
   const isAddReviewMode = !!searchParams.get('addReview');
 
   const [selectionType, setSelectionType] = useState<'surah' | 'page' | 'ayahs' | 'custom'>('page');
-  const [selectedAyahs, setSelectedAyahs] = useState<Set<{ surah: number; ayah: number }>>(new Set());
+  const [selectedAyahs, setSelectedAyahs] = useState<Set<string>>(new Set());
+  const [ayahSelectionMode, setAyahSelectionMode] = useState<'individual' | 'range'>('individual');
+  const [rangeStartAyah, setRangeStartAyah] = useState<number | null>(null);
   const [customRange, setCustomRange] = useState({ start: 1, end: 1 });
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -109,7 +119,7 @@ export default function EnhancedMemorizationModal({
       const defaultSurah = uniqueSurahs[0] ?? null;
       if (externalSelectedAyahs && externalSelectedAyahs.size > 0) {
         setSelectionType('ayahs');
-        setSelectedAyahs(new Set(externalSelectedAyahs));
+        setSelectedAyahs(new Set(Array.from(externalSelectedAyahs).map((a) => ayahKey(a.surah, a.ayah))));
         const first = Array.from(externalSelectedAyahs)[0];
         const ayahObj = pageData.ayahs.find(
           (a: any) => a.surah?.number === first.surah && a.numberInSurah === first.ayah,
@@ -132,11 +142,13 @@ export default function EnhancedMemorizationModal({
 
   // Load full surah data when needed
   useEffect(() => {
-    if (!isOpen || !selectedSurah) return;
+    if (!isOpen) return;
     if (selectionType === 'ayahs' || selectionType === 'surah') {
-      loadFullSurah(selectedSurah);
+      if (selectedSurah) loadFullSurah(selectedSurah);
+    } else if (selectionType === 'custom') {
+      if (customSurah) loadFullSurah(customSurah);
     }
-  }, [selectedSurah, selectionType, isOpen]);
+  }, [selectedSurah, selectionType, isOpen, customSurah]);
 
   // Auto-generate name/description when selection changes (unless user edited)
   useEffect(() => {
@@ -191,7 +203,7 @@ export default function EnhancedMemorizationModal({
   // Keep quick range in sync with grid selection
   useEffect(() => {
     if (selectionType === 'ayahs' && selectedAyahs.size > 0) {
-      const sorted = Array.from(selectedAyahs).sort((a, b) => a.ayah - b.ayah);
+      const sorted = Array.from(selectedAyahs).map(parseAyahKey).sort((a, b) => a.ayah - b.ayah);
       const s = sorted[0].ayah;
       const e = sorted[sorted.length - 1].ayah;
       setCustomRange({ start: s, end: e });
@@ -216,11 +228,42 @@ export default function EnhancedMemorizationModal({
     }
   };
 
-  const handleAyahToggle = (ayah: { surah: number; ayah: number }) => {
+  const handleAyahToggle = (surah: number, ayah: number) => {
+    const key = ayahKey(surah, ayah);
+
+    if (ayahSelectionMode === 'range' && selectedSurah) {
+      // Range mode: first click sets start, second click sets end and selects all in between
+      if (rangeStartAyah === null) {
+        setRangeStartAyah(ayah);
+        // Also select just this one ayah as a starting point
+        setSelectedAyahs(new Set([key]));
+        setNameEdited(true);
+        setDescriptionEdited(true);
+        return;
+      }
+      // Second click — select all ayahs from rangeStartAyah to ayah
+      const start = Math.min(rangeStartAyah, ayah);
+      const end = Math.max(rangeStartAyah, ayah);
+      if (fullSurahData?.ayahs && selectedSurah) {
+        const keysInRange = fullSurahData.ayahs
+          .filter((a: any) => a.numberInSurah >= start && a.numberInSurah <= end)
+          .map((a: any) => ayahKey(selectedSurah, a.numberInSurah));
+        setSelectedAyahs(new Set(keysInRange));
+        setCustomRange({ start, end });
+        setRangeStartStr(String(start));
+        setRangeEndStr(String(end));
+      }
+      setRangeStartAyah(null);
+      setNameEdited(true);
+      setDescriptionEdited(true);
+      return;
+    }
+
+    // Individual mode: toggle single ayah
     setSelectedAyahs((prev) => {
       const next = new Set(prev);
-      if (next.has(ayah)) next.delete(ayah);
-      else next.add(ayah);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
       return next;
     });
     setNameEdited(true);
@@ -234,10 +277,10 @@ export default function EnhancedMemorizationModal({
     if (selectedSurah && fullSurahData?.ayahs) {
       const start = Math.min(newRange.start, newRange.end);
       const end = Math.max(newRange.start, newRange.end);
-      const ayahsInRange = fullSurahData.ayahs
-        .filter((a: any) => a.surah?.number === selectedSurah && a.numberInSurah >= start && a.numberInSurah <= end)
-        .map((a: any) => ({ surah: selectedSurah, ayah: a.numberInSurah }));
-      setSelectedAyahs(new Set(ayahsInRange));
+      const keysInRange = fullSurahData.ayahs
+        .filter((a: any) => a.numberInSurah >= start && a.numberInSurah <= end)
+        .map((a: any) => ayahKey(selectedSurah, a.numberInSurah));
+      setSelectedAyahs(new Set(keysInRange));
     }
     setNameEdited(true);
     setDescriptionEdited(true);
@@ -255,6 +298,7 @@ export default function EnhancedMemorizationModal({
 
   const clearSelection = () => {
     setSelectedAyahs(new Set());
+    setRangeStartAyah(null);
     setCustomRange({ start: 1, end: 1 });
     setNameEdited(false);
     setDescriptionEdited(false);
@@ -262,19 +306,19 @@ export default function EnhancedMemorizationModal({
 
   const selectAllAyahs = () => {
     if (!fullSurahData?.ayahs) return;
-    const ayahsForSurah = fullSurahData.ayahs.filter((a: any) => a.surah?.number === selectedSurah);
+    const ayahsForSurah = fullSurahData.ayahs;
     if (ayahsForSurah.length > 0) {
       setCustomRange({
         start: ayahsForSurah[0].numberInSurah,
         end: ayahsForSurah[ayahsForSurah.length - 1].numberInSurah,
       });
-      setSelectedAyahs(new Set(ayahsForSurah.map((a: any) => ({ surah: selectedSurah!, ayah: a.numberInSurah }))));
+      setSelectedAyahs(new Set(ayahsForSurah.map((a: any) => ayahKey(selectedSurah!, a.numberInSurah))));
     }
   };
 
   const scrollToFirstSelectedAyah = () => {
     if (!surahContainerRef) return;
-    const first = Array.from(selectedAyahs)[0];
+    const first = Array.from(selectedAyahs).map(parseAyahKey).sort((a, b) => a.ayah - b.ayah)[0];
     if (first) {
       const el = surahContainerRef.querySelector(`[data-ayah="${first.ayah}"]`);
       el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -335,7 +379,8 @@ export default function EnhancedMemorizationModal({
     // 'ayahs' mode — group by surah, merge consecutive
     if (selectedAyahs.size === 0) return [];
     const grouped: Record<number, { surah: number; ayah: number }[]> = {};
-    for (const sel of selectedAyahs) {
+    for (const key of selectedAyahs) {
+      const sel = parseAyahKey(key);
       if (!grouped[sel.surah]) grouped[sel.surah] = [];
       grouped[sel.surah].push(sel);
     }
@@ -568,7 +613,7 @@ export default function EnhancedMemorizationModal({
               {pageSurahs.length > 1 && (
                 <div className="space-y-1.5">
                   <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Surah</Label>
-                  <Select value={selectedSurah?.toString() || ''} onValueChange={(v) => setSelectedSurah(Number(v))}>
+                  <Select value={selectedSurah?.toString() || ''} onValueChange={(v) => { setSelectedSurah(Number(v)); setRangeStartAyah(null); setSelectedAyahs(new Set()); }}>
                     <SelectTrigger><SelectValue /></SelectTrigger>
                     <SelectContent>
                       {pageSurahs.map((s) => (
@@ -578,6 +623,41 @@ export default function EnhancedMemorizationModal({
                   </Select>
                 </div>
               )}
+
+              {/* Selection mode toggle */}
+              <div className="flex items-center gap-2">
+                <div className="flex p-0.5 bg-muted rounded-[var(--radius)] gap-0.5">
+                  <button
+                    onClick={() => { setAyahSelectionMode('individual'); setRangeStartAyah(null); }}
+                    className={cn(
+                      'px-3 py-1.5 text-xs font-semibold rounded-[var(--radius-sm)] transition-colors',
+                      ayahSelectionMode === 'individual'
+                        ? 'bg-card text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    Individual
+                  </button>
+                  <button
+                    onClick={() => { setAyahSelectionMode('range'); setRangeStartAyah(null); }}
+                    className={cn(
+                      'px-3 py-1.5 text-xs font-semibold rounded-[var(--radius-sm)] transition-colors',
+                      ayahSelectionMode === 'range'
+                        ? 'bg-card text-foreground shadow-sm'
+                        : 'text-muted-foreground hover:text-foreground',
+                    )}
+                  >
+                    Range
+                  </button>
+                </div>
+                {ayahSelectionMode === 'range' && (
+                  <span className="text-[11px] text-muted-foreground">
+                    {rangeStartAyah !== null
+                      ? `Click an end ayah (started at ${rangeStartAyah})`
+                      : 'Click a start ayah'}
+                  </span>
+                )}
+              </div>
 
               {/* Action bar */}
               <div className="flex items-center justify-between">
@@ -679,16 +759,15 @@ export default function EnhancedMemorizationModal({
                         const isOnPage = (pageData?.ayahs || []).some(
                           (pa: any) => pa.surah?.number === selectedSurah && pa.numberInSurah === ayah.numberInSurah,
                         );
-                        const isSelected = Array.from(selectedAyahs).some(
-                          (s) => s.surah === selectedSurah && s.ayah === ayah.numberInSurah,
-                        );
+                        const isSelected = selectedSurah ? selectedAyahs.has(ayahKey(selectedSurah, ayah.numberInSurah)) : false;
+                        const isRangeStart = ayahSelectionMode === 'range' && rangeStartAyah === ayah.numberInSurah;
                         const isPageEnd = pageEndAyahs.has(ayah.numberInSurah);
                         const surahPage = ayahToSurahPage.get(ayah.numberInSurah);
                         return (
                           <button
                             key={ayah.number}
                             data-ayah={ayah.numberInSurah}
-                            onClick={() => selectedSurah && handleAyahToggle({ surah: selectedSurah, ayah: ayah.numberInSurah })}
+                            onClick={() => selectedSurah && handleAyahToggle(selectedSurah, ayah.numberInSurah)}
                             className={cn(
                               'relative h-8 rounded-[var(--radius-xs)] text-xs font-semibold transition-all duration-100',
                               isSelected
@@ -697,6 +776,7 @@ export default function EnhancedMemorizationModal({
                                   ? 'bg-accent/10 text-foreground hover:bg-accent/20'
                                   : 'bg-transparent text-muted-foreground hover:bg-secondary',
                               isPageEnd && 'border border-accent/50',
+                              isRangeStart && 'ring-2 ring-accent ring-offset-1 ring-offset-background',
                             )}
                           >
                             {ayah.numberInSurah}
@@ -797,6 +877,81 @@ export default function EnhancedMemorizationModal({
                 </div>
                 <p className="text-[11px] text-muted-foreground">
                   {getSurahName(customSurah)} has {customMaxAyahs} ayahs
+                </p>
+              </div>
+
+              {/* Ayah grid */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-accent" />
+                  <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+                    All ayahs in surah
+                  </Label>
+                  {loadingSurah && <span className="text-xs text-muted-foreground">Loading…</span>}
+                </div>
+                <div
+                  ref={setSurahContainerRef}
+                  className="max-h-52 overflow-y-auto rounded-[var(--radius)] border border-border bg-muted/30 p-2"
+                >
+                  {loadingSurah ? (
+                    <div className="flex items-center justify-center py-6">
+                      <div className="animate-spin rounded-full h-5 w-5 border-2 border-accent border-t-transparent" />
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-1.5 pt-1.5 px-0.5 pb-1">
+                      {(fullSurahData?.ayahs || []).map((ayah: any) => {
+                        const isInRange = ayah.numberInSurah >= Math.min(customAyahStart, customAyahEnd) && ayah.numberInSurah <= Math.max(customAyahStart, customAyahEnd);
+                        const isPageEnd = pageEndAyahs.has(ayah.numberInSurah);
+                        const surahPage = ayahToSurahPage.get(ayah.numberInSurah);
+                        return (
+                          <button
+                            key={ayah.number}
+                            data-ayah={ayah.numberInSurah}
+                            onClick={() => {
+                              // First click or clicking below current start = set start
+                              // Second click = set end
+                              if (customAyahStart === customAyahEnd) {
+                                // Only start is set, this click sets end
+                                if (ayah.numberInSurah >= customAyahStart) {
+                                  setCustomAyahEnd(ayah.numberInSurah);
+                                  setCustomEndStr(String(ayah.numberInSurah));
+                                } else {
+                                  // Clicked before start, make it the new start
+                                  setCustomAyahStart(ayah.numberInSurah);
+                                  setCustomStartStr(String(ayah.numberInSurah));
+                                }
+                              } else {
+                                // Range already set, start fresh with this as start
+                                setCustomAyahStart(ayah.numberInSurah);
+                                setCustomAyahEnd(ayah.numberInSurah);
+                                setCustomStartStr(String(ayah.numberInSurah));
+                                setCustomEndStr(String(ayah.numberInSurah));
+                              }
+                              setNameEdited(false);
+                              setDescriptionEdited(false);
+                            }}
+                            className={cn(
+                              'relative h-8 rounded-[var(--radius-xs)] text-xs font-semibold transition-all duration-100',
+                              isInRange
+                                ? 'bg-accent text-accent-foreground shadow-sm'
+                                : 'bg-transparent text-muted-foreground hover:bg-secondary',
+                              isPageEnd && 'border border-accent/50',
+                            )}
+                          >
+                            {ayah.numberInSurah}
+                            {isPageEnd && (
+                              <span className="absolute -top-1.5 -left-1.5 size-4 flex items-center justify-center text-[8px] font-bold text-accent-foreground bg-accent rounded-full leading-none shadow-sm ring-1 ring-background">
+                                {surahPage}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+                <p className="text-[11px] text-muted-foreground text-center">
+                  Click an ayah to set start, then click another to set end · <span className="text-accent font-medium">circled number</span> = last ayah on that page of the surah
                 </p>
               </div>
 
