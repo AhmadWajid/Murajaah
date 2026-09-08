@@ -228,7 +228,17 @@ export default function EnhancedMemorizationModal({
   };
 
   const handleRangeChange = (type: 'start' | 'end', value: number) => {
-    setCustomRange((prev) => ({ ...prev, [type]: value }));
+    const newRange = { ...customRange, [type]: value };
+    setCustomRange(newRange);
+    // Select all ayahs in the computed range
+    if (selectedSurah && fullSurahData?.ayahs) {
+      const start = Math.min(newRange.start, newRange.end);
+      const end = Math.max(newRange.start, newRange.end);
+      const ayahsInRange = fullSurahData.ayahs
+        .filter((a: any) => a.surah?.number === selectedSurah && a.numberInSurah >= start && a.numberInSurah <= end)
+        .map((a: any) => ({ surah: selectedSurah, ayah: a.numberInSurah }));
+      setSelectedAyahs(new Set(ayahsInRange));
+    }
     setNameEdited(true);
     setDescriptionEdited(true);
   };
