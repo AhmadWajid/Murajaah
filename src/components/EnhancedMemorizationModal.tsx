@@ -427,6 +427,30 @@ export default function EnhancedMemorizationModal({
 
   const customMaxAyahs = getAyahCount(customSurah);
 
+  // Compute which ayahs are the last on their Quran page (page boundaries)
+  // and map each to its "page of surah" number (1, 2, 3, ...)
+  const { pageEndAyahs, ayahToSurahPage } = useMemo(() => {
+    const pageEndAyahs = new Set<number>();
+    const ayahToSurahPage = new Map<number, number>();
+    const ayahs = fullSurahData?.ayahs;
+    if (!ayahs || ayahs.length === 0) return { pageEndAyahs, ayahToSurahPage };
+
+    let surahPageNum = 0;
+    for (let i = 0; i < ayahs.length; i++) {
+      const ayah = ayahs[i];
+      const nextAyah = ayahs[i + 1];
+      // New page starts when page number changes
+      const isNewPage = i === 0 || ayah.page !== ayahs[i - 1].page;
+      if (isNewPage) surahPageNum++;
+      ayahToSurahPage.set(ayah.numberInSurah, surahPageNum);
+      // This ayah is the last on its page if there's no next ayah, or the next ayah is on a different page
+      if (!nextAyah || nextAyah.page !== ayah.page) {
+        pageEndAyahs.add(ayah.numberInSurah);
+      }
+    }
+    return { pageEndAyahs, ayahToSurahPage };
+  }, [fullSurahData]);
+
   // ─── Render ───
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
@@ -640,7 +664,7 @@ export default function EnhancedMemorizationModal({
                       <div className="animate-spin rounded-full h-5 w-5 border-2 border-accent border-t-transparent" />
                     </div>
                   ) : (
-                    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-1">
+                    <div className="grid grid-cols-4 sm:grid-cols-5 md:grid-cols-6 gap-1.5 pt-1.5 px-0.5 pb-1">
                       {(fullSurahData?.ayahs || []).map((ayah: any) => {
                         const isOnPage = (pageData?.ayahs || []).some(
                           (pa: any) => pa.surah?.number === selectedSurah && pa.numberInSurah === ayah.numberInSurah,
@@ -648,21 +672,29 @@ export default function EnhancedMemorizationModal({
                         const isSelected = Array.from(selectedAyahs).some(
                           (s) => s.surah === selectedSurah && s.ayah === ayah.numberInSurah,
                         );
+                        const isPageEnd = pageEndAyahs.has(ayah.numberInSurah);
+                        const surahPage = ayahToSurahPage.get(ayah.numberInSurah);
                         return (
                           <button
                             key={ayah.number}
                             data-ayah={ayah.numberInSurah}
                             onClick={() => selectedSurah && handleAyahToggle({ surah: selectedSurah, ayah: ayah.numberInSurah })}
                             className={cn(
-                              'h-8 rounded-[var(--radius-xs)] text-xs font-semibold transition-all duration-100',
+                              'relative h-8 rounded-[var(--radius-xs)] text-xs font-semibold transition-all duration-100',
                               isSelected
                                 ? 'bg-accent text-accent-foreground shadow-sm'
                                 : isOnPage
                                   ? 'bg-accent/10 text-foreground hover:bg-accent/20'
                                   : 'bg-transparent text-muted-foreground hover:bg-secondary',
+                              isPageEnd && 'border border-accent/50',
                             )}
                           >
                             {ayah.numberInSurah}
+                            {isPageEnd && (
+                              <span className="absolute -top-1.5 -left-1.5 size-4 flex items-center justify-center text-[8px] font-bold text-accent-foreground bg-accent rounded-full leading-none shadow-sm ring-1 ring-background">
+                                {surahPage}
+                              </span>
+                            )}
                           </button>
                         );
                       })}
@@ -670,7 +702,7 @@ export default function EnhancedMemorizationModal({
                   )}
                 </div>
                 <p className="text-[11px] text-muted-foreground text-center">
-                  Ayahs on the current page are highlighted
+                  Ayahs on the current page are highlighted · <span className="text-accent font-medium">circled number</span> = last ayah on that page of the surah
                 </p>
               </div>
             </div>
