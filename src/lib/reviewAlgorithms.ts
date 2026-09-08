@@ -5,14 +5,14 @@
  *  - FSRS-6 (Free Spaced Repetition Scheduler) — DSR model (Difficulty, Stability, Retrievability)
  *    https://github.com/open-spaced-repetition/awesome-fsrs/wiki/The-Algorithm
  *  - SM-2 (SuperMemo 2) — Classic ease-factor algorithm used by Anki for years
- *  - Traditional Hifz methods — Sabak/Sabqi/Dhor + 7-3-2-1 method
+ *  - An app-specific fixed ladder inspired by staged Hifz revision
  *
  * Beginner Mode (per-passage): When a passage is marked as "still learning",
  * intervals stay short until the student builds confidence. Auto-disables
- * after 5-7 successful reviews. Can always be re-toggled per passage.
+ * after five successful reviews on separate calendar days. Can always be re-toggled per passage.
  */
 
-import { MemorizationItem, ReviewRating } from './spacedRepetition';
+import type { MemorizationItem, ReviewRating } from './spacedRepetition';
 import { getUserTimeZone, getTodayInUserTimeZone, addDaysInUserTimeZone } from './utils';
 import { DateTime } from 'luxon';
 
@@ -27,22 +27,12 @@ export const DEFAULT_SETTINGS: ReviewSettings = {
 };
 
 export const ALGORITHM_INFO: Record<AlgorithmType, { name: string; shortDesc: string; details: string; recommended?: boolean }> = {
-  adaptive: {
-    name: 'Adaptive',
-    shortDesc: 'Learns your memory and adjusts automatically',
-    recommended: true,
-    details: 'This method tracks how difficult each passage is for you personally and how stable your memory of it is. When you rate a review, it uses that history to predict the best time to see it again — not too soon (wastes your time), not too late (you forget). Over time, passages you find easy get longer intervals automatically, while passages you struggle with come back sooner. This means fewer total reviews for the same retention — about 20-30% fewer than the classic method. Best for most users.',
-  },
-  classic: {
-    name: 'Classic',
-    shortDesc: 'Predictable intervals with a fixed ease factor',
-    details: 'This is the SM-2 algorithm, the method Anki used for most of its history. Each passage has an "ease factor" (a multiplier) that starts at 2.5 and adjusts slightly based on your ratings: Easy increases it, Hard decreases it. Your next interval is always the previous interval multiplied by this factor. The rules are the same for everyone — two people who rate identically get identical schedules. Simple and predictable, but it doesn\'t adapt to your actual memory patterns.',
-  },
-  hifz: {
-    name: 'Traditional Hifz',
-    shortDesc: 'Fixed schedule based on traditional madrasa methods',
-    details: 'This follows the 7-3-2-1 method used in traditional Quran memorization, combined with the Sabak/Sabqi/Dhor tier system. Reviews follow a fixed schedule: Day 1 → 2 → 4 → 7 → 14 → 30 → 60 → 90 → 180. When you rate Easy, you advance to the next tier. Medium keeps you at the current tier. Hard sends you back one tier. This is the method used in madrasas for centuries — it doesn\'t adapt to individual memory patterns, but it matches the traditional hifz curriculum that many students follow with their teachers.',
-  },
+  adaptive: { name: 'Adaptive', shortDesc: 'FSRS-6 memory model', recommended: true,
+    details: 'Estimates stability and difficulty using FSRS-6 default parameters and a 90% model retention target. Easy means fluent unaided recall; Medium means successful but effortful recall; Hard means needed help or forgot. The target is a model estimate, not a Quran-specific guarantee. Intervals are capped at 365 days.' },
+  classic: { name: 'Classic', shortDesc: 'Simple ease-based progression',
+    details: 'An SM-2-inspired three-rating scheduler, not exact SM-2. Successful spaced reviews grow intervals with ease. Hard returns to daily review. Early reviews use elapsed days to avoid awarding a full interval of growth.' },
+  hifz: { name: 'Traditional Hifz', shortDesc: 'Fixed revision ladder',
+    details: 'An app-specific ladder inspired by staged revision: 1, 2, 4, 7, 14, 30, 60, 90, 180 days. Easy advances one tier when due; Medium holds; Hard restarts daily review. This is not a universal traditional curriculum. Keep continuous recitation and teacher-led revision alongside scheduled passage reviews.' },
 };
 
 /* ─── FSRS-6 Default Parameters ─── */
@@ -79,16 +69,16 @@ const MAX_INTERVAL = 365;
 /* ─── FSRS Core Functions ─── */
 
 // Map our 3-grade system (easy/medium/hard) to FSRS 4-grade (1=again, 2=hard, 3=good, 4=easy)
-// We don't have "again" (lapse), so hard=2, medium=3, easy=4
+// Three-button contract: hard=Again, medium=Good, easy=Easy.
 function ratingToGrade(rating: ReviewRating): number {
   if (rating === 'easy') return 4;
   if (rating === 'medium') return 3;
-  return 2; // hard
+  return 1; // Hard means failed unaided recitation in this three-button app.
 }
 
 // Initial stability after first review: S0(G) = w[G-1]
 function initStability(grade: number): number {
-  return Math.max(0.1, FSRS_PARAMS[grade - 1]);
+  return Math.max(0.01, FSRS_PARAMS[grade - 1]);
 }
 
 // Initial difficulty: D0(G) = w4 - e^(w5*(G-1)) + 1, clamped to [1, 10]
@@ -101,7 +91,7 @@ function initDifficulty(grade: number): number {
 function nextDifficulty(d: number, grade: number): number {
   const deltaD = -FSRS_PARAMS[6] * (grade - 3);
   const dampedD = d + (deltaD * (10 - d) / 9);
-  const d0Easy = initDifficulty(4); // mean reversion target
+  const d0Easy = FSRS_PARAMS[4] - Math.exp(FSRS_PARAMS[5] * 3) + 1; // mean reversion target
   const nextD = FSRS_PARAMS[7] * d0Easy + (1 - FSRS_PARAMS[7]) * dampedD;
   return Math.min(10, Math.max(1, nextD));
 }
@@ -109,7 +99,7 @@ function nextDifficulty(d: number, grade: number): number {
 // Retrievability: R(t, S) = (1 + FACTOR * t/S)^DECAY
 function retrievability(elapsedDays: number, stability: number): number {
   const t = Math.max(0, elapsedDays);
-  const s = Math.max(0.1, stability);
+  const s = Math.max(0.01, stability);
   return Math.pow(1 + FACTOR * t / s, DECAY);
 }
 
@@ -131,7 +121,7 @@ function nextRecallStability(d: number, s: number, r: number, grade: number): nu
     (Math.exp((1 - r) * FSRS_PARAMS[10]) - 1) *
     hardPenalty *
     easyBonus;
-  return Math.max(0.1, s * growth);
+  return Math.max(0.01, s * growth);
 }
 
 // Next stability after lapse (Again)
@@ -142,7 +132,7 @@ function nextForgetStability(d: number, s: number, r: number): number {
     (Math.pow(s + 1, FSRS_PARAMS[13]) - 1) *
     Math.exp((1 - r) * FSRS_PARAMS[14]);
   const shortTermCap = s / Math.exp(FSRS_PARAMS[17] * FSRS_PARAMS[18]);
-  return Math.max(0.1, Math.min(longTerm, shortTermCap));
+  return Math.max(0.01, Math.min(longTerm, shortTermCap));
 }
 
 // Short-term stability (same-day review)
@@ -151,48 +141,23 @@ function shortTermStability(s: number, grade: number): number {
   const inc = Math.exp(FSRS_PARAMS[17] * (grade - 3 + FSRS_PARAMS[18])) * Math.pow(s, -FSRS_PARAMS[19]);
   // Ensure SInc >= 1 for non-Again ratings
   const clampedInc = grade >= 2 ? Math.max(1, inc) : inc;
-  return Math.max(0.1, s * clampedInc);
+  return Math.max(0.01, s * clampedInc);
 }
 
 /* ─── Helpers ─── */
 
-function daysSinceCreation(item: MemorizationItem, tz: string): number {
-  const createdAt = DateTime.fromISO(item.createdAt, { zone: tz });
-  const todayDate = DateTime.now().setZone(tz).startOf('day');
-  const daysPassed = todayDate.diff(createdAt, 'days').days;
-  if (item.memorizationAge !== undefined) {
-    return item.memorizationAge + daysPassed;
-  }
-  return daysPassed;
+/** Calendar days, including across DST. Date-only values are floating local dates. */
+export function reviewDay(value: string, zone: string): string {
+  const date = DateTime.fromISO(value, { zone });
+  if (!date.isValid) throw new RangeError('Invalid review date or timezone');
+  return date.toISODate()!;
 }
 
-function daysSinceLastReview(item: MemorizationItem, tz: string): number {
-  if (!item.lastReviewed) return 0;
-  const lastReview = DateTime.fromISO(item.lastReviewed, { zone: tz });
-  const todayDate = DateTime.now().setZone(tz).startOf('day');
-  return Math.max(0, Math.floor(todayDate.diff(lastReview, 'days').days));
-}
-
-function shouldDisableBeginnerMode(item: MemorizationItem): boolean {
-  // Count reviews since beginner mode was (re)enabled
-  const startedAt = item.beginnerStartedAtReview ?? 0;
-  const reviewsSinceEnabled = item.reviewCount - startedAt;
-
-  // Need at least 5 reviews since beginner was enabled
-  if (reviewsSinceEnabled < 5) return false;
-
-  // Check individual verse ratings (from Quran page reviews)
-  const ratings = Object.values(item.individualRatings || {});
-  if (ratings.length >= 5) {
-    const recentRatings = ratings.slice(-5);
-    const successCount = recentRatings.filter((r) => r === 'easy' || r === 'medium').length;
-    if (successCount >= 4) return true;
-  }
-
-  // Fallback: if enough reviews since enable and ease factor is healthy
-  if (reviewsSinceEnabled >= 5 && item.easeFactor >= 2.3) return true;
-
-  return false;
+export function elapsedReviewDays(previous: string | undefined, today: string, zone: string): number {
+  if (!previous) return 0;
+  const last = DateTime.fromISO(previous, { zone }).startOf('day');
+  if (!last.isValid) return 0;
+  return Math.max(0, Math.round(DateTime.fromISO(today, { zone }).diff(last, 'days').days));
 }
 
 /**
@@ -200,13 +165,12 @@ function shouldDisableBeginnerMode(item: MemorizationItem): boolean {
  * Uses the per-item isBeginner flag, auto-disabled after enough successful reviews.
  */
 export function isItemBeginner(item: MemorizationItem): boolean {
-  if (!item.isBeginner) return false;
-  return !shouldDisableBeginnerMode(item);
+  return !!item.isBeginner;
 }
 
 /* ─── 1. Adaptive Algorithm (FSRS-6) ─── */
 /*
- * Uses the actual FSRS-6 formulas with default parameters.
+ * FSRS-6 memory formulas with default parameters, wrapped in a daily recitation policy.
  * Tracks per-item stability (S) and difficulty (D) stored on the item.
  * Falls back to deriving S/D from interval/easeFactor for existing items.
  *
@@ -217,7 +181,7 @@ export function isItemBeginner(item: MemorizationItem): boolean {
 function getStability(item: MemorizationItem): number {
   // Use stored stability if available, otherwise derive from interval
   if (item.stability && item.stability > 0) return item.stability;
-  return Math.max(0.1, item.interval);
+  return Math.max(0.01, item.interval);
 }
 
 function getDifficulty(item: MemorizationItem): number {
@@ -230,11 +194,9 @@ function getDifficulty(item: MemorizationItem): number {
 function adaptiveInterval(
   item: MemorizationItem,
   rating: ReviewRating,
-  tz: string,
-  beginnerMode: boolean,
-): { interval: number; easeFactor: number; stability: number; difficulty: number } {
+  elapsedDays: number,
+): { interval: number; easeFactor: number; stability?: number; difficulty?: number } {
   const grade = ratingToGrade(rating);
-  const elapsedDays = daysSinceLastReview(item, tz);
   const isFirstReview = item.reviewCount === 0;
 
   let s: number;
@@ -256,7 +218,7 @@ function adaptiveInterval(
     } else {
       // Long-term review
       if (grade === 1) {
-        // Again (lapse) — we don't use this, but handle it for completeness
+        // Failed unaided recitation.
         s = nextForgetStability(currentD, currentS, r);
       } else {
         // Hard / Good / Easy
@@ -268,33 +230,7 @@ function adaptiveInterval(
   }
 
   // Calculate interval from stability
-  let newInterval = nextInterval(s);
-
-  // Beginner mode: keep intervals short while learning.
-  // Use BOTH an absolute cap and a relative cap (fraction of computed interval)
-  // so beginner mode always makes a visible difference.
-  if (beginnerMode) {
-    let absoluteCap: number;
-    let relativeCap: number; // fraction of computed interval
-    if (item.reviewCount < 2) {
-      absoluteCap = 1;
-      relativeCap = 0.5;
-    } else if (item.reviewCount < 4) {
-      absoluteCap = 2;
-      relativeCap = 0.6;
-    } else if (item.reviewCount < 6) {
-      absoluteCap = 3;
-      relativeCap = 0.7;
-    } else if (item.reviewCount < 8) {
-      absoluteCap = 5;
-      relativeCap = 0.8;
-    } else {
-      absoluteCap = 7;
-      relativeCap = 0.85;
-    }
-    // Apply the tighter of the two caps
-    newInterval = Math.min(newInterval, absoluteCap, Math.max(1, Math.round(newInterval * relativeCap)));
-  }
+  const newInterval = nextInterval(s);
 
   // Update easeFactor for backward compatibility / display
   let newEaseFactor = item.easeFactor;
@@ -307,65 +243,48 @@ function adaptiveInterval(
 /* ─── 2. Classic Algorithm (SM-2 style) ─── */
 /*
  * Uses ease factor (starts at 2.5, floor 1.3).
- * I(1) = 1, I(2) = 6, I(n) = I(n-1) * EF
+ * First success: 1 day; second: Easy 3 / Medium 2; later: elapsed-adjusted ease growth.
  * Beginner mode: forces daily review for first few reviews.
  */
 
 function classicInterval(
   item: MemorizationItem,
   rating: ReviewRating,
-  tz: string,
-  beginnerMode: boolean,
-): { interval: number; easeFactor: number; stability: number; difficulty: number } {
+  elapsedDays: number,
+): { interval: number; easeFactor: number; stability?: number; difficulty?: number } {
   // Update ease factor
   let newEaseFactor = item.easeFactor;
   if (rating === 'easy') newEaseFactor = Math.min(2.5, item.easeFactor + 0.1);
   else if (rating === 'hard') newEaseFactor = Math.max(1.3, item.easeFactor - 0.15);
 
-  // Beginner mode: constrain intervals while learning
-  if (beginnerMode && item.reviewCount < 3) {
-    return { interval: 1, easeFactor: newEaseFactor, stability: 1, difficulty: 5 };
-  }
-
   // SM-2 interval calculation
   let newInterval: number;
-  if (item.reviewCount === 0) {
+  if (rating === 'hard') {
+    newInterval = 1;
+  } else if (item.reviewCount === 0) {
     newInterval = 1;
   } else if (item.reviewCount === 1) {
-    newInterval = rating === 'easy' ? 3 : rating === 'medium' ? 2 : 1;
+    newInterval = rating === 'easy' ? 3 : 2;
   } else {
-    const ratingMultiplier = rating === 'easy' ? 1.3 : rating === 'medium' ? 1.0 : 0.5;
-    newInterval = Math.round(item.interval * newEaseFactor * ratingMultiplier);
-  }
-
-  // Beginner mode: also cap at fraction of computed interval for later reviews
-  if (beginnerMode) {
-    const cap = item.reviewCount < 6 ? 3 : item.reviewCount < 8 ? 5 : 7;
-    const fraction = item.reviewCount < 6 ? 0.6 : item.reviewCount < 8 ? 0.75 : 0.85;
-    newInterval = Math.min(newInterval, cap, Math.max(1, Math.round(newInterval * fraction)));
+    const ratingMultiplier = rating === 'easy' ? 1.3 : 1.0;
+    newInterval = Math.round(Math.min(item.interval, Math.max(1, elapsedDays)) * newEaseFactor * ratingMultiplier);
   }
 
   newInterval = Math.max(1, Math.min(newInterval, MAX_INTERVAL));
 
-  return { interval: newInterval, easeFactor: newEaseFactor, stability: newInterval, difficulty: 5 };
+  return { interval: newInterval, easeFactor: newEaseFactor, stability: undefined, difficulty: undefined };
 }
 
-/* ─── 3. Traditional Hifz Algorithm (7-3-2-1 + Sabak/Sabqi/Dhor) ─── */
+/* ─── 3. Traditional Hifz: app-specific fixed ladder ─── */
 
 const HIFZ_SCHEDULE = [1, 2, 4, 7, 14, 30, 60, 90, 180];
 
 function hifzInterval(
   item: MemorizationItem,
   rating: ReviewRating,
-  tz: string,
-  beginnerMode: boolean,
-): { interval: number; easeFactor: number; stability: number; difficulty: number } {
-  // Beginner mode: daily for first 3 reviews
-  if (beginnerMode && item.reviewCount < 3) {
-    return { interval: 1, easeFactor: item.easeFactor, stability: 1, difficulty: 5 };
-  }
-
-  const currentTier = Math.min(item.reviewCount, HIFZ_SCHEDULE.length - 1);
+  elapsedDays: number,
+): { interval: number; easeFactor: number; stability?: number; difficulty?: number } {
+  const currentTier = Math.max(0, HIFZ_SCHEDULE.findLastIndex(days => days <= item.interval));
 
   let nextTier: number;
   if (rating === 'easy') {
@@ -373,69 +292,86 @@ function hifzInterval(
   } else if (rating === 'medium') {
     nextTier = currentTier;
   } else {
-    nextTier = Math.max(0, currentTier - 1);
+    // Hard now means unaided recall failed. A 180→90 day retreat would be unsafe
+    // as a recovery schedule; restart the existing ladder at daily revision.
+    nextTier = 0;
   }
 
   let newInterval = HIFZ_SCHEDULE[nextTier];
 
-  // Beginner mode: cap at a lower tier than normal
-  if (beginnerMode) {
-    const maxTier = item.reviewCount < 6 ? 2 : item.reviewCount < 8 ? 4 : 5; // max 4/14/30 days
-    const cappedInterval = HIFZ_SCHEDULE[Math.min(nextTier, maxTier)];
-    newInterval = Math.min(newInterval, cappedInterval);
-  }
-
-  return { interval: newInterval, easeFactor: item.easeFactor, stability: newInterval, difficulty: 5 };
+  if (item.reviewCount === 0) newInterval = 1;
+  if (rating !== 'hard' && elapsedDays < item.interval && item.reviewCount > 0) newInterval = item.interval;
+  return { interval: newInterval, easeFactor: item.easeFactor, stability: undefined, difficulty: undefined };
 }
 
 /* ─── Main entry point ─── */
 
+export const SCHEDULERS = {
+  adaptive: { name: 'Adaptive', metrics: ['stability', 'difficulty'] as const, apply: adaptiveInterval },
+  classic: { name: 'Classic', metrics: ['easeFactor'] as const, apply: classicInterval },
+  hifz: { name: 'Traditional Hifz', metrics: [] as const, apply: hifzInterval },
+};
+
+const finite = (value: number | undefined, fallback: number, min: number, max: number) =>
+  Number.isFinite(value) ? Math.min(max, Math.max(min, value!)) : fallback;
+
+/** Safe, lazy normalization: no writes or rescheduling on load. */
+export function normalizeSchedulingItem(item: MemorizationItem): MemorizationItem {
+  const reviewCount = Math.floor(finite(item.reviewCount, 0, 0, 1_000_000));
+  return { ...item,
+    interval: Math.round(finite(item.interval, 1, 1, MAX_INTERVAL)),
+    easeFactor: finite(item.easeFactor, 2.5, 1.3, 2.5), reviewCount,
+    stability: item.stability == null ? undefined : finite(item.stability, 1, 0.01, 36500),
+    difficulty: item.difficulty == null ? undefined : finite(item.difficulty, 5, 1, 10),
+    beginnerStartedAtReview: Math.floor(finite(item.beginnerStartedAtReview, reviewCount, 0, reviewCount)),
+  };
+}
+
+/** Canonical scheduler. Supplying reviewDate and zone makes it deterministic and storage-free. */
 export function calculateReviewInterval(
-  item: MemorizationItem,
+  input: MemorizationItem,
   rating: ReviewRating,
   settings: ReviewSettings,
   userTimeZone?: string,
+  reviewDate?: string,
 ): MemorizationItem {
   const tz = userTimeZone || getUserTimeZone();
-  const today = getTodayInUserTimeZone(tz);
-
-  // Per-item beginner mode (auto-disabled after enough successful reviews)
-  const effectiveBeginner = isItemBeginner(item);
-
-  let result: { interval: number; easeFactor: number; stability: number; difficulty: number };
-
-  switch (settings.algorithm) {
-    case 'classic':
-      result = classicInterval(item, rating, tz, effectiveBeginner);
-      break;
-    case 'hifz':
-      result = hifzInterval(item, rating, tz, effectiveBeginner);
-      break;
-    case 'adaptive':
-    default:
-      result = adaptiveInterval(item, rating, tz, effectiveBeginner);
-      break;
+  const today = reviewDay(reviewDate ?? getTodayInUserTimeZone(tz), tz);
+  if (!['easy', 'medium', 'hard'].includes(rating)) throw new RangeError('Invalid review rating');
+  const item = normalizeSchedulingItem(input);
+  if (reviewDate && item.lastReviewed && DateTime.fromISO(item.lastReviewed, { zone: tz }).isValid && reviewDay(item.lastReviewed, tz) > today) {
+    throw new RangeError('Review date precedes last review');
   }
-
-  const nextReviewDate = addDaysInUserTimeZone(today, result.interval, tz);
-
-  // Auto-clear the isBeginner flag once the student has built confidence
-  const shouldStillBeBeginner = item.isBeginner && !shouldDisableBeginnerMode(item);
-
+  const hasLastReview = !!item.lastReviewed && DateTime.fromISO(item.lastReviewed, { zone: tz }).isValid;
+  // Legacy records with a count but no valid date are treated as due, not same-day practice.
+  const elapsed = hasLastReview ? elapsedReviewDays(item.lastReviewed, today, tz) : item.interval;
+  const beginner = !!item.isBeginner;
+  const algorithm = Object.hasOwn(SCHEDULERS, settings.algorithm) ? settings.algorithm : 'adaptive';
+  const result = SCHEDULERS[algorithm].apply(item, rating, elapsed);
+  let interval = Math.round(finite(result.interval, 1, 1, MAX_INTERVAL));
+  // Daily recitation policy: repeated clicks/practice on one date are not independent
+  // long-term recall evidence. Keep memory/schedule on success; still process failures.
+  const sameDaySuccess = hasLastReview && item.reviewCount > 0 && elapsed === 0 && rating !== 'hard';
+  if (sameDaySuccess) {
+    interval = item.interval;
+    result.easeFactor = item.easeFactor;
+    result.stability = algorithm === 'adaptive' ? item.stability : undefined;
+    result.difficulty = algorithm === 'adaptive' ? item.difficulty : undefined;
+  }
+  let startedAt = item.beginnerStartedAtReview ?? item.reviewCount;
+  if (beginner && (rating === 'hard' || sameDaySuccess)) startedAt = rating === 'hard' ? item.reviewCount + 1 : startedAt + 1;
+  const successes = item.reviewCount + 1 - startedAt;
+  const stillBeginner = beginner && successes < 5;
+  if (beginner) interval = Math.min(interval, [1, 1, 2, 3, 5][Math.min(4, Math.max(0, successes - 1))]);
   return {
-    ...item,
-    interval: result.interval,
-    nextReview: nextReviewDate,
-    easeFactor: result.easeFactor,
-    reviewCount: item.reviewCount + 1,
-    lastReviewed: today,
-    completedToday: today,
-    isBeginner: shouldStillBeBeginner,
-    // Clear the started-at tracker when beginner mode ends
-    beginnerStartedAtReview: shouldStillBeBeginner ? item.beginnerStartedAtReview : undefined,
-    // Store FSRS memory state for the adaptive algorithm
-    stability: result.stability,
-    difficulty: result.difficulty,
+    ...item, ...result, interval,
+    nextReview: sameDaySuccess && interval === item.interval && DateTime.fromISO(item.nextReview, { zone: tz }).isValid && reviewDay(item.nextReview, tz) > today
+      ? reviewDay(item.nextReview, tz) : addDaysInUserTimeZone(today, interval, tz),
+    stability: result.stability == null ? undefined : finite(result.stability, 1, 0.01, 36500),
+    difficulty: result.difficulty == null ? undefined : finite(result.difficulty, 5, 1, 10),
+    reviewCount: item.reviewCount + 1, lastReviewed: today, completedToday: today,
+    isBeginner: stillBeginner, beginnerStartedAtReview: stillBeginner ? startedAt : undefined,
+    individualRatings: undefined,
   };
 }
 
@@ -458,6 +394,7 @@ export function previewIntervals(
 /* ─── Settings storage (localStorage) ─── */
 
 const SETTINGS_KEY = 'mquran_review_settings';
+export const REVIEW_SETTINGS_EVENT = 'mquran:review-settings-changed';
 
 export function getReviewSettings(): ReviewSettings {
   if (typeof window === 'undefined') return DEFAULT_SETTINGS;
@@ -466,7 +403,7 @@ export function getReviewSettings(): ReviewSettings {
     if (!raw) return DEFAULT_SETTINGS;
     const parsed = JSON.parse(raw);
     return {
-      algorithm: parsed.algorithm || DEFAULT_SETTINGS.algorithm,
+      algorithm: parsed && Object.hasOwn(SCHEDULERS, parsed.algorithm) ? parsed.algorithm : DEFAULT_SETTINGS.algorithm,
     };
   } catch {
     return DEFAULT_SETTINGS;
@@ -477,6 +414,7 @@ export function saveReviewSettings(settings: ReviewSettings): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
+    window.dispatchEvent(new Event(REVIEW_SETTINGS_EVENT));
   } catch (e) {
     console.error('Failed to save review settings:', e);
   }

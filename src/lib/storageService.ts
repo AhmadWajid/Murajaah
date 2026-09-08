@@ -12,6 +12,7 @@
  */
 
 import { MemorizationItem } from './spacedRepetition';
+import { REVIEW_SETTINGS_EVENT } from './reviewAlgorithms';
 import * as localStorageService from './storage';
 
 export interface MistakeData {
@@ -231,7 +232,10 @@ export async function syncSettingsFromDb(): Promise<boolean> {
     if (s.hideWords !== undefined) localStorage.setItem('hideWords', s.hideWords ? 'true' : 'false');
     if (s.hideWordsDelay !== undefined) localStorage.setItem('hideWordsDelay', String(s.hideWordsDelay));
     // Review settings
-    if (s.reviewSettings) localStorage.setItem('mquran_review_settings', JSON.stringify(s.reviewSettings));
+    if (s.reviewSettings) {
+      localStorage.setItem('mquran_review_settings', JSON.stringify(s.reviewSettings));
+      window.dispatchEvent(new Event(REVIEW_SETTINGS_EVENT));
+    }
     // Reading layout
     if (s.readingLayout) localStorage.setItem('quran-reading-layout', s.readingLayout);
 
@@ -755,6 +759,7 @@ export async function saveReviewSettings(settings: any): Promise<void> {
   // Always save to localStorage (the reviewAlgorithms module reads from there)
   if (typeof window !== 'undefined') {
     localStorage.setItem('mquran_review_settings', JSON.stringify(settings));
+    window.dispatchEvent(new Event(REVIEW_SETTINGS_EVENT));
   }
   // Sync to DB
   if (await isAuthenticated()) {

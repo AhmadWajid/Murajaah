@@ -1,0 +1,196 @@
+{
+  "dates": [
+    "2026-01-01",
+    "2026-01-09",
+    "2026-01-31",
+    "2026-03-02",
+    "2026-03-03"
+  ],
+  "ratings": [
+    "easy",
+    "easy",
+    "medium",
+    "hard",
+    "easy"
+  ],
+  "algorithms": {
+    "adaptive": {
+      "before": [
+        {
+          "interval": 8,
+          "nextReview": "2026-01-09",
+          "stability": 8.2956,
+          "difficulty": 1
+        },
+        {
+          "interval": 66,
+          "nextReview": "2026-03-16",
+          "stability": 65.62422616189995,
+          "difficulty": 1
+        },
+        {
+          "interval": 139,
+          "nextReview": "2026-06-19",
+          "stability": 139.40582714873855,
+          "difficulty": 1
+        },
+        {
+          "interval": 196,
+          "nextReview": "2026-09-14",
+          "stability": 195.5008736185126,
+          "difficulty": 4.016380600000001
+        },
+        {
+          "interval": 200,
+          "nextReview": "2026-09-19",
+          "stability": 199.73956818572256,
+          "difficulty": 2.007933833184041
+        }
+      ],
+      "after": [
+        {
+          "interval": 8,
+          "nextReview": "2026-01-09",
+          "stability": 8.2956,
+          "difficulty": 1
+        },
+        {
+          "interval": 66,
+          "nextReview": "2026-03-16",
+          "stability": 65.62422616189995,
+          "difficulty": 1
+        },
+        {
+          "interval": 139,
+          "nextReview": "2026-06-19",
+          "stability": 139.40582714873855,
+          "difficulty": 1
+        },
+        {
+          "interval": 4,
+          "nextReview": "2026-03-06",
+          "stability": 4.153908286917403,
+          "difficulty": 7.0269895692968385
+        },
+        {
+          "interval": 8,
+          "nextReview": "2026-03-11",
+          "stability": 8.262876224331366,
+          "difficulty": 6.018776394938751
+        }
+      ]
+    },
+    "classic": {
+      "before": [
+        {
+          "interval": 1,
+          "nextReview": "2026-01-02",
+          "stability": 1,
+          "difficulty": 5
+        },
+        {
+          "interval": 3,
+          "nextReview": "2026-01-12",
+          "stability": 3,
+          "difficulty": 5
+        },
+        {
+          "interval": 8,
+          "nextReview": "2026-02-08",
+          "stability": 8,
+          "difficulty": 5
+        },
+        {
+          "interval": 9,
+          "nextReview": "2026-03-11",
+          "stability": 9,
+          "difficulty": 5
+        },
+        {
+          "interval": 29,
+          "nextReview": "2026-04-01",
+          "stability": 29,
+          "difficulty": 5
+        }
+      ],
+      "after": [
+        {
+          "interval": 1,
+          "nextReview": "2026-01-02"
+        },
+        {
+          "interval": 3,
+          "nextReview": "2026-01-12"
+        },
+        {
+          "interval": 8,
+          "nextReview": "2026-02-08"
+        },
+        {
+          "interval": 1,
+          "nextReview": "2026-03-03"
+        },
+        {
+          "interval": 3,
+          "nextReview": "2026-03-06"
+        }
+      ]
+    },
+    "hifz": {
+      "before": [
+        {
+          "interval": 2,
+          "nextReview": "2026-01-03",
+          "stability": 2,
+          "difficulty": 5
+        },
+        {
+          "interval": 4,
+          "nextReview": "2026-01-13",
+          "stability": 4,
+          "difficulty": 5
+        },
+        {
+          "interval": 4,
+          "nextReview": "2026-02-04",
+          "stability": 4,
+          "difficulty": 5
+        },
+        {
+          "interval": 4,
+          "nextReview": "2026-03-06",
+          "stability": 4,
+          "difficulty": 5
+        },
+        {
+          "interval": 30,
+          "nextReview": "2026-04-02",
+          "stability": 30,
+          "difficulty": 5
+        }
+      ],
+      "after": [
+        {
+          "interval": 1,
+          "nextReview": "2026-01-02"
+        },
+        {
+          "interval": 2,
+          "nextReview": "2026-01-11"
+        },
+        {
+          "interval": 2,
+          "nextReview": "2026-02-02"
+        },
+        {
+          "interval": 1,
+          "nextReview": "2026-03-03"
+        },
+        {
+          "interval": 2,
+          "nextReview": "2026-03-05"
+        }
+      ]
+    }
+  }
+}

@@ -7,7 +7,7 @@ import { getAllMemorizationItems, updateMemorizationItem, removeMemorizationItem
 import { MistakeData } from '@/lib/storageService';
 import { generateMemorizationId, getTodayISODate } from '@/lib/utils';
 import { MemorizationItem, updateInterval, updateIntervalWithSettings, resetDailyCompletions, getDueItems, getUpcomingReviews, createMemorizationItem } from '@/lib/spacedRepetition';
-import { ReviewSettings, getReviewSettings, saveReviewSettings, previewIntervals, ALGORITHM_INFO, AlgorithmType, DEFAULT_SETTINGS } from '@/lib/reviewAlgorithms';
+import { ReviewSettings, getReviewSettings, saveReviewSettings, previewIntervals, ALGORITHM_INFO, AlgorithmType, DEFAULT_SETTINGS, REVIEW_SETTINGS_EVENT } from '@/lib/reviewAlgorithms';
 import { formatAyahRange, formatAyahRangeArabic, getSurahName, getSurahNameArabic } from '@/lib/quran';
 import { getSurahList, SurahListItem } from '@/lib/quranService';
 import { Card, CardContent } from '@/components/ui/card';
@@ -209,8 +209,8 @@ function QuickReviewModal({
 
   const ratingOptions: { rating: 'easy' | 'medium' | 'hard'; label: string; desc: string; color: string; bg: string; border: string }[] = [
     { rating: 'easy', label: 'Easy', desc: 'Remembered it perfectly', color: 'text-success', bg: 'bg-success/15', border: 'hover:border-success/30 hover:bg-success/[0.04]' },
-    { rating: 'medium', label: 'Medium', desc: 'Mostly remembered it', color: 'text-accent', bg: 'bg-accent/15', border: 'hover:border-accent/30 hover:bg-accent/[0.04]' },
-    { rating: 'hard', label: 'Hard', desc: 'Struggled to remember', color: 'text-warning', bg: 'bg-warning/15', border: 'hover:border-warning/30 hover:bg-warning/[0.04]' },
+    { rating: 'medium', label: 'Medium', desc: 'Recalled unaided with effort', color: 'text-accent', bg: 'bg-accent/15', border: 'hover:border-accent/30 hover:bg-accent/[0.04]' },
+    { rating: 'hard', label: 'Hard', desc: 'Needed help or forgot', color: 'text-warning', bg: 'bg-warning/15', border: 'hover:border-warning/30 hover:bg-warning/[0.04]' },
   ];
 
   return (
@@ -591,9 +591,22 @@ export default function Dashboard() {
   const [reviewSettings, setReviewSettings] = useState<ReviewSettings>(DEFAULT_SETTINGS);
   const [bookmarks, setBookmarks] = useState<BookmarkType[]>([]);
 
-  // Load review settings on mount
+  const [todayISO, setTodayISO] = useState(() => getTodayISODate());
+
+  // Reconcile asynchronously synced preferences and calendar rollover.
   useEffect(() => {
-    setReviewSettings(getReviewSettings());
+    const refresh = () => { setReviewSettings(getReviewSettings()); setTodayISO(getTodayISODate()); };
+    refresh();
+    window.addEventListener(REVIEW_SETTINGS_EVENT, refresh);
+    window.addEventListener('storage', refresh);
+    window.addEventListener('focus', refresh);
+    const timer = window.setInterval(() => setTodayISO(getTodayISODate()), 60_000);
+    return () => {
+      window.removeEventListener(REVIEW_SETTINGS_EVENT, refresh);
+      window.removeEventListener('storage', refresh);
+      window.removeEventListener('focus', refresh);
+      window.clearInterval(timer);
+    };
   }, []);
 
   // Load bookmarks on mount
@@ -645,7 +658,7 @@ export default function Dashboard() {
         setIsLoading(false);
       }
     }
-  }, []);
+  }, [todayISO]);
 
   // Load data on mount
   useEffect(() => {
@@ -923,7 +936,6 @@ export default function Dashboard() {
   }, [items]);
 
   // Helper to determine if a date is today
-  const todayISO = useMemo(() => getTodayISODate(), []);
   const isDateToday = useCallback((date: string) => date === todayISO, [todayISO]);
 
   // Helper to determine if a date is overdue
@@ -1296,7 +1308,7 @@ export default function Dashboard() {
             item={reviewingItem}
             onClose={() => setReviewingItem(null)}
             onSubmit={async (rating) => {
-              const updated = updateIntervalWithSettings(reviewingItem, rating, reviewSettings);
+              const updated = updateInterval(reviewingItem, rating);
               setReviewingItem(null);
               await updateMemorizationItem(updated);
               await loadAllData(false);
@@ -1497,6 +1509,8 @@ function ReviewSettingsModal({
             </div>
           </div>
 
+          <a href="/review-simulator" className="block text-sm text-accent underline">Open revision simulator</a>
+          <p className="text-xs text-muted-foreground">Easy: fluent unaided recall. Medium: recalled unaided with effort. Hard: needed help or forgot.</p>
           {/* Per-passage beginner mode info */}
           <div className="pt-4 border-t border-border">
             <div className="flex items-start gap-3">
@@ -1506,7 +1520,7 @@ function ReviewSettingsModal({
               <div>
                 <p className="text-sm font-semibold text-foreground">"Still learning" mode</p>
                 <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
-                  You can mark individual passages as "still learning" when you add or edit them. This keeps reviews frequent (daily or every 2 days) until you've reviewed it confidently several times — then it automatically switches to normal scheduling. Use this for passages you just memorized or ones you keep struggling with.
+                  You can mark individual passages as "still learning" when you add or edit them. This caps intervals at 1, 1, 2, 3, then 5 days across five successful reviews on separate days. Hard restarts progress; same-day repetition does not advance graduation. Use this for passages you just memorized or ones you keep struggling with.
                 </p>
               </div>
             </div>

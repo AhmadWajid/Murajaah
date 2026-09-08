@@ -17,13 +17,7 @@ export function formatToISODate(date: Date): string {
  * Gets today's date in ISO format
  */
 export function getTodayISODate(): string {
-  // Get the current date in the user's local timezone
-  const now = new Date();
-  
-  // Use toLocaleDateString to get the date in local timezone, then parse it
-  const localDateString = now.toLocaleDateString('en-CA'); // en-CA format is YYYY-MM-DD
-  
-  return localDateString;
+  return getTodayInUserTimeZone();
 }
 
 /**
@@ -134,12 +128,11 @@ export function getMemorizationItemColor(itemId: string): {
 }
 
 export function getUserTimeZone(): string {
-  // Try localStorage first (user override), then auto-detect
-  return (
-    (typeof window !== 'undefined' && localStorage.getItem('userTimeZone')) ||
-    (typeof Intl !== 'undefined' && Intl.DateTimeFormat().resolvedOptions().timeZone) ||
-    'UTC'
-  );
+  let stored: string | null = null;
+  try { if (typeof window !== 'undefined') stored = localStorage.getItem('userTimeZone'); } catch { /* Storage can be unavailable in private contexts. */ }
+  const detected = typeof Intl !== 'undefined' ? Intl.DateTimeFormat().resolvedOptions().timeZone : 'UTC';
+  const zone = stored || detected || 'UTC';
+  return DateTime.now().setZone(zone).isValid ? zone : 'UTC';
 }
 
 export function getTodayInUserTimeZone(timeZone?: string): string {
@@ -157,5 +150,5 @@ export function addDaysInUserTimeZone(isoDate: string, days: number, timeZone?: 
 
 export function toUserTimeZoneDate(isoDate: string, timeZone?: string): string {
   const zone = timeZone || getUserTimeZone();
-  return DateTime.fromISO(isoDate, { zone: 'utc' }).setZone(zone).toISODate() || "";
+  return DateTime.fromISO(isoDate, { zone }).toISODate() || "";
 }

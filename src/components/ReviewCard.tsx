@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { MemorizationItem, ReviewRating, RecallQuality } from '@/lib/spacedRepetition';
+import { MemorizationItem, ReviewRating, RecallQuality, updateInterval } from '@/lib/spacedRepetition';
 import { formatAyahRange, formatAyahRangeArabic } from '@/lib/quran';
 import { getAyahRange, getAyahAudioUrl } from '@/lib/quranService';
 import { updateMemorizationItem, updateMemorizationItemWithIndividualRating, getMemorizationItem } from '@/lib/storageService';
@@ -301,22 +301,9 @@ export default function ReviewCard({ item, onComplete, onViewInQuran }: ReviewCa
 
   const handleRating = async (rating: ReviewRating) => {
     try {
-      // For overall rating, we need to rate all ayahs in the range with the same rating
-      // This simulates rating the entire passage as one unit
-      const ayahNumbers = ayahData.map(ayah => ayah.numberInSurah);
-      
-      // Rate each ayah individually with the same rating
-      for (const ayahNumber of ayahNumbers) {
-        await updateMemorizationItemWithIndividualRating(memorizationItem.id, ayahNumber, rating);
-      }
-      
-      // Get the updated item after all ratings are applied
-      const updatedItem = await getMemorizationItem(memorizationItem.id);
-      if (updatedItem) {
-        onComplete(updatedItem);
-      } else {
-        console.error('Failed to get updated item after rating');
-      }
+      const updatedItem = updateInterval(memorizationItem, rating);
+      await updateMemorizationItem(updatedItem);
+      onComplete(updatedItem);
     } catch (error) {
       console.error('Error handling rating:', error);
     }
@@ -420,7 +407,7 @@ export default function ReviewCard({ item, onComplete, onViewInQuran }: ReviewCa
                 }}
                 className="w-full px-3 py-2 text-left text-xs sm:text-sm text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
               >
-                Hard
+                Hard (help / forgot)
               </button>
               
               {/* Recall Quality Section */}
@@ -634,7 +621,7 @@ export default function ReviewCard({ item, onComplete, onViewInQuran }: ReviewCa
               onClick={() => handleRating('hard')}
               className="flex-1 py-3 sm:py-4 px-4 sm:px-6 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 rounded-xl border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors font-medium text-sm sm:text-base"
             >
-              Hard
+              Hard (help / forgot)
             </button>
             <button
               onClick={() => handleRating('medium')}

@@ -1,8 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Geist_Mono } from "next/font/google";
 import "./globals.css";
-import { AuthProvider } from "@/components/AuthProvider";
-import { DataMigration } from "@/components/DataMigration";
+import { AppDataBoundary } from "@/components/AppDataBoundary";
 
 const inter = Inter({
   variable: "--font-geist-sans",
@@ -91,10 +90,7 @@ export default function RootLayout({
         className={`${inter.variable} ${geistMono.variable} antialiased`}
         suppressHydrationWarning
       >
-        <AuthProvider>
-          {children}
-          <DataMigration />
-        </AuthProvider>
+        <AppDataBoundary>{children}</AppDataBoundary>
       </body>
     </html>
   );
