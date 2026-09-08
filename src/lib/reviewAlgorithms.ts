@@ -323,8 +323,23 @@ export function normalizeSchedulingItem(item: MemorizationItem): MemorizationIte
     easeFactor: finite(item.easeFactor, 2.5, 1.3, 2.5), reviewCount,
     stability: item.stability == null ? undefined : finite(item.stability, 1, 0.01, 36500),
     difficulty: item.difficulty == null ? undefined : finite(item.difficulty, 5, 1, 10),
-    beginnerStartedAtReview: Math.floor(finite(item.beginnerStartedAtReview, reviewCount, 0, reviewCount)),
+    beginnerStartedAtReview: Number.isInteger(item.beginnerStartedAtReview) && item.beginnerStartedAtReview! >= 0 && item.beginnerStartedAtReview! <= reviewCount
+      ? item.beginnerStartedAtReview : item.isBeginner ? reviewCount : undefined,
   };
+}
+
+/** Existing progress offset also tracks the temporary Adaptive graduation bridge.
+ * Missing offsets on legacy mature passages deliberately do not opt them into it.
+ */
+export function adaptiveTransitionProgress(item: MemorizationItem): number | undefined {
+  const offset = item.beginnerStartedAtReview;
+  return !item.isBeginner && Number.isInteger(offset) && offset! >= 0 && item.reviewCount - offset! >= 5
+    ? item.reviewCount - offset! - 5 : undefined;
+}
+
+export function schedulingPhase(item: MemorizationItem, algorithm: AlgorithmType): string {
+  return item.isBeginner ? 'Beginner' : algorithm === 'adaptive' && adaptiveTransitionProgress(item) !== undefined
+    ? 'Transition' : algorithm === 'adaptive' ? 'Adaptive' : 'Normal';
 }
 
 /** Canonical scheduler. Supplying reviewDate and zone makes it deterministic and storage-free. */
@@ -361,16 +376,38 @@ export function calculateReviewInterval(
   let startedAt = item.beginnerStartedAtReview ?? item.reviewCount;
   if (beginner && (rating === 'hard' || sameDaySuccess)) startedAt = rating === 'hard' ? item.reviewCount + 1 : startedAt + 1;
   const successes = item.reviewCount + 1 - startedAt;
-  const stillBeginner = beginner && successes < 5;
+  let stillBeginner = beginner && successes < 5;
   if (beginner) interval = Math.min(interval, [1, 1, 2, 3, 5][Math.min(4, Math.max(0, successes - 1))]);
+  let keepOffset = stillBeginner || (beginner && algorithm === 'adaptive');
+  const progress = algorithm === 'adaptive' ? adaptiveTransitionProgress(item) : undefined;
+  // A temporary scheduling policy, NOT an FSRS memory equation. Grow the limit
+  // only after successful due reviews; release when the memory model fits it.
+  // Easy starts at 2x, Medium at 1.5x; each due success relaxes it by 0.5x.
+  // This avoids both an abrupt fixed-step exit and a permanent mature-card cap.
+  const earlyTransitionSuccess = progress !== undefined && rating !== 'hard' && elapsed < item.interval;
+  if (progress !== undefined) {
+    keepOffset = true;
+    if (rating === 'hard') {
+      interval = 1;
+      stillBeginner = true;
+      startedAt = item.reviewCount + 1;
+    } else if (sameDaySuccess || earlyTransitionSuccess) {
+      startedAt += 1; // Extra practice must not advance the transition.
+      interval = Math.min(interval, item.interval);
+    } else {
+      const ceiling = Math.max(1, Math.round(item.interval * ((rating === 'easy' ? 2 : 1.5) + progress * 0.5)));
+      keepOffset = interval > ceiling;
+      interval = Math.min(interval, ceiling);
+    }
+  }
   return {
     ...item, ...result, interval,
-    nextReview: sameDaySuccess && interval === item.interval && DateTime.fromISO(item.nextReview, { zone: tz }).isValid && reviewDay(item.nextReview, tz) > today
+    nextReview: (sameDaySuccess || earlyTransitionSuccess) && interval === item.interval && DateTime.fromISO(item.nextReview, { zone: tz }).isValid && reviewDay(item.nextReview, tz) > today
       ? reviewDay(item.nextReview, tz) : addDaysInUserTimeZone(today, interval, tz),
     stability: result.stability == null ? undefined : finite(result.stability, 1, 0.01, 36500),
     difficulty: result.difficulty == null ? undefined : finite(result.difficulty, 5, 1, 10),
     reviewCount: item.reviewCount + 1, lastReviewed: today, completedToday: today,
-    isBeginner: stillBeginner, beginnerStartedAtReview: stillBeginner ? startedAt : undefined,
+    isBeginner: stillBeginner, beginnerStartedAtReview: keepOffset ? startedAt : undefined,
     individualRatings: undefined,
   };
 }

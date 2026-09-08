@@ -1,0 +1,1744 @@
+{
+  "start": "2026-01-01",
+  "zone": "America/Los_Angeles",
+  "notes": "Day 0 is memorization/addition; app creates an immediately due item. Counts use [0,horizon). Prefix followed by declared continuation in script.",
+  "scenarios": [
+    {
+      "name": "strong",
+      "firstDay": 0,
+      "rows": [
+        {
+          "review": 1,
+          "day": 0,
+          "rating": "easy",
+          "interval": 1,
+          "dueDay": 1,
+          "beginner": true,
+          "stability": 8.296,
+          "difficulty": 1
+        },
+        {
+          "review": 2,
+          "day": 1,
+          "rating": "easy",
+          "interval": 1,
+          "dueDay": 2,
+          "beginner": true,
+          "stability": 18.015,
+          "difficulty": 1
+        },
+        {
+          "review": 3,
+          "day": 2,
+          "rating": "easy",
+          "interval": 2,
+          "dueDay": 4,
+          "beginner": true,
+          "stability": 26.823,
+          "difficulty": 1
+        },
+        {
+          "review": 4,
+          "day": 4,
+          "rating": "easy",
+          "interval": 3,
+          "dueDay": 7,
+          "beginner": true,
+          "stability": 43.158,
+          "difficulty": 1
+        },
+        {
+          "review": 5,
+          "day": 7,
+          "rating": "easy",
+          "interval": 5,
+          "dueDay": 12,
+          "beginner": false,
+          "stability": 65.848,
+          "difficulty": 1
+        },
+        {
+          "review": 6,
+          "day": 12,
+          "rating": "easy",
+          "interval": 101,
+          "dueDay": 113,
+          "beginner": false,
+          "stability": 100.988,
+          "difficulty": 1
+        },
+        {
+          "review": 7,
+          "day": 113,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 478,
+          "beginner": false,
+          "stability": 573.387,
+          "difficulty": 1
+        },
+        {
+          "review": 8,
+          "day": 478,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 843,
+          "beginner": false,
+          "stability": 2004.066,
+          "difficulty": 1
+        },
+        {
+          "review": 9,
+          "day": 843,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 1208,
+          "beginner": false,
+          "stability": 3387.159,
+          "difficulty": 1
+        },
+        {
+          "review": 10,
+          "day": 1208,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 1573,
+          "beginner": false,
+          "stability": 4697.882,
+          "difficulty": 1
+        },
+        {
+          "review": 11,
+          "day": 1573,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 1938,
+          "beginner": false,
+          "stability": 5956.765,
+          "difficulty": 1
+        },
+        {
+          "review": 12,
+          "day": 1938,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 2303,
+          "beginner": false,
+          "stability": 7176.378,
+          "difficulty": 1
+        },
+        {
+          "review": 13,
+          "day": 2303,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 2668,
+          "beginner": false,
+          "stability": 8364.695,
+          "difficulty": 1
+        },
+        {
+          "review": 14,
+          "day": 2668,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 3033,
+          "beginner": false,
+          "stability": 9527.145,
+          "difficulty": 1
+        },
+        {
+          "review": 15,
+          "day": 3033,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 3398,
+          "beginner": false,
+          "stability": 10667.633,
+          "difficulty": 1
+        },
+        {
+          "review": 16,
+          "day": 3398,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 3763,
+          "beginner": false,
+          "stability": 11789.092,
+          "difficulty": 1
+        },
+        {
+          "review": 17,
+          "day": 3763,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 4128,
+          "beginner": false,
+          "stability": 12893.8,
+          "difficulty": 1
+        },
+        {
+          "review": 18,
+          "day": 4128,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 4493,
+          "beginner": false,
+          "stability": 13983.572,
+          "difficulty": 1
+        }
+      ],
+      "burden": {
+        "14": 6,
+        "30": 6,
+        "90": 6,
+        "180": 7,
+        "365": 7
+      }
+    },
+    {
+      "name": "normal",
+      "firstDay": 0,
+      "rows": [
+        {
+          "review": 1,
+          "day": 0,
+          "rating": "medium",
+          "interval": 1,
+          "dueDay": 1,
+          "beginner": true,
+          "stability": 2.307,
+          "difficulty": 2.118
+        },
+        {
+          "review": 2,
+          "day": 1,
+          "rating": "medium",
+          "interval": 1,
+          "dueDay": 2,
+          "beginner": true,
+          "stability": 7.315,
+          "difficulty": 2.111
+        },
+        {
+          "review": 3,
+          "day": 2,
+          "rating": "easy",
+          "interval": 2,
+          "dueDay": 4,
+          "beginner": true,
+          "stability": 16.072,
+          "difficulty": 1
+        },
+        {
+          "review": 4,
+          "day": 4,
+          "rating": "medium",
+          "interval": 3,
+          "dueDay": 7,
+          "beginner": true,
+          "stability": 25.352,
+          "difficulty": 1
+        },
+        {
+          "review": 5,
+          "day": 7,
+          "rating": "easy",
+          "interval": 5,
+          "dueDay": 12,
+          "beginner": false,
+          "stability": 49.583,
+          "difficulty": 1
+        },
+        {
+          "review": 6,
+          "day": 12,
+          "rating": "easy",
+          "interval": 86,
+          "dueDay": 98,
+          "beginner": false,
+          "stability": 85.993,
+          "difficulty": 1
+        },
+        {
+          "review": 7,
+          "day": 98,
+          "rating": "medium",
+          "interval": 307,
+          "dueDay": 405,
+          "beginner": false,
+          "stability": 306.593,
+          "difficulty": 1
+        },
+        {
+          "review": 8,
+          "day": 405,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 770,
+          "beginner": false,
+          "stability": 1499.553,
+          "difficulty": 1
+        },
+        {
+          "review": 9,
+          "day": 770,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 1135,
+          "beginner": false,
+          "stability": 2254.332,
+          "difficulty": 1
+        },
+        {
+          "review": 10,
+          "day": 1135,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 1500,
+          "beginner": false,
+          "stability": 3622.814,
+          "difficulty": 1
+        },
+        {
+          "review": 11,
+          "day": 1500,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 1865,
+          "beginner": false,
+          "stability": 4317.117,
+          "difficulty": 1
+        },
+        {
+          "review": 12,
+          "day": 1865,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 2230,
+          "beginner": false,
+          "stability": 5589.708,
+          "difficulty": 1
+        },
+        {
+          "review": 13,
+          "day": 2230,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 2595,
+          "beginner": false,
+          "stability": 6246.562,
+          "difficulty": 1
+        },
+        {
+          "review": 14,
+          "day": 2595,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 2960,
+          "beginner": false,
+          "stability": 7458.22,
+          "difficulty": 1
+        },
+        {
+          "review": 15,
+          "day": 2960,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 3325,
+          "beginner": false,
+          "stability": 8089.23,
+          "difficulty": 1
+        },
+        {
+          "review": 16,
+          "day": 3325,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 3690,
+          "beginner": false,
+          "stability": 9257.336,
+          "difficulty": 1
+        },
+        {
+          "review": 17,
+          "day": 3690,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 4055,
+          "beginner": false,
+          "stability": 9868.865,
+          "difficulty": 1
+        },
+        {
+          "review": 18,
+          "day": 4055,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 4420,
+          "beginner": false,
+          "stability": 11003.415,
+          "difficulty": 1
+        }
+      ],
+      "burden": {
+        "14": 6,
+        "30": 6,
+        "90": 6,
+        "180": 7,
+        "365": 7
+      }
+    },
+    {
+      "name": "shaky",
+      "firstDay": 0,
+      "rows": [
+        {
+          "review": 1,
+          "day": 0,
+          "rating": "easy",
+          "interval": 1,
+          "dueDay": 1,
+          "beginner": true,
+          "stability": 8.296,
+          "difficulty": 1
+        },
+        {
+          "review": 2,
+          "day": 1,
+          "rating": "easy",
+          "interval": 1,
+          "dueDay": 2,
+          "beginner": true,
+          "stability": 18.015,
+          "difficulty": 1
+        },
+        {
+          "review": 3,
+          "day": 2,
+          "rating": "medium",
+          "interval": 2,
+          "dueDay": 4,
+          "beginner": true,
+          "stability": 22.718,
+          "difficulty": 1
+        },
+        {
+          "review": 4,
+          "day": 4,
+          "rating": "medium",
+          "interval": 3,
+          "dueDay": 7,
+          "beginner": true,
+          "stability": 31.627,
+          "difficulty": 1
+        },
+        {
+          "review": 5,
+          "day": 7,
+          "rating": "easy",
+          "interval": 5,
+          "dueDay": 12,
+          "beginner": false,
+          "stability": 55.238,
+          "difficulty": 1
+        },
+        {
+          "review": 6,
+          "day": 12,
+          "rating": "easy",
+          "interval": 91,
+          "dueDay": 103,
+          "beginner": false,
+          "stability": 91.173,
+          "difficulty": 1
+        },
+        {
+          "review": 7,
+          "day": 103,
+          "rating": "medium",
+          "interval": 322,
+          "dueDay": 425,
+          "beginner": false,
+          "stability": 322.465,
+          "difficulty": 1
+        },
+        {
+          "review": 8,
+          "day": 425,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 790,
+          "beginner": false,
+          "stability": 1564.217,
+          "difficulty": 1
+        },
+        {
+          "review": 9,
+          "day": 790,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 1155,
+          "beginner": false,
+          "stability": 2316.916,
+          "difficulty": 1
+        },
+        {
+          "review": 10,
+          "day": 1155,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 1520,
+          "beginner": false,
+          "stability": 3681.841,
+          "difficulty": 1
+        },
+        {
+          "review": 11,
+          "day": 1520,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 1885,
+          "beginner": false,
+          "stability": 4374.801,
+          "difficulty": 1
+        },
+        {
+          "review": 12,
+          "day": 1885,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 2250,
+          "beginner": false,
+          "stability": 5645.252,
+          "difficulty": 1
+        },
+        {
+          "review": 13,
+          "day": 2250,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 2615,
+          "beginner": false,
+          "stability": 6301.227,
+          "difficulty": 1
+        },
+        {
+          "review": 14,
+          "day": 2615,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 2980,
+          "beginner": false,
+          "stability": 7511.424,
+          "difficulty": 1
+        },
+        {
+          "review": 15,
+          "day": 2980,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 3345,
+          "beginner": false,
+          "stability": 8141.793,
+          "difficulty": 1
+        },
+        {
+          "review": 16,
+          "day": 3345,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 3710,
+          "beginner": false,
+          "stability": 9308.805,
+          "difficulty": 1
+        },
+        {
+          "review": 17,
+          "day": 3710,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 4075,
+          "beginner": false,
+          "stability": 9919.835,
+          "difficulty": 1
+        },
+        {
+          "review": 18,
+          "day": 4075,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 4440,
+          "beginner": false,
+          "stability": 11053.517,
+          "difficulty": 1
+        }
+      ],
+      "burden": {
+        "14": 6,
+        "30": 6,
+        "90": 6,
+        "180": 7,
+        "365": 7
+      }
+    },
+    {
+      "name": "earlyFailure",
+      "firstDay": 0,
+      "rows": [
+        {
+          "review": 1,
+          "day": 0,
+          "rating": "medium",
+          "interval": 1,
+          "dueDay": 1,
+          "beginner": true,
+          "stability": 2.307,
+          "difficulty": 2.118
+        },
+        {
+          "review": 2,
+          "day": 1,
+          "rating": "hard",
+          "interval": 1,
+          "dueDay": 2,
+          "beginner": true,
+          "stability": 0.571,
+          "difficulty": 7.395
+        },
+        {
+          "review": 3,
+          "day": 2,
+          "rating": "medium",
+          "interval": 1,
+          "dueDay": 3,
+          "beginner": true,
+          "stability": 2.341,
+          "difficulty": 7.382
+        },
+        {
+          "review": 4,
+          "day": 3,
+          "rating": "easy",
+          "interval": 1,
+          "dueDay": 4,
+          "beginner": true,
+          "stability": 6.162,
+          "difficulty": 6.493
+        },
+        {
+          "review": 5,
+          "day": 4,
+          "rating": "easy",
+          "interval": 2,
+          "dueDay": 6,
+          "beginner": true,
+          "stability": 10.679,
+          "difficulty": 5.306
+        },
+        {
+          "review": 6,
+          "day": 6,
+          "rating": "easy",
+          "interval": 3,
+          "dueDay": 9,
+          "beginner": true,
+          "stability": 20.977,
+          "difficulty": 3.723
+        },
+        {
+          "review": 7,
+          "day": 9,
+          "rating": "medium",
+          "interval": 5,
+          "dueDay": 14,
+          "beginner": false,
+          "stability": 30.584,
+          "difficulty": 3.714
+        },
+        {
+          "review": 8,
+          "day": 14,
+          "rating": "easy",
+          "interval": 59,
+          "dueDay": 73,
+          "beginner": false,
+          "stability": 58.523,
+          "difficulty": 1.599
+        },
+        {
+          "review": 9,
+          "day": 73,
+          "rating": "medium",
+          "interval": 210,
+          "dueDay": 283,
+          "beginner": false,
+          "stability": 209.866,
+          "difficulty": 1.593
+        },
+        {
+          "review": 10,
+          "day": 283,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 648,
+          "beginner": false,
+          "stability": 1027.711,
+          "difficulty": 1
+        },
+        {
+          "review": 11,
+          "day": 648,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 1013,
+          "beginner": false,
+          "stability": 1795.658,
+          "difficulty": 1
+        },
+        {
+          "review": 12,
+          "day": 1013,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 1378,
+          "beginner": false,
+          "stability": 3191.303,
+          "difficulty": 1
+        },
+        {
+          "review": 13,
+          "day": 1378,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 1743,
+          "beginner": false,
+          "stability": 3895.952,
+          "difficulty": 1
+        },
+        {
+          "review": 14,
+          "day": 1743,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 2108,
+          "beginner": false,
+          "stability": 5184.924,
+          "difficulty": 1
+        },
+        {
+          "review": 15,
+          "day": 2108,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 2473,
+          "beginner": false,
+          "stability": 5848.431,
+          "difficulty": 1
+        },
+        {
+          "review": 16,
+          "day": 2473,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 2838,
+          "beginner": false,
+          "stability": 7071.11,
+          "difficulty": 1
+        },
+        {
+          "review": 17,
+          "day": 2838,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 3203,
+          "beginner": false,
+          "stability": 7706.92,
+          "difficulty": 1
+        },
+        {
+          "review": 18,
+          "day": 3203,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 3568,
+          "beginner": false,
+          "stability": 8883.202,
+          "difficulty": 1
+        }
+      ],
+      "burden": {
+        "14": 7,
+        "30": 8,
+        "90": 9,
+        "180": 9,
+        "365": 10
+      }
+    },
+    {
+      "name": "immediateDifficulty",
+      "firstDay": 0,
+      "rows": [
+        {
+          "review": 1,
+          "day": 0,
+          "rating": "hard",
+          "interval": 1,
+          "dueDay": 1,
+          "beginner": true,
+          "stability": 0.212,
+          "difficulty": 6.413
+        },
+        {
+          "review": 2,
+          "day": 1,
+          "rating": "medium",
+          "interval": 1,
+          "dueDay": 2,
+          "beginner": true,
+          "stability": 1.887,
+          "difficulty": 6.402
+        },
+        {
+          "review": 3,
+          "day": 2,
+          "rating": "medium",
+          "interval": 1,
+          "dueDay": 3,
+          "beginner": true,
+          "stability": 4.475,
+          "difficulty": 6.391
+        },
+        {
+          "review": 4,
+          "day": 3,
+          "rating": "easy",
+          "interval": 2,
+          "dueDay": 5,
+          "beginner": true,
+          "stability": 9.218,
+          "difficulty": 5.17
+        },
+        {
+          "review": 5,
+          "day": 5,
+          "rating": "easy",
+          "interval": 3,
+          "dueDay": 8,
+          "beginner": true,
+          "stability": 19.885,
+          "difficulty": 3.542
+        },
+        {
+          "review": 6,
+          "day": 8,
+          "rating": "easy",
+          "interval": 5,
+          "dueDay": 13,
+          "beginner": false,
+          "stability": 38.426,
+          "difficulty": 1.369
+        },
+        {
+          "review": 7,
+          "day": 13,
+          "rating": "medium",
+          "interval": 58,
+          "dueDay": 71,
+          "beginner": false,
+          "stability": 57.699,
+          "difficulty": 1.362
+        },
+        {
+          "review": 8,
+          "day": 71,
+          "rating": "easy",
+          "interval": 344,
+          "dueDay": 415,
+          "beginner": false,
+          "stability": 344.282,
+          "difficulty": 1
+        },
+        {
+          "review": 9,
+          "day": 415,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 780,
+          "beginner": false,
+          "stability": 1044.784,
+          "difficulty": 1
+        },
+        {
+          "review": 10,
+          "day": 780,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 1145,
+          "beginner": false,
+          "stability": 2482.421,
+          "difficulty": 1
+        },
+        {
+          "review": 11,
+          "day": 1145,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 1510,
+          "beginner": false,
+          "stability": 3206.286,
+          "difficulty": 1
+        },
+        {
+          "review": 12,
+          "day": 1510,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 1875,
+          "beginner": false,
+          "stability": 4525.319,
+          "difficulty": 1
+        },
+        {
+          "review": 13,
+          "day": 1875,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 2240,
+          "beginner": false,
+          "stability": 5200.729,
+          "difficulty": 1
+        },
+        {
+          "review": 14,
+          "day": 2240,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 2605,
+          "beginner": false,
+          "stability": 6442.91,
+          "difficulty": 1
+        },
+        {
+          "review": 15,
+          "day": 2605,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 2970,
+          "beginner": false,
+          "stability": 7087.079,
+          "difficulty": 1
+        },
+        {
+          "review": 16,
+          "day": 2970,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 3335,
+          "beginner": false,
+          "stability": 8277.507,
+          "difficulty": 1
+        },
+        {
+          "review": 17,
+          "day": 3335,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 3700,
+          "beginner": false,
+          "stability": 8899.12,
+          "difficulty": 1
+        },
+        {
+          "review": 18,
+          "day": 3700,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 4065,
+          "beginner": false,
+          "stability": 10051.113,
+          "difficulty": 1
+        }
+      ],
+      "burden": {
+        "14": 7,
+        "30": 7,
+        "90": 8,
+        "180": 8,
+        "365": 8
+      }
+    },
+    {
+      "name": "repeatedMedium",
+      "firstDay": 0,
+      "rows": [
+        {
+          "review": 1,
+          "day": 0,
+          "rating": "medium",
+          "interval": 1,
+          "dueDay": 1,
+          "beginner": true,
+          "stability": 2.307,
+          "difficulty": 2.118
+        },
+        {
+          "review": 2,
+          "day": 1,
+          "rating": "medium",
+          "interval": 1,
+          "dueDay": 2,
+          "beginner": true,
+          "stability": 7.315,
+          "difficulty": 2.111
+        },
+        {
+          "review": 3,
+          "day": 2,
+          "rating": "medium",
+          "interval": 2,
+          "dueDay": 4,
+          "beginner": true,
+          "stability": 11.991,
+          "difficulty": 2.104
+        },
+        {
+          "review": 4,
+          "day": 4,
+          "rating": "medium",
+          "interval": 3,
+          "dueDay": 7,
+          "beginner": true,
+          "stability": 20.494,
+          "difficulty": 2.097
+        },
+        {
+          "review": 5,
+          "day": 7,
+          "rating": "medium",
+          "interval": 5,
+          "dueDay": 12,
+          "beginner": false,
+          "stability": 32.275,
+          "difficulty": 2.091
+        },
+        {
+          "review": 6,
+          "day": 12,
+          "rating": "medium",
+          "interval": 50,
+          "dueDay": 62,
+          "beginner": false,
+          "stability": 50.424,
+          "difficulty": 2.084
+        },
+        {
+          "review": 7,
+          "day": 62,
+          "rating": "medium",
+          "interval": 176,
+          "dueDay": 238,
+          "beginner": false,
+          "stability": 175.72,
+          "difficulty": 2.077
+        },
+        {
+          "review": 8,
+          "day": 238,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 603,
+          "beginner": false,
+          "stability": 533.194,
+          "difficulty": 2.07
+        },
+        {
+          "review": 9,
+          "day": 603,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 968,
+          "beginner": false,
+          "stability": 1212.695,
+          "difficulty": 2.063
+        },
+        {
+          "review": 10,
+          "day": 968,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 1333,
+          "beginner": false,
+          "stability": 1894.995,
+          "difficulty": 2.056
+        },
+        {
+          "review": 11,
+          "day": 1333,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 1698,
+          "beginner": false,
+          "stability": 2558.584,
+          "difficulty": 2.05
+        },
+        {
+          "review": 12,
+          "day": 1698,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 2063,
+          "beginner": false,
+          "stability": 3204.503,
+          "difficulty": 2.043
+        },
+        {
+          "review": 13,
+          "day": 2063,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 2428,
+          "beginner": false,
+          "stability": 3835.382,
+          "difficulty": 2.036
+        },
+        {
+          "review": 14,
+          "day": 2428,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 2793,
+          "beginner": false,
+          "stability": 4453.496,
+          "difficulty": 2.029
+        },
+        {
+          "review": 15,
+          "day": 2793,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 3158,
+          "beginner": false,
+          "stability": 5060.643,
+          "difficulty": 2.022
+        },
+        {
+          "review": 16,
+          "day": 3158,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 3523,
+          "beginner": false,
+          "stability": 5658.241,
+          "difficulty": 2.015
+        },
+        {
+          "review": 17,
+          "day": 3523,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 3888,
+          "beginner": false,
+          "stability": 6247.419,
+          "difficulty": 2.009
+        },
+        {
+          "review": 18,
+          "day": 3888,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 4253,
+          "beginner": false,
+          "stability": 6829.094,
+          "difficulty": 2.002
+        }
+      ],
+      "burden": {
+        "14": 6,
+        "30": 6,
+        "90": 7,
+        "180": 7,
+        "365": 8
+      }
+    },
+    {
+      "name": "forgotten",
+      "firstDay": 0,
+      "rows": [
+        {
+          "review": 1,
+          "day": 0,
+          "rating": "easy",
+          "interval": 1,
+          "dueDay": 1,
+          "beginner": true,
+          "stability": 8.296,
+          "difficulty": 1
+        },
+        {
+          "review": 2,
+          "day": 1,
+          "rating": "easy",
+          "interval": 1,
+          "dueDay": 2,
+          "beginner": true,
+          "stability": 18.015,
+          "difficulty": 1
+        },
+        {
+          "review": 3,
+          "day": 2,
+          "rating": "easy",
+          "interval": 2,
+          "dueDay": 4,
+          "beginner": true,
+          "stability": 26.823,
+          "difficulty": 1
+        },
+        {
+          "review": 4,
+          "day": 4,
+          "rating": "easy",
+          "interval": 3,
+          "dueDay": 7,
+          "beginner": true,
+          "stability": 43.158,
+          "difficulty": 1
+        },
+        {
+          "review": 5,
+          "day": 7,
+          "rating": "easy",
+          "interval": 5,
+          "dueDay": 12,
+          "beginner": false,
+          "stability": 65.848,
+          "difficulty": 1
+        },
+        {
+          "review": 6,
+          "day": 12,
+          "rating": "easy",
+          "interval": 101,
+          "dueDay": 113,
+          "beginner": false,
+          "stability": 100.988,
+          "difficulty": 1
+        },
+        {
+          "review": 7,
+          "day": 113,
+          "rating": "hard",
+          "interval": 4,
+          "dueDay": 117,
+          "beginner": false,
+          "stability": 4.152,
+          "difficulty": 7.027
+        },
+        {
+          "review": 8,
+          "day": 117,
+          "rating": "medium",
+          "interval": 11,
+          "dueDay": 128,
+          "beginner": false,
+          "stability": 10.977,
+          "difficulty": 7.015
+        },
+        {
+          "review": 9,
+          "day": 128,
+          "rating": "medium",
+          "interval": 27,
+          "dueDay": 155,
+          "beginner": false,
+          "stability": 26.811,
+          "difficulty": 7.003
+        },
+        {
+          "review": 10,
+          "day": 155,
+          "rating": "easy",
+          "interval": 90,
+          "dueDay": 245,
+          "beginner": false,
+          "stability": 89.637,
+          "difficulty": 5.987
+        },
+        {
+          "review": 11,
+          "day": 245,
+          "rating": "easy",
+          "interval": 305,
+          "dueDay": 550,
+          "beginner": false,
+          "stability": 304.639,
+          "difficulty": 4.632
+        },
+        {
+          "review": 12,
+          "day": 550,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 915,
+          "beginner": false,
+          "stability": 708.078,
+          "difficulty": 4.622
+        },
+        {
+          "review": 13,
+          "day": 915,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 1280,
+          "beginner": false,
+          "stability": 1198.692,
+          "difficulty": 4.613
+        },
+        {
+          "review": 14,
+          "day": 1280,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 1645,
+          "beginner": false,
+          "stability": 1686.574,
+          "difficulty": 4.604
+        },
+        {
+          "review": 15,
+          "day": 1645,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 2010,
+          "beginner": false,
+          "stability": 2165.497,
+          "difficulty": 4.594
+        },
+        {
+          "review": 16,
+          "day": 2010,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 2375,
+          "beginner": false,
+          "stability": 2635.309,
+          "difficulty": 4.585
+        },
+        {
+          "review": 17,
+          "day": 2375,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 2740,
+          "beginner": false,
+          "stability": 3096.866,
+          "difficulty": 4.575
+        },
+        {
+          "review": 18,
+          "day": 2740,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 3105,
+          "beginner": false,
+          "stability": 3551.113,
+          "difficulty": 4.566
+        }
+      ],
+      "burden": {
+        "14": 6,
+        "30": 6,
+        "90": 6,
+        "180": 10,
+        "365": 11
+      }
+    },
+    {
+      "name": "matureLapse",
+      "firstDay": 0,
+      "rows": [
+        {
+          "review": 1,
+          "day": 0,
+          "rating": "easy",
+          "interval": 1,
+          "dueDay": 1,
+          "beginner": true,
+          "stability": 8.296,
+          "difficulty": 1
+        },
+        {
+          "review": 2,
+          "day": 1,
+          "rating": "easy",
+          "interval": 1,
+          "dueDay": 2,
+          "beginner": true,
+          "stability": 18.015,
+          "difficulty": 1
+        },
+        {
+          "review": 3,
+          "day": 2,
+          "rating": "easy",
+          "interval": 2,
+          "dueDay": 4,
+          "beginner": true,
+          "stability": 26.823,
+          "difficulty": 1
+        },
+        {
+          "review": 4,
+          "day": 4,
+          "rating": "easy",
+          "interval": 3,
+          "dueDay": 7,
+          "beginner": true,
+          "stability": 43.158,
+          "difficulty": 1
+        },
+        {
+          "review": 5,
+          "day": 7,
+          "rating": "easy",
+          "interval": 5,
+          "dueDay": 12,
+          "beginner": false,
+          "stability": 65.848,
+          "difficulty": 1
+        },
+        {
+          "review": 6,
+          "day": 12,
+          "rating": "easy",
+          "interval": 101,
+          "dueDay": 113,
+          "beginner": false,
+          "stability": 100.988,
+          "difficulty": 1
+        },
+        {
+          "review": 7,
+          "day": 113,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 478,
+          "beginner": false,
+          "stability": 573.387,
+          "difficulty": 1
+        },
+        {
+          "review": 8,
+          "day": 478,
+          "rating": "hard",
+          "interval": 7,
+          "dueDay": 485,
+          "beginner": false,
+          "stability": 7.206,
+          "difficulty": 7.027
+        },
+        {
+          "review": 9,
+          "day": 485,
+          "rating": "medium",
+          "interval": 18,
+          "dueDay": 503,
+          "beginner": false,
+          "stability": 18.078,
+          "difficulty": 7.015
+        },
+        {
+          "review": 10,
+          "day": 503,
+          "rating": "medium",
+          "interval": 42,
+          "dueDay": 545,
+          "beginner": false,
+          "stability": 41.965,
+          "difficulty": 7.003
+        },
+        {
+          "review": 11,
+          "day": 545,
+          "rating": "easy",
+          "interval": 133,
+          "dueDay": 678,
+          "beginner": false,
+          "stability": 132.826,
+          "difficulty": 5.987
+        },
+        {
+          "review": 12,
+          "day": 678,
+          "rating": "easy",
+          "interval": 365,
+          "dueDay": 1043,
+          "beginner": false,
+          "stability": 430.633,
+          "difficulty": 4.632
+        },
+        {
+          "review": 13,
+          "day": 1043,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 1408,
+          "beginner": false,
+          "stability": 907.493,
+          "difficulty": 4.622
+        },
+        {
+          "review": 14,
+          "day": 1408,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 1773,
+          "beginner": false,
+          "stability": 1398.459,
+          "difficulty": 4.613
+        },
+        {
+          "review": 15,
+          "day": 1773,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 2138,
+          "beginner": false,
+          "stability": 1882.585,
+          "difficulty": 4.604
+        },
+        {
+          "review": 16,
+          "day": 2138,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 2503,
+          "beginner": false,
+          "stability": 2357.439,
+          "difficulty": 4.594
+        },
+        {
+          "review": 17,
+          "day": 2503,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 2868,
+          "beginner": false,
+          "stability": 2823.504,
+          "difficulty": 4.585
+        },
+        {
+          "review": 18,
+          "day": 2868,
+          "rating": "medium",
+          "interval": 365,
+          "dueDay": 3233,
+          "beginner": false,
+          "stability": 3281.715,
+          "difficulty": 4.575
+        }
+      ],
+      "burden": {
+        "14": 6,
+        "30": 6,
+        "90": 6,
+        "180": 7,
+        "365": 7
+      }
+    }
+  ],
+  "delayedFirst": {
+    "name": "strong",
+    "firstDay": 1,
+    "rows": [
+      {
+        "review": 1,
+        "day": 1,
+        "rating": "easy",
+        "interval": 1,
+        "dueDay": 2,
+        "beginner": true,
+        "stability": 8.296,
+        "difficulty": 1
+      },
+      {
+        "review": 2,
+        "day": 2,
+        "rating": "easy",
+        "interval": 1,
+        "dueDay": 3,
+        "beginner": true,
+        "stability": 18.015,
+        "difficulty": 1
+      },
+      {
+        "review": 3,
+        "day": 3,
+        "rating": "easy",
+        "interval": 2,
+        "dueDay": 5,
+        "beginner": true,
+        "stability": 26.823,
+        "difficulty": 1
+      },
+      {
+        "review": 4,
+        "day": 5,
+        "rating": "easy",
+        "interval": 3,
+        "dueDay": 8,
+        "beginner": true,
+        "stability": 43.158,
+        "difficulty": 1
+      },
+      {
+        "review": 5,
+        "day": 8,
+        "rating": "easy",
+        "interval": 5,
+        "dueDay": 13,
+        "beginner": false,
+        "stability": 65.848,
+        "difficulty": 1
+      },
+      {
+        "review": 6,
+        "day": 13,
+        "rating": "easy",
+        "interval": 101,
+        "dueDay": 114,
+        "beginner": false,
+        "stability": 100.988,
+        "difficulty": 1
+      },
+      {
+        "review": 7,
+        "day": 114,
+        "rating": "easy",
+        "interval": 365,
+        "dueDay": 479,
+        "beginner": false,
+        "stability": 573.387,
+        "difficulty": 1
+      },
+      {
+        "review": 8,
+        "day": 479,
+        "rating": "easy",
+        "interval": 365,
+        "dueDay": 844,
+        "beginner": false,
+        "stability": 2004.066,
+        "difficulty": 1
+      },
+      {
+        "review": 9,
+        "day": 844,
+        "rating": "easy",
+        "interval": 365,
+        "dueDay": 1209,
+        "beginner": false,
+        "stability": 3387.159,
+        "difficulty": 1
+      },
+      {
+        "review": 10,
+        "day": 1209,
+        "rating": "easy",
+        "interval": 365,
+        "dueDay": 1574,
+        "beginner": false,
+        "stability": 4697.882,
+        "difficulty": 1
+      },
+      {
+        "review": 11,
+        "day": 1574,
+        "rating": "easy",
+        "interval": 365,
+        "dueDay": 1939,
+        "beginner": false,
+        "stability": 5956.765,
+        "difficulty": 1
+      },
+      {
+        "review": 12,
+        "day": 1939,
+        "rating": "easy",
+        "interval": 365,
+        "dueDay": 2304,
+        "beginner": false,
+        "stability": 7176.378,
+        "difficulty": 1
+      },
+      {
+        "review": 13,
+        "day": 2304,
+        "rating": "easy",
+        "interval": 365,
+        "dueDay": 2669,
+        "beginner": false,
+        "stability": 8364.695,
+        "difficulty": 1
+      },
+      {
+        "review": 14,
+        "day": 2669,
+        "rating": "easy",
+        "interval": 365,
+        "dueDay": 3034,
+        "beginner": false,
+        "stability": 9527.145,
+        "difficulty": 1
+      },
+      {
+        "review": 15,
+        "day": 3034,
+        "rating": "easy",
+        "interval": 365,
+        "dueDay": 3399,
+        "beginner": false,
+        "stability": 10667.633,
+        "difficulty": 1
+      },
+      {
+        "review": 16,
+        "day": 3399,
+        "rating": "easy",
+        "interval": 365,
+        "dueDay": 3764,
+        "beginner": false,
+        "stability": 11789.092,
+        "difficulty": 1
+      },
+      {
+        "review": 17,
+        "day": 3764,
+        "rating": "easy",
+        "interval": 365,
+        "dueDay": 4129,
+        "beginner": false,
+        "stability": 12893.8,
+        "difficulty": 1
+      },
+      {
+        "review": 18,
+        "day": 4129,
+        "rating": "easy",
+        "interval": 365,
+        "dueDay": 4494,
+        "beginner": false,
+        "stability": 13983.572,
+        "difficulty": 1
+      }
+    ],
+    "burden": {
+      "14": 6,
+      "30": 6,
+      "90": 6,
+      "180": 7,
+      "365": 7
+    }
+  }
+}

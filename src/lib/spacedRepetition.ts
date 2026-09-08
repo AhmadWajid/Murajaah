@@ -28,6 +28,7 @@ export interface MemorizationItem {
   isBeginner?: boolean;
   // Progress offset: count minus this value is consecutive successful spaced reviews.
   // Reset on enabling/Hard; shifted on same-day successes to avoid false graduation.
+  // Retained through Adaptive transition; absent on unrestricted mature passages.
   beginnerStartedAtReview?: number;
   // FSRS memory state: stability (days until 90% recall) and difficulty (1-10)
   // Used by the adaptive algorithm. Derived from interval/easeFactor for old items.

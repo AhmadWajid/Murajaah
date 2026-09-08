@@ -359,7 +359,7 @@ function EditItemForm({ item, onSave, onCancel }: EditItemFormProps) {
     const beginnerJustEnabled = fam.isBeginner && !wasBeginner;
     const beginnerStartedAtReview = beginnerJustEnabled
       ? formData.reviewCount
-      : fam.isBeginner
+      : fam.isBeginner || familiarity === deriveFamiliarity(item)
         ? item.beginnerStartedAtReview
         : undefined;
 
