@@ -816,7 +816,7 @@ export default function QuranContent({
                             }}
                             data-tooltip-id={showWordByWordTooltip && translation && shouldShowTranslationTooltip ? WORD_TRANSLATION_TOOLTIP_ID_15 : undefined}
                             data-tooltip-content={showWordByWordTooltip && translation && shouldShowTranslationTooltip ? translation : undefined}
-                            className={`inline cursor-pointer select-none transition-all duration-200 px-0.5 rounded-sm relative font-arabic arabic-text uthmanic-hafs ${
+                            className={`inline-block cursor-pointer select-none transition-all duration-200 px-0.5 rounded-sm relative font-arabic arabic-text uthmanic-hafs ${
                               isActive 
                                 ? 'bg-accent/15 dark:bg-accent/20' 
                                 : isSelected
@@ -832,6 +832,7 @@ export default function QuranContent({
                               textRendering: 'optimizeLegibility',
                               WebkitFontSmoothing: 'antialiased',
                               MozOsxFontSmoothing: 'grayscale',
+                              verticalAlign: 'baseline',
                             }}
                           >
                             {/* Invisible text that takes up natural space */}
