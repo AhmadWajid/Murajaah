@@ -816,13 +816,13 @@ export default function QuranContent({
                             }}
                             data-tooltip-id={showWordByWordTooltip && translation && shouldShowTranslationTooltip ? WORD_TRANSLATION_TOOLTIP_ID_15 : undefined}
                             data-tooltip-content={showWordByWordTooltip && translation && shouldShowTranslationTooltip ? translation : undefined}
-                            className={`inline-block cursor-pointer select-none transition-all duration-200 px-0.5 rounded-sm relative font-arabic arabic-text uthmanic-hafs ${
+                            className={`inline cursor-pointer select-none transition-all duration-200 px-0.5 rounded-sm font-arabic arabic-text uthmanic-hafs ${
                               isActive 
                                 ? 'bg-accent/15 dark:bg-accent/20' 
                                 : isSelected
                                   ? 'bg-accent/8 dark:bg-accent/10'
                                   : 'hover:bg-accent/5 dark:hover:bg-accent/10'
-                            } ${isMemorized ? reviewGlowClass : ''}`}
+                            } ${isMemorized ? reviewGlowClass : ''} ${!isWordVisible ? 'border border-dashed border-gray-400/60' : ''}`}
                             style={{
                               fontFamily: fontLoaded15 ? qpcFontLoader.getFontFamily(pageNum) : "'UthmanicHafs_V22', 'qpc-v2-fallback', 'Amiri', serif",
                               fontSize: `${arabicFontSize}px`,
@@ -832,41 +832,10 @@ export default function QuranContent({
                               textRendering: 'optimizeLegibility',
                               WebkitFontSmoothing: 'antialiased',
                               MozOsxFontSmoothing: 'grayscale',
-                              verticalAlign: 'baseline',
+                              color: isWordVisible ? 'inherit' : 'transparent',
                             }}
                           >
-                            {/* Invisible text that takes up natural space */}
-                            <span className="opacity-0" style={{ fontSize: `${arabicFontSize}px` }}>
-                              {word.text}
-                            </span>
-                            
-                            {/* Overlay for hiding/showing */}
-                            <span
-                              className={`transition-opacity duration-200 absolute inset-0 flex items-center justify-center ${
-                                isWordVisible ? 'opacity-0' : 'opacity-100'
-                              }`}
-                              style={{
-                                backgroundColor: 'transparent',
-                                border: '1px dashed rgba(156, 163, 175, 0.6)',
-                                borderRadius: '3px',
-                                zIndex: 10
-                              }}
-                            />
-
-                            {/* Visible text when revealed — with tajweed coloring */}
-                            <span
-                              className={`transition-opacity duration-200 absolute inset-0 flex items-center justify-center ${
-                                isWordVisible ? 'opacity-100' : 'opacity-0'
-                              }`}
-                              style={{
-                                fontSize: `${arabicFontSize}px`,
-                                backgroundColor: 'transparent',
-                                borderRadius: '3px',
-                                zIndex: 20
-                              }}
-                            >
-                              {renderWordContent()}
-                            </span>
+                            {renderWordContent()}
                           </span>
                         );
                       }
