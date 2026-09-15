@@ -5,10 +5,7 @@ import { usePathname } from 'next/navigation';
 import { setSyncUser } from '@/lib/syncClient';
 import { clearAuthCache, syncSettingsFromDb } from '@/lib/storageService';
 
-interface AuthUser {
-  id: string;
-  email: string;
-}
+import { normalizeAuthUser, type AuthUser } from '@/lib/authUser';
 
 interface AuthContextType {
   user: AuthUser | null;
@@ -41,12 +38,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
   const syncedSettingsFor = useRef<string | null>(null);
+  const authRequest = useRef(0);
 
   const refreshUser = useCallback(async () => {
+    const requestId = ++authRequest.current;
     try {
-      const res = await fetch('/api/auth/me');
+      const res = await fetch('/api/auth/me', { cache: 'no-store' });
+      if (!res.ok) throw new Error('Session check failed');
       const data = await res.json();
-      const newUser = data.user || null;
+      if (requestId !== authRequest.current) return;
+      const newUser = normalizeAuthUser(data.user);
       setSyncUser(newUser?.id || null);
       setUser(newUser);
       clearAuthCache();
@@ -63,15 +64,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
         syncedSettingsFor.current = null;
       }
     } catch {
-      setUser(null);
+      // A network failure does not sign out a previously authenticated device.
     } finally {
-      setLoading(false);
+      if (requestId === authRequest.current) setLoading(false);
     }
   }, []);
 
   // Check auth on mount AND whenever the route changes
   useEffect(() => {
-    refreshUser();
+    void Promise.resolve().then(refreshUser);
   }, [refreshUser, pathname]);
 
   useEffect(() => {
@@ -81,7 +82,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, [refreshUser]);
 
   const signOut = useCallback(async () => {
-    await fetch('/api/auth/signout', { method: 'POST' });
+    const response = await fetch('/api/auth/signout', { method: 'POST' });
+    if (!response.ok) throw new Error('Sign out failed');
+    authRequest.current++;
     setSyncUser(null);
     setUser(null);
     clearAuthCache();

@@ -4,6 +4,7 @@
  * Reads refresh the device cache, and offline writes are retried automatically.
  */
 
+import { normalizeAuthUser, type AuthUser } from './authUser';
 import { MemorizationItem } from './spacedRepetition';
 import { REVIEW_SETTINGS_EVENT } from './reviewAlgorithms';
 import * as localStorageService from './storage';
@@ -26,14 +27,14 @@ export interface DailyReviewData {
 // AUTHENTICATION STATE
 // =============================================
 
-let cachedUser: { userId: string; email: string } | null | undefined;
+let cachedUser: AuthUser | null | undefined;
 
 export async function isAuthenticated(): Promise<boolean> {
   if (cachedUser === undefined) {
     try {
       const res = await fetch('/api/auth/me');
       const data = await res.json();
-      cachedUser = data.user || null;
+      cachedUser = normalizeAuthUser(data.user);
     } catch {
       cachedUser = null;
     }

@@ -6,5 +6,5 @@ export async function GET() {
   if (!session) {
     return NextResponse.json({ user: null }, { status: 200 });
   }
-  return NextResponse.json({ user: session });
+  return NextResponse.json({ user: { id: session.userId, email: session.email } });
 }

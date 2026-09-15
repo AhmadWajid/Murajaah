@@ -1,7 +1,8 @@
 'use client';
 
 import * as local from './storage';
-import { bookmarkKey, diffSnapshots, emptySnapshot, stableJSON, SyncChange, SyncSnapshot } from './syncModel';
+import { normalizeAuthUser } from './authUser';
+import { applyChanges, bookmarkKey, diffSnapshots, emptySnapshot, stableJSON, SyncChange, SyncSnapshot } from './syncModel';
 
 export const SYNC_EVENT = 'mquran-sync-status';
 export const SYNC_DATA_EVENT = 'mquran-sync-data';
@@ -18,6 +19,7 @@ interface DeviceState {
   legacyBackup?: SyncSnapshot;
 }
 let userId: string | null | undefined;
+let authGeneration = 0;
 let authPromise: Promise<void> | undefined;
 let running: Promise<void> | undefined;
 let lastFetch = 0;
@@ -52,6 +54,7 @@ function notify() { window.dispatchEvent(new Event(SYNC_EVENT)); }
 export function setSyncUser(id: string | null) {
   if (typeof window === 'undefined') return;
   const previous = localStorage.getItem(OWNER);
+  authGeneration++;
   userId = id;
   const next = id || 'guest';
   if (previous !== next) {
@@ -62,11 +65,22 @@ export function setSyncUser(id: string | null) {
       if (!old) localStorage.setItem(oldKey, JSON.stringify({ snapshot: readSnapshot(), pending: [], initialized: false }));
       const saved = localStorage.getItem(keyFor());
       const guestSnapshot = previous === 'guest' ? readSnapshot() : emptySnapshot();
-      if (!saved && previous === 'guest') {
-        const guestState = JSON.parse(localStorage.getItem(oldKey) || '{}');
-        saveState({ snapshot: guestSnapshot, pending: guestState.pending || [], initialized: false, lastEditedAt: guestState.lastEditedAt });
+      if (previous === 'guest') {
+        const guestState: DeviceState = JSON.parse(localStorage.getItem(oldKey) || '{}');
+        const target: DeviceState = saved ? JSON.parse(saved) : { snapshot: guestSnapshot, pending: [], initialized: false };
+        const seen = new Set(target.pending.map(change => change.id));
+        const guestChanges = (guestState.pending || []).filter(change => !seen.has(change.id));
+        target.pending.push(...guestChanges);
+        target.snapshot = applyChanges(target.snapshot, target.pending).snapshot;
+        if (guestState.lastEditedAt && (!target.lastEditedAt || guestState.lastEditedAt > target.lastEditedAt)) target.lastEditedAt = guestState.lastEditedAt;
+        // Persist the account queue before consuming the guest queue. This also
+        // recovers edits stranded as guest data by the old userId/id mismatch.
+        saveState(target);
+        localStorage.setItem(oldKey, JSON.stringify({ snapshot: emptySnapshot(), pending: [], initialized: false }));
+        applySnapshot(target.snapshot);
+      } else {
+        applySnapshot(saved ? JSON.parse(saved).snapshot : emptySnapshot());
       }
-      applySnapshot(saved ? JSON.parse(saved).snapshot : guestSnapshot);
     }
     localStorage.setItem(OWNER, next);
     lastFetch = 0;
@@ -77,13 +91,15 @@ export function setSyncUser(id: string | null) {
 async function identify() {
   if (userId !== undefined) return;
   if (!authPromise) authPromise = (async () => {
+    const generation = authGeneration;
     try {
       const res = await fetch('/api/auth/me', { signal: AbortSignal.timeout(10000) });
       if (!res.ok) throw new Error('Auth unavailable');
       const data = await res.json();
-      setSyncUser(data.user?.id || null);
+      if (generation === authGeneration) setSyncUser(normalizeAuthUser(data.user)?.id || null);
     } catch {
       // Stay with this device's previously authenticated account while offline.
+      if (generation !== authGeneration) return;
       const owner = localStorage.getItem(OWNER);
       setSyncUser(owner && owner !== 'guest' ? owner : null);
     }

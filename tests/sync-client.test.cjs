@@ -93,3 +93,40 @@ test('bookmark added then removed offline stays deleted after reconnect', async 
   env.offline(false); await client.synchronizeData(true);
   assert.deepEqual(env.cloud().bookmarks, {});
 });
+test('a clean device downloads cloud data using the real legacy /auth/me response shape', async () => {
+  const env = setup();
+  env.remote([{ id: 'cloud', collection: 'items', key: 'p', value: passage, changedAt: 1 }]);
+  const syncFetch = global.fetch;
+  global.fetch = (url, options) => url === '/api/auth/me'
+    ? Promise.resolve({ ok: true, json: async () => ({ user: { userId: 'alice', email: 'test@example.com' } }) })
+    : syncFetch(url, options);
+  const client = env.loadClient();
+  await client.synchronizeData(true);
+  assert.equal(local.getMemorizationItem('p').id, 'p');
+  assert.equal(localStorage.getItem('mquran-sync-owner'), 'alice');
+  assert.ok(client.getSyncStatus().lastSyncedAt);
+});
+test('stranded guest edits move into an existing account and are consumed once', async () => {
+  const env = setup(); const client = env.loadClient();
+  client.setSyncUser('alice'); await client.synchronizeData(true);
+  client.setSyncUser(null);
+  await client.mutateSyncedData(() => local.addMemorizationItem({ ...passage, name: 'Stranded edit' }));
+  client.setSyncUser('alice'); await client.synchronizeData(true);
+  assert.equal(env.cloud().items.p.name, 'Stranded edit');
+  assert.equal(JSON.parse(localStorage.getItem('mquran-sync-v2:guest')).pending.length, 0);
+  client.setSyncUser(null);
+  assert.deepEqual(local.getAllMemorizationItems(), []);
+});
+test('a delayed signed-out session check cannot undo a successful sign-in', async () => {
+  const env = setup(); const syncFetch = global.fetch;
+  let resolveAuth;
+  global.fetch = (url, options) => url === '/api/auth/me'
+    ? new Promise(resolve => { resolveAuth = resolve; }) : syncFetch(url, options);
+  const client = env.loadClient();
+  const sync = client.synchronizeData(true);
+  client.setSyncUser('alice');
+  resolveAuth({ ok: true, json: async () => ({ user: null }) });
+  await sync;
+  assert.equal(localStorage.getItem('mquran-sync-owner'), 'alice');
+  assert.ok(client.getSyncStatus().lastSyncedAt);
+});
