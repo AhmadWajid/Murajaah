@@ -1,19 +1,13 @@
 /**
- * Storage Service — Unified write-through data layer
- *
- * Architecture:
- *   - All writes go to localStorage first (optimistic, instant UI feedback)
- *   - If authenticated, the same write also syncs to Neon via API
- *   - All reads prefer DB when authenticated, fall back to localStorage
- *   - Adding a new entity only requires: a local function + an API function
- *
- * This eliminates the repeated "if auth { fetch + localStorage } else { localStorage }"
- * pattern that was duplicated for every operation.
+ * Shared storage API. Passages, mistakes and bookmarks use the durable,
+ * per-account sync queue; settings retain their existing API-backed storage.
+ * Reads refresh the device cache, and offline writes are retried automatically.
  */
 
 import { MemorizationItem } from './spacedRepetition';
 import { REVIEW_SETTINGS_EVENT } from './reviewAlgorithms';
 import * as localStorageService from './storage';
+import { mutateSyncedData, readSyncedData, synchronizeData } from './syncClient';
 
 export interface MistakeData {
   timestamp: string;
@@ -77,58 +71,11 @@ async function apiPost(body: Record<string, any>): Promise<Response> {
   return res;
 }
 
-/** POST to /api/data and discard the response (for fire-and-forget writes) */
-async function apiWrite(body: Record<string, any>): Promise<void> {
-  await apiPost(body);
-}
-
 /** GET from /api/data with automatic error checking */
 async function apiGet(query: string): Promise<any> {
   const res = await fetch(`/api/data?${query}`);
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   return res.json();
-}
-
-/**
- * Write-through: writes to localStorage immediately, then syncs to DB if authenticated.
- * - Local write always succeeds (optimistic — UI is instantly updated)
- * - DB failure is logged but does NOT roll back local (sync modal will catch it later)
- */
-async function writeThrough(
-  localFn: () => void,
-  apiFn?: () => Promise<void>,
-): Promise<void> {
-  localFn();
-  if (apiFn && await isAuthenticated()) {
-    try {
-      await apiFn();
-    } catch (error) {
-      console.warn('[storage] DB sync failed, local write succeeded:', error);
-    }
-  }
-}
-
-/**
- * Write-through with result: writes locally first, then if authenticated,
- * calls the API and syncs the authoritative result back to localStorage.
- * Falls back to local result if API fails.
- */
-async function writeThroughResult<T>(
-  localFn: () => T,
-  apiFn: () => Promise<T>,
-  syncLocal: (apiResult: T) => void,
-): Promise<T> {
-  const localResult = localFn();
-  if (await isAuthenticated()) {
-    try {
-      const apiResult = await apiFn();
-      syncLocal(apiResult);
-      return apiResult;
-    } catch (error) {
-      console.warn('[storage] DB sync failed, using local result:', error);
-    }
-  }
-  return localResult;
 }
 
 /**
@@ -289,86 +236,31 @@ async function readSetting<T>(
 // =============================================
 
 export async function addMemorizationItem(item: MemorizationItem): Promise<void> {
-  await writeThrough(
-    () => localStorageService.addMemorizationItem(item),
-    () => apiWrite({ op: 'addItem', item }),
-  );
+  await mutateSyncedData(() => localStorageService.addMemorizationItem(item));
 }
 
 export async function updateMemorizationItem(item: MemorizationItem): Promise<void> {
-  await writeThrough(
-    () => localStorageService.updateMemorizationItem(item),
-    () => apiWrite({ op: 'updateItem', item }),
-  );
+  await mutateSyncedData(() => localStorageService.updateMemorizationItem(item));
 }
 
-export async function updateMemorizationItemWithIndividualRating(
-  itemId: string,
-  ayahNumber: number,
-  rating: 'easy' | 'medium' | 'hard'
-): Promise<void> {
-  if (await isAuthenticated()) {
-    try {
-      const data = await apiGet(`type=items&id=${encodeURIComponent(itemId)}`);
-      if (!data.item) throw new Error('Item not found');
-
-      const { updateIndividualAyahRating } = await import('./spacedRepetition');
-      const result = updateIndividualAyahRating(data.item, ayahNumber, rating);
-
-      if (result.shouldSplit && result.newItems) {
-        await apiPost({ op: 'removeItem', id: itemId });
-        localStorageService.removeMemorizationItem(itemId);
-        for (const newItem of result.newItems) {
-          await apiPost({ op: 'addItem', item: newItem });
-          localStorageService.addMemorizationItem(newItem);
-        }
-      } else {
-        await apiPost({ op: 'updateItem', item: result.updatedItem });
-        localStorageService.updateMemorizationItem(result.updatedItem);
-      }
-    } catch (error) {
-      console.warn('[storage] Individual rating sync failed, using local:', error);
-      localStorageService.updateMemorizationItemWithIndividualRating(itemId, ayahNumber, rating);
-    }
-  } else {
-    localStorageService.updateMemorizationItemWithIndividualRating(itemId, ayahNumber, rating);
-  }
+export async function updateMemorizationItemWithIndividualRating(itemId: string, ayahNumber: number, rating: 'easy' | 'medium' | 'hard'): Promise<void> {
+  await mutateSyncedData(() => localStorageService.updateMemorizationItemWithIndividualRating(itemId, ayahNumber, rating));
 }
 
 export async function removeMemorizationItem(id: string): Promise<void> {
-  await writeThrough(
-    () => localStorageService.removeMemorizationItem(id),
-    () => apiWrite({ op: 'removeItem', id }),
-  );
+  await mutateSyncedData(() => localStorageService.removeMemorizationItem(id));
 }
 
 export async function getAllMemorizationItems(): Promise<MemorizationItem[]> {
-  return readThrough(
-    async () => {
-      const data = await apiGet('type=items');
-      return data.items || [];
-    },
-    () => localStorageService.getAllMemorizationItems(),
-    [],
-  );
+  return readSyncedData(() => localStorageService.getAllMemorizationItems());
 }
 
 export async function getMemorizationItem(id: string): Promise<MemorizationItem | null> {
-  return readThrough(
-    async () => {
-      const data = await apiGet(`type=items&id=${encodeURIComponent(id)}`);
-      return data.item || null;
-    },
-    () => localStorageService.getMemorizationItem(id),
-    null,
-  );
+  return readSyncedData(() => localStorageService.getMemorizationItem(id));
 }
 
 export async function clearAllData(): Promise<void> {
-  await writeThrough(
-    () => localStorageService.clearAllData(),
-    () => apiWrite({ op: 'clearAllItems' }),
-  );
+  await mutateSyncedData(() => localStorageService.clearAllData());
 }
 
 export async function exportData(): Promise<string> {
@@ -398,92 +290,35 @@ export function migrateDateFormats(): void {
 // =============================================
 
 export async function getMistakes(): Promise<Record<string, MistakeData | boolean>> {
-  return readThrough(
-    async () => {
-      const data = await apiGet('type=mistakes');
-      return data.mistakes || {};
-    },
-    () => localStorageService.getMistakes(),
-    {},
-  );
+  return readSyncedData(() => localStorageService.getMistakes());
 }
 
 export async function saveMistakes(mistakes: Record<string, MistakeData | boolean>): Promise<void> {
-  const dbMistakes: Record<string, MistakeData> = {};
-  Object.entries(mistakes).forEach(([key, value]) => {
-    if (typeof value === 'object' && value !== null && 'timestamp' in value) {
-      dbMistakes[key] = value as MistakeData;
-    } else if (typeof value === 'boolean' && value === true) {
-      const [surah, ayah] = key.split(':').map(Number);
-      dbMistakes[key] = { timestamp: new Date().toISOString(), surah, ayah };
-    }
-  });
-  await writeThrough(
-    () => localStorageService.saveMistakes(mistakes),
-    () => apiWrite({ op: 'saveMistakes', mistakes: dbMistakes }),
-  );
+  await mutateSyncedData(() => localStorageService.saveMistakes(mistakes));
 }
 
 export async function toggleMistake(surahNumber: number, ayahNumber: number): Promise<Record<string, MistakeData | boolean>> {
-  return writeThroughResult(
-    () => localStorageService.toggleMistake(surahNumber, ayahNumber),
-    async () => {
-      const data = await apiPost({ op: 'toggleMistake', surah: surahNumber, ayah: ayahNumber }).then(r => r.json());
-      return data.mistakes || {};
-    },
-    (apiMistakes) => localStorageService.saveMistakes(apiMistakes),
-  );
+  return mutateSyncedData(() => localStorageService.toggleMistake(surahNumber, ayahNumber));
 }
 
 export async function showMistake(surahNumber: number, ayahNumber: number): Promise<Record<string, MistakeData | boolean>> {
-  return writeThroughResult(
-    () => localStorageService.showMistake(surahNumber, ayahNumber),
-    async () => {
-      const data = await apiPost({ op: 'toggleMistake', surah: surahNumber, ayah: ayahNumber }).then(r => r.json());
-      return data.mistakes || {};
-    },
-    (apiMistakes) => localStorageService.saveMistakes(apiMistakes),
-  );
+  return mutateSyncedData(() => localStorageService.showMistake(surahNumber, ayahNumber));
 }
 
 export async function removeMistake(surahNumber: number, ayahNumber: number): Promise<Record<string, MistakeData | boolean>> {
-  return writeThroughResult(
-    () => localStorageService.removeMistake(surahNumber, ayahNumber),
-    async () => {
-      const data = await apiPost({ op: 'removeMistake', surah: surahNumber, ayah: ayahNumber }).then(r => r.json());
-      return data.mistakes || {};
-    },
-    (apiMistakes) => localStorageService.saveMistakes(apiMistakes),
-  );
+  return mutateSyncedData(() => localStorageService.removeMistake(surahNumber, ayahNumber));
 }
 
 export async function clearAllMistakes(): Promise<void> {
-  await writeThrough(
-    () => localStorageService.clearAllMistakes(),
-    () => apiWrite({ op: 'clearAllMistakes' }),
-  );
+  await mutateSyncedData(() => localStorageService.clearAllMistakes());
 }
 
 export async function getMistakesList(): Promise<MistakeData[]> {
-  return readThrough(
-    async () => {
-      const data = await apiGet('type=mistakesList');
-      return data.mistakes || [];
-    },
-    () => localStorageService.getMistakesList(),
-    [],
-  );
+  return readSyncedData(() => localStorageService.getMistakesList());
 }
 
 export async function getMistakesInVerseOrder(): Promise<MistakeData[]> {
-  return readThrough(
-    async () => {
-      const data = await apiGet('type=mistakesVerseOrder');
-      return data.mistakes || [];
-    },
-    () => localStorageService.getMistakesInVerseOrder(),
-    [],
-  );
+  return readSyncedData(() => localStorageService.getMistakesInVerseOrder());
 }
 
 export async function getNextMistakeInVerseOrder(
@@ -851,16 +686,7 @@ export async function batchAddMemorizationItems(items: MemorizationItem[]): Prom
 // =============================================
 
 export async function migrateToDatabase(): Promise<void> {
-  if (typeof window === 'undefined') return;
-  try {
-    const items = localStorageService.getAllMemorizationItems();
-    const mistakes = localStorageService.getMistakes();
-    await apiPost({ op: 'migrate', items, mistakes });
-    console.log('Successfully migrated data to database');
-  } catch (error) {
-    console.error('Failed to migrate data to database:', error);
-    throw error;
-  }
+  await synchronizeData(true);
 }
 
 // =============================================
@@ -944,50 +770,16 @@ export async function compareLocalAndDb(): Promise<SyncComparison> {
 }
 
 export async function syncUploadLocalToDb(): Promise<void> {
-  const items = localStorageService.getAllMemorizationItems();
-  const mistakes = localStorageService.getMistakes();
-  const localBookmarks = loadLocalBookmarks();
-  await apiPost({ op: 'syncUploadLocal', items, mistakes, bookmarks: localBookmarks });
+  await synchronizeData(true);
 }
 
 export async function syncDownloadDbToLocal(): Promise<void> {
-  const data = await apiPost({ op: 'syncDownloadDb' }).then(r => r.json());
-
-  if (data.items && Array.isArray(data.items)) {
-    localStorageService.clearAllData();
-    for (const item of data.items) {
-      localStorageService.addMemorizationItem(item);
-    }
-  }
-  if (data.mistakes) {
-    localStorageService.saveMistakes(data.mistakes);
-  }
-  if (data.bookmarks) {
-    saveLocalBookmarks(data.bookmarks);
-  }
+  await synchronizeData(true);
 }
 
 export async function syncMerge(): Promise<{ items: MemorizationItem[]; mistakes: Record<string, any> }> {
-  const items = localStorageService.getAllMemorizationItems();
-  const mistakes = localStorageService.getMistakes();
-  const localBookmarks = loadLocalBookmarks();
-
-  const data = await apiPost({ op: 'syncMerge', items, mistakes, bookmarks: localBookmarks }).then(r => r.json());
-
-  if (data.items && Array.isArray(data.items)) {
-    localStorageService.clearAllData();
-    for (const item of data.items) {
-      localStorageService.addMemorizationItem(item);
-    }
-  }
-  if (data.mistakes) {
-    localStorageService.saveMistakes(data.mistakes);
-  }
-  if (data.bookmarks) {
-    saveLocalBookmarks(data.bookmarks);
-  }
-
-  return { items: data.items || [], mistakes: data.mistakes || {} };
+  await synchronizeData(true);
+  return { items: localStorageService.getAllMemorizationItems(), mistakes: localStorageService.getMistakes() };
 }
 
 // =============================================
@@ -1023,70 +815,28 @@ function saveLocalBookmarks(bookmarks: Bookmark[]): void {
 }
 
 export async function getBookmarks(): Promise<Bookmark[]> {
-  return readThrough(
-    async () => {
-      const data = await apiGet('type=bookmarks');
-      const bookmarks = data.bookmarks || [];
-      saveLocalBookmarks(bookmarks); // keep local in sync
-      return bookmarks;
-    },
-    () => loadLocalBookmarks(),
-    [],
-  );
+  return readSyncedData(loadLocalBookmarks);
 }
 
 export async function addBookmark(bookmark: Omit<Bookmark, 'id' | 'createdAt'>): Promise<Bookmark | null> {
-  if (await isAuthenticated()) {
-    try {
-      const data = await apiPost({ op: 'addBookmark', ...bookmark }).then(r => r.json());
-      const newBookmark = data.bookmark;
-      if (newBookmark) {
-        const local = loadLocalBookmarks();
-        saveLocalBookmarks([...local, newBookmark]);
-      }
-      return newBookmark;
-    } catch (error) {
-      console.warn('[storage] Bookmark add sync failed, using local:', error);
-    }
-  }
-  // Local fallback
-  const local = loadLocalBookmarks();
-  const exists = local.find(b =>
-    b.type === bookmark.type &&
-    b.page === bookmark.page &&
-    b.surah === bookmark.surah &&
-    b.ayah === bookmark.ayah
-  );
-  if (exists) return exists;
-  const newBookmark: Bookmark = {
-    ...bookmark,
-    id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-    createdAt: new Date().toISOString(),
-  };
-  saveLocalBookmarks([...local, newBookmark]);
-  return newBookmark;
+  return mutateSyncedData(() => {
+    const local = loadLocalBookmarks();
+    const exists = local.find(b => b.type === bookmark.type && (b.page ?? null) === (bookmark.page ?? null) && (b.surah ?? null) === (bookmark.surah ?? null) && (b.ayah ?? null) === (bookmark.ayah ?? null));
+    if (exists) return exists;
+    const newBookmark: Bookmark = { ...bookmark, id: crypto.randomUUID(), createdAt: new Date().toISOString() };
+    saveLocalBookmarks([...local, newBookmark]);
+    return newBookmark;
+  });
 }
 
 export async function removeBookmark(id: string): Promise<void> {
-  await writeThrough(
-    () => saveLocalBookmarks(loadLocalBookmarks().filter(b => b.id !== id)),
-    () => apiWrite({ op: 'removeBookmark', id }),
-  );
+  await mutateSyncedData(() => saveLocalBookmarks(loadLocalBookmarks().filter(b => b.id !== id)));
 }
 
-export async function removeBookmarkByTarget(
-  type: 'page' | 'ayah',
-  target: { page?: number; surah?: number; ayah?: number }
-): Promise<void> {
-  await writeThrough(
-    () => saveLocalBookmarks(loadLocalBookmarks().filter(b =>
-      !(b.type === type &&
-        b.page === target.page &&
-        b.surah === target.surah &&
-        b.ayah === target.ayah)
-    )),
-    () => apiWrite({ op: 'removeBookmarkByTarget', type, ...target }),
-  );
+export async function removeBookmarkByTarget(type: 'page' | 'ayah', target: { page?: number; surah?: number; ayah?: number }): Promise<void> {
+  await mutateSyncedData(() => saveLocalBookmarks(loadLocalBookmarks().filter(b =>
+    !(b.type === type && (b.page ?? null) === (target.page ?? null) && (b.surah ?? null) === (target.surah ?? null) && (b.ayah ?? null) === (target.ayah ?? null))
+  )));
 }
 
 export async function isBookmarked(

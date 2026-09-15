@@ -36,6 +36,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import React from 'react';
+import { SYNC_DATA_EVENT } from '@/lib/syncClient';
 
 interface GroupedItems {
   [date: string]: MemorizationItem[];
@@ -67,6 +68,12 @@ function ReviewRow({
   const englishName = getSurahName(item.surah);
   const arabicName = getSurahNameArabic(item.surah);
   const ayahLabel = item.ayahStart === item.ayahEnd ? `Ayah ${item.ayahStart}` : `Ayahs ${item.ayahStart}-${item.ayahEnd}`;
+  const todayISO = getTodayISODate();
+  const isUpcoming = !isDone && item.nextReview > todayISO;
+  // Compare calendar dates in UTC so daylight-saving changes do not shift the day count.
+  const daysUntilReview = Math.round((Date.parse(item.nextReview) - Date.parse(todayISO)) / 86400000);
+  const upcomingLabel = daysUntilReview === 1 ? 'Tomorrow' : daysUntilReview === 0 ? 'Today' : daysUntilReview > 1 ? `In ${daysUntilReview} days` : 'Overdue';
+  const nextReviewDate = new Date(`${item.nextReview}T12:00:00`).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
 
   return (
     <div
@@ -77,7 +84,7 @@ function ReviewRow({
       {/* Surah number badge */}
       <div
         className={`w-9 h-9 rounded-[var(--radius)] flex items-center justify-center flex-shrink-0 font-bold text-sm ${
-          isDone ? 'bg-success/15 text-success' : isOverdue ? 'bg-destructive/15 text-destructive' : 'bg-accent/15 text-accent'
+          isDone ? 'bg-success/15 text-success' : isUpcoming ? 'bg-muted text-muted-foreground' : isOverdue ? 'bg-destructive/15 text-destructive' : 'bg-accent/15 text-accent'
         }`}
       >
         {item.surah}
@@ -89,42 +96,48 @@ function ReviewRow({
         className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity"
         title="Open in Quran"
       >
-        <div className="flex items-center gap-2">
-          <span className="font-semibold text-sm text-foreground truncate">{englishName}</span>
-          <span className="font-arabic text-accent text-base flex-shrink-0" dir="rtl">{arabicName}</span>
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className="font-semibold text-sm text-foreground">{englishName}</span>
+          <span className={`font-arabic ${isUpcoming ? 'text-muted-foreground' : 'text-accent'} text-base flex-shrink-0`} dir="rtl">{arabicName}</span>
         </div>
-        <p className="text-xs text-muted-foreground mt-0.5 truncate">
-          {ayahLabel} · {item.interval}d · {item.reviewCount} {item.reviewCount === 1 ? 'review' : 'reviews'}
-          {item.isBeginner && ' · Learning'}
+        <p className="text-xs text-muted-foreground mt-0.5">
+          {ayahLabel} · Every {item.interval} {item.interval === 1 ? 'day' : 'days'} · {item.reviewCount} {item.reviewCount === 1 ? 'review' : 'reviews'}
+          {item.isBeginner && (isUpcoming || isDone) && ' · Learning'}
         </p>
-      </button>
-
-      {/* Status badge */}
-      {isDone ? (
-        <span className="inline-flex items-center gap-1 text-xs font-semibold text-success bg-success/15 px-2 py-1 rounded-[var(--radius-sm)] flex-shrink-0">
-          <CheckCircle className="w-3 h-3" />
-          Done
-        </span>
-      ) : (
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          {item.isBeginner && (
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-accent bg-accent/15 px-2 py-1 rounded-[var(--radius-sm)]">
-              <GraduationCap className="w-3 h-3" />
-              Learning
-            </span>
-          )}
-          <span className={`text-xs font-semibold px-2 py-1 rounded-[var(--radius-sm)] ${
-            isOverdue ? 'text-destructive bg-destructive/15' : 'text-accent bg-accent/15'
-          }`}>
-            {isOverdue ? 'Overdue' : 'Due'}
+        {(isUpcoming || isDone) && (
+          <span className="inline-flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs text-muted-foreground mt-1.5">
+            <Calendar className="w-3 h-3" aria-hidden="true" />
+            <span>Next review: {upcomingLabel} · <time dateTime={item.nextReview}>{nextReviewDate}</time></span>
           </span>
-        </div>
-      )}
+        )}
+        {/* Status badge */}
+        {isDone ? (
+          <span className="inline-flex items-center gap-1 mt-1.5 text-xs font-semibold text-success bg-success/15 px-2 py-1 rounded-[var(--radius-sm)] flex-shrink-0">
+            <CheckCircle className="w-3 h-3" />
+            Done
+          </span>
+        ) : !isUpcoming ? (
+          <span className="flex flex-wrap items-center gap-1.5 mt-1.5">
+            {item.isBeginner && (
+              <span className="inline-flex items-center gap-1 text-xs font-semibold text-accent bg-accent/15 px-2 py-1 rounded-[var(--radius-sm)]">
+                <GraduationCap className="w-3 h-3" />
+                Learning
+              </span>
+            )}
+            <span className={`text-xs font-semibold px-2 py-1 rounded-[var(--radius-sm)] ${
+              isOverdue ? 'text-destructive bg-destructive/15' : 'text-accent bg-accent/15'
+            }`}>
+              {isOverdue ? 'Overdue' : 'Due now'}
+            </span>
+          </span>
+        ) : null}
+
+      </button>
 
       {/* Primary action: Review */}
       {!isDone && (
-        <Button size="sm" onClick={onReview} className="h-8 px-3 text-xs flex-shrink-0">
-          Review
+        <Button size="sm" variant={isUpcoming ? 'outline' : 'default'} onClick={onReview} className="h-8 px-3 text-xs flex-shrink-0">
+          {isUpcoming ? 'Practice' : 'Review'}
         </Button>
       )}
 
@@ -231,7 +244,7 @@ function QuickReviewModal({
                 <span className="text-sm text-foreground font-medium truncate">{englishName}</span>
                 <span className="font-arabic text-accent text-sm" dir="rtl">{arabicName}</span>
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">{ayahLabel} · {item.interval}d interval · {item.reviewCount} reviews</p>
+              <p className="text-xs text-muted-foreground mt-0.5">{ayahLabel} · Every {item.interval} {item.interval === 1 ? 'day' : 'days'} · {item.reviewCount} {item.reviewCount === 1 ? 'review' : 'reviews'}</p>
               {beginnerActive && (
                 <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-accent bg-accent/10 px-1.5 py-0.5 rounded-[var(--radius-xs)] mt-1">
                   <GraduationCap className="w-2.5 h-2.5" />
@@ -630,17 +643,6 @@ export default function Dashboard() {
       // Reset daily completions for items completed on previous days
       const resetItems = resetDailyCompletions(allItems);
       
-      // Batch save items that were reset (if they changed) - only save if there are changes
-      const itemsToUpdate = resetItems.filter(item => {
-        const originalItem = allItems.find(original => original.id === item.id);
-        return originalItem && originalItem.completedToday !== item.completedToday;
-      });
-      
-      // Update items in parallel instead of sequentially
-      if (itemsToUpdate.length > 0) {
-        await batchUpdateMemorizationItems(itemsToUpdate);
-      }
-      
       // Update allItems with the reset items
       const finalItems = resetItems;
       
@@ -664,6 +666,15 @@ export default function Dashboard() {
   useEffect(() => {
     loadAllData();
     loadSurahList();
+  }, [loadAllData]);
+
+  useEffect(() => {
+    const refresh = () => {
+      void loadAllData(false);
+      void getBookmarks().then(setBookmarks);
+    };
+    window.addEventListener(SYNC_DATA_EVENT, refresh);
+    return () => window.removeEventListener(SYNC_DATA_EVENT, refresh);
   }, [loadAllData]);
 
   // Refresh data every 5 minutes instead of every minute to reduce load
@@ -1035,27 +1046,36 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {/* ─── Due Now (primary section) ─── */}
-        {dueItems.length > 0 && (
+        {/* ─── Bookmarks ─── */}
+        {bookmarks.length > 0 && (
           <section className="mb-8">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Due Now</h2>
-            <div className="space-y-2.5">
-              {dueItems.map((item) => {
-                const isDone = item.completedToday === todayISO;
-                const isOverdue = item.nextReview < todayISO;
-                return (
-                  <ReviewRow
-                    key={item.id}
-                    item={item}
-                    isDone={isDone}
-                    isOverdue={isOverdue}
-                    onReview={() => router.push(`/quran?review=${encodeURIComponent(item.id)}`)}
-                    onQuickRate={() => setReviewingItem(item)}
-                    onEdit={() => handleEdit(item)}
-                    onDelete={() => setShowDeleteConfirm(item.id)}
-                  />
-                );
-              })}
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
+              <Bookmark className="w-3.5 h-3.5 text-accent" />
+              Bookmarks ({bookmarks.length})
+            </h2>
+            <div className="flex flex-wrap gap-2">
+              {[...bookmarks]
+                .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+                .map((bm) => (
+                  <div key={bm.id} className="inline-flex items-center rounded-[var(--radius-sm)] border border-border bg-card overflow-hidden">
+                    <Link
+                      href={bm.type === 'ayah' && bm.surah && bm.ayah ? `/quran?ayah=${bm.surah}:${bm.ayah}` : `/quran?page=${bm.page || 1}`}
+                      className="inline-flex items-center gap-2 px-3 py-2 text-xs hover:bg-muted transition-colors"
+                    >
+                      <Bookmark className="w-3 h-3 text-accent" aria-hidden="true" />
+                      <span className="font-medium">{bm.surahName || `Page ${bm.page}`}</span>
+                      <span className="text-muted-foreground">{bm.type === 'page' ? `Page ${bm.page}` : `${bm.surah}:${bm.ayah}`}</span>
+                    </Link>
+                    <button
+                      onClick={() => removeBookmark(bm.id).then(() => setBookmarks(prev => prev.filter(b => b.id !== bm.id)))}
+                      className="self-stretch px-2 text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                      aria-label={`Remove bookmark ${bm.surahName || ''} ${bm.type === 'page' ? `page ${bm.page}` : `${bm.surah}:${bm.ayah}`}`}
+                      type="button"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </div>
+                ))}
             </div>
           </section>
         )}
@@ -1181,14 +1201,39 @@ export default function Dashboard() {
           </section>
         )}
 
-        {/* ─── All Passages (sorted by next review date) ─── */}
-        {items.length > 0 && (
+        {/* ─── Due Now (primary section) ─── */}
+        {dueItems.length > 0 && (
+          <section className="mb-8">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">Due Now</h2>
+            <div className="space-y-2.5">
+              {dueItems.map((item) => {
+                const isDone = item.completedToday === todayISO;
+                const isOverdue = item.nextReview < todayISO;
+                return (
+                  <ReviewRow
+                    key={item.id}
+                    item={item}
+                    isDone={isDone}
+                    isOverdue={isOverdue}
+                    onReview={() => router.push(`/quran?review=${encodeURIComponent(item.id)}`)}
+                    onQuickRate={() => setReviewingItem(item)}
+                    onEdit={() => handleEdit(item)}
+                    onDelete={() => setShowDeleteConfirm(item.id)}
+                  />
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* ─── Upcoming and completed passages ─── */}
+        {items.some(item => !dueItems.some(due => due.id === item.id)) && (
           <section className="mb-8">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3">
-              All Passages ({items.length})
+              Upcoming & completed
             </h2>
             <div className="space-y-2">
-              {[...items]
+              {items.filter(item => !dueItems.some(due => due.id === item.id))
                 .sort((a, b) => a.nextReview.localeCompare(b.nextReview))
                 .map((item) => {
                   const isDone = item.completedToday === todayISO;
@@ -1206,58 +1251,6 @@ export default function Dashboard() {
                     />
                   );
                 })}
-            </div>
-          </section>
-        )}
-
-        {/* ─── Bookmarks ─── */}
-        {bookmarks.length > 0 && (
-          <section className="mb-8">
-            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide mb-3 flex items-center gap-2">
-              <Bookmark className="w-3.5 h-3.5 text-accent" />
-              Bookmarks ({bookmarks.length})
-            </h2>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
-              {[...bookmarks]
-                .sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
-                .map((bm) => (
-                  <div
-                    key={bm.id}
-                    className="group relative flex items-center gap-3 rounded-[var(--radius-lg)] border border-border bg-card p-3 hover:border-accent/30 hover:bg-accent/[0.03] transition-all cursor-pointer"
-                    onClick={() => {
-                      if (bm.type === 'ayah' && bm.surah && bm.ayah) {
-                        router.push(`/quran?ayah=${bm.surah}:${bm.ayah}`);
-                      } else {
-                        router.push(`/quran?page=${bm.page || 1}`);
-                      }
-                    }}
-                  >
-                    <div className="w-9 h-9 rounded-[var(--radius-sm)] bg-accent/10 flex items-center justify-center flex-shrink-0">
-                      <Bookmark className="w-4 h-4 text-accent fill-accent" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-foreground truncate">
-                        {bm.surahName || `Page ${bm.page}`}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {bm.type === 'page' ? `Page ${bm.page}` : `${bm.surah}:${bm.ayah}`}
-                      </p>
-                    </div>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        removeBookmark(bm.id).then(() => {
-                          setBookmarks(prev => prev.filter(b => b.id !== bm.id));
-                        });
-                      }}
-                      className="size-7 flex items-center justify-center rounded-[var(--radius-sm)] text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover:opacity-100 transition-all flex-shrink-0"
-                      title="Remove bookmark"
-                      aria-label="Remove bookmark"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
             </div>
           </section>
         )}

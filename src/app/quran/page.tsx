@@ -4,6 +4,7 @@ import { Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useState, useEffect, useCallback } from 'react';
 import { addMemorizationItem, updateMemorizationItem, getMemorizationItem, toggleMistake, saveHideMistakesSetting, saveLastPage, loadLastPage, saveSelectedReciter, saveFontSettings, saveUISettings, saveReadingLayout, getBookmarks, addBookmark, removeBookmarkByTarget, Bookmark as BookmarkType } from '@/lib/storageService';
+import { SYNC_DATA_EVENT } from '@/lib/syncClient';
 import { useOptimizedData } from '@/lib/hooks/useOptimizedData';
 import { MistakeData } from '@/lib/storageService';
 import { MemorizationItem, updateInterval, updateIntervalWithSettings, updateIndividualAyahRating, createMemorizationItem } from '@/lib/spacedRepetition';
@@ -369,7 +370,10 @@ function QuranPageContent() {
 
   // Load bookmarks on mount
   useEffect(() => {
-    getBookmarks().then(setBookmarks).catch(() => {});
+    const refresh = () => { void getBookmarks().then(setBookmarks).catch(() => {}); };
+    refresh();
+    window.addEventListener(SYNC_DATA_EVENT, refresh);
+    return () => window.removeEventListener(SYNC_DATA_EVENT, refresh);
   }, []);
 
   // Update isPageBookmarked when bookmarks or currentPage change

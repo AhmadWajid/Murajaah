@@ -2,6 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, useCallback, useRef } from 'react';
 import { usePathname } from 'next/navigation';
+import { setSyncUser } from '@/lib/syncClient';
 import { clearAuthCache, syncSettingsFromDb } from '@/lib/storageService';
 
 interface AuthUser {
@@ -46,6 +47,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const res = await fetch('/api/auth/me');
       const data = await res.json();
       const newUser = data.user || null;
+      setSyncUser(newUser?.id || null);
       setUser(newUser);
       clearAuthCache();
 
@@ -72,8 +74,15 @@ export function AuthProvider({ children }: AuthProviderProps) {
     refreshUser();
   }, [refreshUser, pathname]);
 
+  useEffect(() => {
+    const refresh = () => { void refreshUser(); };
+    window.addEventListener('online', refresh);
+    return () => window.removeEventListener('online', refresh);
+  }, [refreshUser]);
+
   const signOut = useCallback(async () => {
     await fetch('/api/auth/signout', { method: 'POST' });
+    setSyncUser(null);
     setUser(null);
     clearAuthCache();
     syncedSettingsFor.current = null;

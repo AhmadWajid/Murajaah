@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import { Tooltip } from '@/components/ui/tooltip';
 import { RefreshCw, BarChart3, Target, User, LogOut, BookOpen, ChevronDown, Cloud } from 'lucide-react';
 import { useAuth } from '@/components/AuthProvider';
+import { getSyncStatus, SYNC_EVENT } from '@/lib/syncClient';
 import { SyncModal } from '@/components/SyncModal';
 
 interface AppHeaderProps {
@@ -31,6 +32,15 @@ export default function AppHeader({ pageType, onRefresh, quranHeaderComponent }:
   const [quranToolbarOpen, setQuranToolbarOpen] = useState(true);
   const [syncOpen, setSyncOpen] = useState(false);
   const compact = pageType === 'quran';
+  const [syncState, setSyncState] = useState<ReturnType<typeof getSyncStatus>>({ status: 'idle', pending: 0 });
+  useEffect(() => {
+    const update = () => setSyncState(getSyncStatus());
+    update();
+    window.addEventListener(SYNC_EVENT, update);
+    return () => window.removeEventListener(SYNC_EVENT, update);
+  }, [user]);
+  const syncLabel = syncState.status === 'syncing' ? 'Syncing…' : syncState.pending || syncState.status === 'offline' ? 'Sync pending' : syncState.lastSyncedAt ? 'Synced' : 'Sync';
+
 
   // Show loading state until we know the auth status
   const accountControl = user ? (
@@ -197,15 +207,15 @@ export default function AppHeader({ pageType, onRefresh, quranHeaderComponent }:
           {/* ── Account ── */}
           <div className="flex items-center gap-1.5 shrink-0">
             {user && (
-              <Tooltip label="Sync data">
+              <Tooltip label={`${syncLabel}${syncState.lastSyncedAt ? ` · Last synced ${new Date(syncState.lastSyncedAt).toLocaleString()}` : ''}`}>
                 <Button
                   variant="ghost"
                   size={pageType === 'quran' ? 'icon-sm' : 'sm'}
                   onClick={() => setSyncOpen(true)}
-                  aria-label="Sync data"
+                  aria-label={syncLabel}
                 >
-                  <Cloud className="h-4 w-4" />
-                  {pageType !== 'quran' && <span className="hidden lg:inline">Sync</span>}
+                  <Cloud className={`h-4 w-4 ${syncState.pending || syncState.status === 'offline' ? 'text-warning' : ''}`} />
+                  {pageType !== 'quran' && <span className="hidden sm:inline">{syncLabel}</span>}
                 </Button>
               </Tooltip>
             )}

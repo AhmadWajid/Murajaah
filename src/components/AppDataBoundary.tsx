@@ -7,6 +7,6 @@ import { DataMigration } from './DataMigration';
 /** The simulator must not mount auth/settings synchronization or migration UI. */
 export function AppDataBoundary({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  if (pathname === '/review-simulator') return children;
+  if (pathname === '/review-simulator' || pathname.startsWith('/dynamis')) return children;
   return <AuthProvider>{children}<DataMigration /></AuthProvider>;
 }

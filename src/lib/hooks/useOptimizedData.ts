@@ -7,6 +7,7 @@ import {
   getMistakes,
   invalidateCache
 } from '@/lib/storageService';
+import { SYNC_DATA_EVENT } from '@/lib/syncClient';
 import { DEFAULT_RECITER_ID, resolveReciterId } from '@/lib/recitations';
 
 // Cache for user settings to prevent redundant API calls
@@ -92,6 +93,12 @@ export function useOptimizedData(): UseOptimizedDataReturn {
       setIsLoadingData(false);
     }
   }, []);
+
+  useEffect(() => {
+    const refresh = () => { void loadData(true); };
+    window.addEventListener(SYNC_DATA_EVENT, refresh);
+    return () => window.removeEventListener(SYNC_DATA_EVENT, refresh);
+  }, [loadData]);
 
   // Cache helper function
   const getCachedSetting = async (key: string, fetchFn: () => Promise<any>): Promise<any> => {
